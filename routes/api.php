@@ -30,8 +30,9 @@ Route::post('/sysinfo', [SystemController::class, 'sysinfo']);
 Route::post('/sysinfo_ver', [SystemController::class, 'sysinfoVer']);
 
 // Account login & 2FA negotiation (contract §3-§4). Unauthenticated except where noted.
+// Login is brute-force throttled (per account+IP and per IP) — see AppServiceProvider.
 Route::get('/login-options', [LoginController::class, 'loginOptions']);
-Route::post('/login', [LoginController::class, 'login']);
+Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:api-login');
 
 // OIDC / OAuth device-login flow (contract §3a). All unauthenticated.
 Route::post('/oidc/auth', [OauthController::class, 'auth']);

@@ -8,6 +8,8 @@ use App\Services\LdapService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -33,6 +35,16 @@ class AuthController extends Controller
             'username' => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
+
+        // Brute-force protection: 5 failed attempts per account+IP per minute, then locked out.
+        $throttleKey = 'admin-login:'.Str::lower($credentials['username']).'|'.$request->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            return back()
+                ->withInput($request->only('username'))
+                ->withErrors(['username' => "Too many login attempts. Try again in {$seconds} seconds."]);
+        }
 
         // LDAP first: on success sync the user and establish the session directly. On failure,
         // fall back to the unchanged local-credentials path.
@@ -62,10 +74,15 @@ class AuthController extends Controller
         }
 
         if (! $authenticated && ! Auth::attempt($credentials, $request->boolean('remember'))) {
+            RateLimiter::hit($throttleKey);
+
             return back()
                 ->withInput($request->only('username'))
                 ->withErrors(['username' => 'Invalid username or password.']);
         }
+
+        // Credentials accepted — clear the failure counter for this account+IP.
+        RateLimiter::clear($throttleKey);
 
         /** @var User $user */
         $user = Auth::user();

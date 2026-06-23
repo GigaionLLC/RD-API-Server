@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-22 15:40] - Security: brute-force throttling on both login surfaces
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Providers/AppServiceProvider.php` (new `api-login` named limiter: 10/min per account+IP + 30/min per IP, returns `{error}` 429)
+- `routes/api.php` (`POST /api/login` → `throttle:api-login`)
+- `app/Http/Controllers/Admin/AuthController.php` (in-controller throttle: 5 failed attempts/min per account+IP → redirect back with form error; clears on success)
+- `tests/Feature/RateLimitTest.php` (NEW — 3 tests)
+**Database/API Changes:** None (login responses unchanged on the happy path; throttled requests now return 429 `{error}` for the client API).
+**Summary:** Closed the first research finding — there was **no** rate limiting anywhere, so `/api/login` and the admin login could be brute-forced unboundedly. Added a layered limiter for the client API (per-account+IP and a looser per-IP cap so an attacker can't cycle usernames) returning the `{error}` shape the client surfaces, and a Fortify-style in-controller throttle for the admin web login. Verified: Pint 137, PHPStan L5 0 errors, 33 PHPUnit passed.
+
 ## [2026-06-22 15:10] - New endpoint: `POST /api/devices/cli` (`rustdesk --assign`)
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**
