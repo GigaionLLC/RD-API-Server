@@ -102,11 +102,14 @@ class OauthController extends Controller
         $code = (string) $request->query('code', '');
         $json = $this->oauth->pollResult($code);
 
-        $payload = json_decode($json, true);
-        if (! is_array($payload)) {
-            $payload = [];
+        // Decode to OBJECTS (not assoc arrays) so an empty `info` stays `{}` and isn't
+        // re-encoded as `[]` — the client's serde UserInfo expects an object, and `[]` would
+        // fail AuthBody deserialization.
+        $payload = json_decode($json);
+        if (! $payload instanceof \stdClass) {
+            $payload = new \stdClass;
         }
-        $payload['body'] = $json;
+        $payload->body = $json;
 
         return response()->json($payload);
     }

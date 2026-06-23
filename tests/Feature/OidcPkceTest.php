@@ -140,6 +140,10 @@ class OidcPkceTest extends TestCase
         $res->assertJsonPath('access_token', fn ($t) => is_string($t) && $t !== '');
         $res->assertJsonPath('type', 'access_token');
         $res->assertJsonPath('user.name', 'u');
+        // user.info MUST serialize as an object {} (the client's serde UserInfo expects a map);
+        // an empty array [] here would fail AuthBody deserialization.
+        $this->assertStringContainsString('"info":{}', $res->getContent());
+        $this->assertStringNotContainsString('"info":[]', $res->getContent());
         // Also mirrored in `body` for newer clients that read {"body":"<json>"}.
         $this->assertStringContainsString('access_token', $res->json('body'));
     }

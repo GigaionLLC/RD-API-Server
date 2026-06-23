@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 18:00] - Fix: keep user.info an object {} at top level (was re-encoded to [])
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Http/Controllers/Api/OauthController.php`: `authQuery` now `json_decode($json)` to **objects** (not assoc arrays) before adding `body`, so an empty `user.info` stays `{}` instead of being re-encoded as `[]`.
+- `tests/Feature/OidcPkceTest.php`: assert the top-level response contains `"info":{}` and never `"info":[]`.
+**Database/API Changes:** None beyond the prior commit; the top-level `user.info` is now correctly an object.
+**Summary:** After moving the AuthBody to the top level (prior commit), the user's capture showed `"info":[]` at the top level — `json_decode(..., true)` had turned the empty `{}` into a PHP `[]`, which re-encoded as an array, and the client's serde `UserInfo` expects a map, so `from_value::<AuthBody>` still failed on `info:[]`. Decoding to objects preserves `{}`. The `body` mirror was always correct; this fixes the top-level copy the stable client actually reads. Verified: Pint 193 files clean, PHPStan L5 0 errors, **157 PHPUnit passed** (532 assertions); test now pins `"info":{}`.
+
 ## [2026-06-23 17:40] - Fix (real root cause): OIDC auth-query must return the AuthBody at top level
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**
