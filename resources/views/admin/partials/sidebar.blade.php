@@ -16,23 +16,28 @@
 
         <div class="rd-nav__label">Management</div>
         @if ($u && $u->hasPermission('devices.view'))
-            <a href="/admin/devices" class="rd-nav__item {{ str_contains($nav, 'devices') ? 'active' : '' }}">
+            <a href="/admin/devices" class="rd-nav__item {{ (str_starts_with($nav, 'admin/devices') && ! str_contains($nav, 'pending')) ? 'active' : '' }}">
                 <i class="ri-computer-line"></i> Devices
             </a>
         @endif
+        @if ($u && $u->hasPermission('device_groups.view'))
+            <a href="/admin/device-groups" class="rd-nav__item {{ str_starts_with($nav, 'admin/device-groups') ? 'active' : '' }}">
+                <i class="ri-stack-line"></i> Device Groups
+            </a>
+        @endif
         @if ($u && $u->hasPermission('users.view'))
-            <a href="/admin/users" class="rd-nav__item {{ str_contains($nav, 'users') ? 'active' : '' }}">
+            <a href="/admin/users" class="rd-nav__item {{ str_starts_with($nav, 'admin/users') ? 'active' : '' }}">
                 <i class="ri-user-line"></i> Users
+            </a>
+        @endif
+        @if ($u && $u->hasPermission('groups.view'))
+            <a href="/admin/groups" class="rd-nav__item {{ str_starts_with($nav, 'admin/groups') ? 'active' : '' }}">
+                <i class="ri-group-line"></i> User Groups
             </a>
         @endif
         @if ($u && $u->hasPermission('address_books.view'))
             <a href="/admin/address-books" class="rd-nav__item {{ str_contains($nav, 'address') ? 'active' : '' }}">
                 <i class="ri-book-2-line"></i> Address Books
-            </a>
-        @endif
-        @if ($u && $u->hasPermission('groups.view'))
-            <a href="/admin/groups" class="rd-nav__item {{ str_contains($nav, 'groups') ? 'active' : '' }}">
-                <i class="ri-group-line"></i> Groups
             </a>
         @endif
         @if ($u && $u->hasPermission('deploy.view'))

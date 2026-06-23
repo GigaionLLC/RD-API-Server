@@ -3,6 +3,13 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 14:35] - Sidebar: separate "Device Groups" from "User Groups"
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `resources/views/admin/partials/sidebar.blade.php` (added a **Device Groups** nav item — previously missing entirely, only reachable via cross-links; renamed the existing "Groups" → **User Groups**; grouped them next to Devices/Users; switched the Devices/Device Groups/Users/User Groups active-state checks to precise `str_starts_with` so `/admin/device-groups` no longer also highlights "Groups" and `/admin/devices` doesn't bleed onto device-groups)
+**Database/API Changes:** None (navigation only).
+**Summary:** Device Groups had no sidebar entry (hence "wasn't obvious"), and the old `str_contains($nav,'groups')` match made the user-Groups item light up on the device-groups page. Now the menu shows **Devices · Device Groups · Users · User Groups · Address Books** as distinct items (Device Groups gated by `device_groups.view`, with a distinct stack icon), and active highlighting is exact. Verified: 26 admin-page render tests pass (sidebar renders on every page); Pint clean.
+
 ## [2026-06-23 14:20] - Make default-group replacement explicit in the UI
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**
