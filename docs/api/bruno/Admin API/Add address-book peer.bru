@@ -1,0 +1,23 @@
+meta {
+  name: Add address-book peer
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/v1/address-books/{{address_book_id}}/peers
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{api_key}}
+}
+
+body:json {
+  {
+    "id": "123456789",
+    "alias": "Front desk",
+    "tags": ["lobby"]
+  }
+}

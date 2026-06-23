@@ -1,0 +1,15 @@
+meta {
+  name: Shared profiles
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/ab/shared/profiles
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{account_token}}
+}

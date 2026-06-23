@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\StrategyController;
 use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/admin');
@@ -88,6 +89,10 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::get('/admin/address-books', [AddressBookController::class, 'index'])->middleware('permission:address_books.view')->name('admin.address-books.index');
     Route::get('/admin/address-books/{addressBook}', [AddressBookController::class, 'show'])->middleware('permission:address_books.view')->name('admin.address-books.show');
     Route::delete('/admin/address-books/{addressBook}', [AddressBookController::class, 'destroy'])->middleware('permission:address_books.edit')->name('admin.address-books.destroy');
+    // Team sharing — mark a book shared + manage collaborators (read / read-write / full).
+    Route::put('/admin/address-books/{addressBook}/sharing', [AddressBookController::class, 'updateSharing'])->middleware('permission:address_books.edit')->name('admin.address-books.sharing');
+    Route::post('/admin/address-books/{addressBook}/collaborators', [AddressBookController::class, 'storeCollaborator'])->middleware('permission:address_books.edit')->name('admin.address-books.collaborators.store');
+    Route::delete('/admin/address-books/collaborators/{collaborator}', [AddressBookController::class, 'destroyCollaborator'])->middleware('permission:address_books.edit')->name('admin.address-books.collaborators.destroy');
     // Peer add/edit/delete (RustDesk-client-style manager).
     Route::post('/admin/address-books/{addressBook}/peers', [AddressBookController::class, 'storePeer'])->middleware('permission:address_books.edit')->name('admin.address-books.peers.store');
     Route::put('/admin/address-books/peers/{peer}', [AddressBookController::class, 'updatePeer'])->middleware('permission:address_books.edit')->name('admin.address-books.peers.update');
@@ -148,6 +153,14 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::post('/admin/deploy-tokens', [DeployTokenController::class, 'store'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.store');
     Route::delete('/admin/deploy-tokens/{deployToken}', [DeployTokenController::class, 'destroy'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.destroy');
     Route::get('/admin/client-config', [ClientConfigController::class, 'index'])->middleware('permission:deploy.view')->name('admin.client-config.index');
+
+    // Outbound webhooks / notifications (Slack / Telegram / generic JSON).
+    Route::get('/admin/webhooks', [WebhookController::class, 'index'])->middleware('permission:webhooks.view')->name('admin.webhooks.index');
+    Route::post('/admin/webhooks', [WebhookController::class, 'store'])->middleware('permission:webhooks.edit')->name('admin.webhooks.store');
+    Route::put('/admin/webhooks/{webhook}', [WebhookController::class, 'update'])->middleware('permission:webhooks.edit')->name('admin.webhooks.update');
+    Route::post('/admin/webhooks/{webhook}/toggle', [WebhookController::class, 'toggle'])->middleware('permission:webhooks.edit')->name('admin.webhooks.toggle');
+    Route::post('/admin/webhooks/{webhook}/test', [WebhookController::class, 'test'])->middleware('permission:webhooks.edit')->name('admin.webhooks.test');
+    Route::delete('/admin/webhooks/{webhook}', [WebhookController::class, 'destroy'])->middleware('permission:webhooks.edit')->name('admin.webhooks.destroy');
 
     // Scoped API keys for the admin REST API (/api/v1).
     Route::get('/admin/api-keys', [ApiKeyController::class, 'index'])->name('admin.api-keys.index');

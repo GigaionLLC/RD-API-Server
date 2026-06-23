@@ -1,0 +1,182 @@
+{
+  "info": {
+    "name": "RustDesk API",
+    "description": "Admin REST API (/api/v1, scoped API key) and the RustDesk client API (/api/*). Set the collection variables `base_url`, `api_key`, and `account_token` (the latter is captured automatically by the Client API → Login request). See docs/api/README.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:21114" },
+    { "key": "api_key", "value": "rdk_xxxxxxxx" },
+    { "key": "account_token", "value": "" },
+    { "key": "address_book_id", "value": "1" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{api_key}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Admin API (v1)",
+      "description": "Authenticated by a scoped API key. Inherits the collection bearer ({{api_key}}).",
+      "item": [
+        {
+          "name": "List devices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/devices?q=&per_page=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "devices"],
+              "query": [
+                { "key": "q", "value": "" },
+                { "key": "per_page", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/users", "host": ["{{base_url}}"], "path": ["api", "v1", "users"] }
+          }
+        },
+        {
+          "name": "List strategies",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/strategies", "host": ["{{base_url}}"], "path": ["api", "v1", "strategies"] }
+          }
+        },
+        {
+          "name": "List connection audit",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/audit/connections?peer_id=",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "audit", "connections"],
+              "query": [{ "key": "peer_id", "value": "" }]
+            }
+          }
+        },
+        {
+          "name": "List address books",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/address-books", "host": ["{{base_url}}"], "path": ["api", "v1", "address-books"] }
+          }
+        },
+        {
+          "name": "List peers in a book",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/address-books/{{address_book_id}}/peers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "address-books", "{{address_book_id}}", "peers"]
+            }
+          }
+        },
+        {
+          "name": "Add a peer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"123456789\",\n  \"alias\": \"Front desk\",\n  \"tags\": [\"lobby\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/address-books/{{address_book_id}}/peers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "address-books", "{{address_book_id}}", "peers"]
+            }
+          }
+        },
+        {
+          "name": "Delete a peer",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/v1/address-books/{{address_book_id}}/peers/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "address-books", "{{address_book_id}}", "peers", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Client API",
+      "description": "The wire protocol the RustDesk client speaks. Login captures {{account_token}} for the account-scoped requests.",
+      "auth": { "type": "noauth" },
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.access_token) { pm.collectionVariables.set('account_token', j.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin\",\n  \"id\": \"postman\",\n  \"uuid\": \"postman-uuid\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/login", "host": ["{{base_url}}"], "path": ["api", "login"] }
+          }
+        },
+        {
+          "name": "Heartbeat",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"123456789\",\n  \"uuid\": \"u-1\",\n  \"modified_at\": 0\n}" },
+            "url": { "raw": "{{base_url}}/api/heartbeat", "host": ["{{base_url}}"], "path": ["api", "heartbeat"] }
+          }
+        },
+        {
+          "name": "Shared address book profiles",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{account_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/ab/shared/profiles", "host": ["{{base_url}}"], "path": ["api", "ab", "shared", "profiles"] }
+          }
+        },
+        {
+          "name": "Add peer to a book",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{account_token}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"123456789\",\n  \"alias\": \"PC\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/ab/peer/add/personal",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ab", "peer", "add", "personal"]
+            }
+          }
+        },
+        {
+          "name": "Ingest connection audit",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"123456789\",\n  \"action\": \"new\",\n  \"conn_id\": 1,\n  \"ip\": \"198.51.100.10\"\n}" },
+            "url": { "raw": "{{base_url}}/api/audit/conn", "host": ["{{base_url}}"], "path": ["api", "audit", "conn"] }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -16,17 +16,16 @@
 > **scoped API keys + admin REST API** (`/api/v1`, see [../api/README.md](../api/README.md)) ·
 > login brute‑force throttling.
 >
-> **Remaining roadmap (chosen 2026‑06‑23):**
-> 1. ~~Scoped API keys + REST API~~ ✅ done · 2. **OpenAPI spec + Postman/Bruno** collection ·
-> 3. **Webhooks / notifications** (alarms + events → Slack/Telegram/generic) ·
-> 4. **Shared / team address books** (collaborators + R/RW/Full rules — contract captured in
-> [11](11-client-feature-opportunities.md) §7).
+> **Roadmap (chosen 2026‑06‑23) — now all ✅ done:**
+> 1. ~~Scoped API keys + REST API~~ · 2. ~~OpenAPI spec + Postman/Bruno collection~~
+> ([../api/openapi.yaml](../api/openapi.yaml)) · 3. ~~Webhooks / notifications~~ (alarms +
+> connection/device events → Slack / Telegram / generic JSON, HMAC‑signed) · 4. ~~Shared / team
+> address books~~ (collaborators + read / read‑write / full‑control rules,
+> `POST /api/ab/shared/profiles`).
 >
-> **New opportunities surfaced while building** (not yet scheduled): more `/api/v1` coverage
-> (device/strategy create+update, address‑book tags) and write scopes · CSV/export of audit
-> logs · bulk actions on users/address‑books · Wake‑on‑LAN (client‑local; needs a relay hook) ·
-> dashboard metrics/observability · per‑AB max‑peer + licensed‑device quotas · a packaged
-> server‑management CLI wrapping `/api/v1`.
+> **What to build next** is now tracked in **[17‑feature‑research‑2026‑06.md](17-feature-research-2026-06.md)**
+> — top recommendation: **`is_pro` capability advertisement** (Small effort, unlocks the
+> client's Pro UI for everything already built), then **`/api/v1` write coverage**.
 
 `rustdesk-api` (have) vs. the client contract ([02](02-client-api-contract.md)) and Pro
 catalog ([03](03-pro-feature-catalog.md)). Ratings are guidance, not gospel.

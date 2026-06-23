@@ -53,6 +53,7 @@ class AdminRole extends Model
         'Alarms' => ['alarms.view'],
         'Recordings' => ['recordings.view'],
         'Deploy' => ['deploy.view', 'deploy.edit'],
+        'Webhooks' => ['webhooks.view', 'webhooks.edit'],
         'OAuth' => ['oauth.view', 'oauth.edit'],
         'LDAP' => ['ldap.view'],
         'Settings' => ['settings.view', 'settings.edit'],

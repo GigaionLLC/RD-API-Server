@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
  */
 class AlarmService
 {
-    public function __construct(private MailService $mail) {}
+    public function __construct(private MailService $mail, private WebhookService $webhooks) {}
 
     /**
      * Create an alarm and, when the device's owner has opted in, email them about it.
@@ -31,6 +31,15 @@ class AlarmService
             'message' => $message,
             'ip' => $ip,
             'emailed' => false,
+        ]);
+
+        // Fan the alarm out to any configured webhooks (Slack/Telegram/generic). Best-effort.
+        $this->webhooks->dispatch('alarm.raised', [
+            'peer_id' => $peerId,
+            'type' => $type,
+            'message' => $message,
+            'ip' => $ip,
+            'device' => $device?->hostname ?: $device?->alias,
         ]);
 
         $user = $device?->user;

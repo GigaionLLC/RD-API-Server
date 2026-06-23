@@ -1,0 +1,15 @@
+meta {
+  name: List strategies
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/strategies
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{api_key}}
+}

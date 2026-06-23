@@ -1,0 +1,19 @@
+meta {
+  name: List devices
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/devices?per_page=50
+  body: none
+  auth: bearer
+}
+
+params:query {
+  per_page: 50
+}
+
+auth:bearer {
+  token: {{api_key}}
+}

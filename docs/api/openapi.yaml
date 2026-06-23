@@ -1,0 +1,551 @@
+openapi: 3.1.0
+info:
+  title: RustDesk API
+  version: "1.0.0"
+  description: |
+    Two surfaces are documented here:
+
+    * **Admin REST API (`/api/v1`)** — programmatic panel access, authenticated by a **scoped
+      API key** (`Authorization: Bearer rdk_…` or `X-API-Key`). Mint keys in the console under
+      **API Keys**. This is the surface most integrations want.
+    * **Client API (`/api/*`)** — the wire protocol the RustDesk client speaks. The JSON keys
+      and paths are fixed for compatibility (see
+      `docs/modernization/02-client-api-contract.md`); account endpoints use a bearer
+      **access token** returned by `POST /api/login`.
+
+    Companion artifacts: `postman_collection.json` and the `bruno/` collection in this folder.
+  license:
+    name: MIT
+servers:
+  - url: "{base}"
+    description: Your server
+    variables:
+      base:
+        default: http://localhost:21114
+        description: Scheme + host (and port) of the API server.
+
+tags:
+  - name: Admin · Devices
+  - name: Admin · Users
+  - name: Admin · Strategies
+  - name: Admin · Audit
+  - name: Admin · Address Books
+  - name: Client · Account
+  - name: Client · Telemetry
+  - name: Client · Address Book
+  - name: Client · Audit
+
+security:
+  - ApiKeyBearer: []
+
+paths:
+  # ------------------------------------------------------------------ Admin v1
+  /api/v1/devices:
+    get:
+      tags: [Admin · Devices]
+      summary: List devices
+      description: Requires the `devices.read` scope.
+      parameters:
+        - { $ref: "#/components/parameters/Query" }
+        - { $ref: "#/components/parameters/PerPage" }
+        - { $ref: "#/components/parameters/Page" }
+      responses:
+        "200":
+          description: A page of devices.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paginator"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Device" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/users:
+    get:
+      tags: [Admin · Users]
+      summary: List users
+      description: Requires the `users.read` scope.
+      parameters:
+        - { $ref: "#/components/parameters/Query" }
+        - { $ref: "#/components/parameters/PerPage" }
+        - { $ref: "#/components/parameters/Page" }
+      responses:
+        "200":
+          description: A page of users.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paginator"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/strategies:
+    get:
+      tags: [Admin · Strategies]
+      summary: List strategies
+      description: Requires the `strategies.read` scope. Includes `options` and `assignments_count`.
+      parameters:
+        - { $ref: "#/components/parameters/PerPage" }
+        - { $ref: "#/components/parameters/Page" }
+      responses:
+        "200":
+          description: A page of strategies.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paginator"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Strategy" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/audit/connections:
+    get:
+      tags: [Admin · Audit]
+      summary: List connection audit events
+      description: Requires the `audit.read` scope.
+      parameters:
+        - name: peer_id
+          in: query
+          schema: { type: string }
+          description: Filter to a single peer id.
+        - { $ref: "#/components/parameters/PerPage" }
+        - { $ref: "#/components/parameters/Page" }
+      responses:
+        "200":
+          description: A page of connection audit rows.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paginator"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/AuditConn" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/address-books:
+    get:
+      tags: [Admin · Address Books]
+      summary: List the key owner's address books
+      description: Requires the `address_book.read` scope.
+      responses:
+        "200":
+          description: The address books owned by the key's user.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AddressBook" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/address-books/{addressBook}/peers:
+    parameters:
+      - { $ref: "#/components/parameters/AddressBookId" }
+    get:
+      tags: [Admin · Address Books]
+      summary: List peers in a book
+      description: Requires the `address_book.read` scope; the book must belong to the key's user.
+      parameters:
+        - { $ref: "#/components/parameters/PerPage" }
+        - { $ref: "#/components/parameters/Page" }
+      responses:
+        "200":
+          description: A page of peers.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paginator"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/AdminPeer" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin · Address Books]
+      summary: Add a peer to a book
+      description: Requires the `address_book.write` scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string, example: "123456789" }
+                alias: { type: string, example: "Front desk" }
+                note: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+        "422":
+          description: The id already exists in this book.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/address-books/{addressBook}/peers/{peer}:
+    parameters:
+      - { $ref: "#/components/parameters/AddressBookId" }
+      - name: peer
+        in: path
+        required: true
+        schema: { type: integer }
+        description: The peer row id.
+    delete:
+      tags: [Admin · Address Books]
+      summary: Delete a peer from a book
+      description: Requires the `address_book.write` scope.
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: boolean, example: true }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # --------------------------------------------------------------- Client API
+  /api/login:
+    post:
+      tags: [Client · Account]
+      summary: Account login
+      description: |
+        Returns an `access_token` used as a bearer for the account-scoped client endpoints.
+        May instead return a 2FA challenge (`tfa_type`). Brute-force throttled.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+                id: { type: string, description: "Device id" }
+                uuid: { type: string }
+      responses:
+        "200":
+          description: Login result (token or 2FA challenge).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  type: { type: string, example: access_token }
+                  user: { $ref: "#/components/schemas/ClientUser" }
+                  tfa_type: { type: string, enum: [totp, email_check] }
+                  error: { type: string }
+
+  /api/heartbeat:
+    post:
+      tags: [Client · Telemetry]
+      summary: Device heartbeat + strategy pull
+      description: |
+        Records liveness and returns the effective Strategy (`config_options`/`extra` as JSON
+        objects) when the client's `modified_at` is stale. Unauthenticated; keyed by id+uuid.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                uuid: { type: string }
+                ver: { type: integer }
+                modified_at: { type: integer }
+                conns:
+                  type: array
+                  items: { type: integer }
+      responses:
+        "200":
+          description: Empty object, or a strategy/disconnect payload.
+          content:
+            application/json:
+              schema: { type: object }
+
+  /api/sysinfo:
+    post:
+      tags: [Client · Telemetry]
+      summary: Submit device inventory
+      description: Returns the plain text `SYSINFO_UPDATED` or `ID_NOT_FOUND`.
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Plain-text status.
+          content:
+            text/plain:
+              schema: { type: string, example: SYSINFO_UPDATED }
+
+  /api/ab/shared/profiles:
+    post:
+      tags: [Client · Address Book]
+      summary: List shared address books for the account
+      description: |
+        Shared books the account owns plus books shared with it, each carrying the account's
+        `rule` (1 read · 2 read/write · 3 full control). Requires the account bearer token.
+      security:
+        - AccountBearer: []
+      responses:
+        "200":
+          description: Shared profiles.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AbProfile" }
+
+  /api/ab/peer/add/{guid}:
+    post:
+      tags: [Client · Address Book]
+      summary: Add a peer to a (personal or shared) book
+      description: |
+        `guid` is the book id (or `personal`). On success returns an **empty 200** (the client's
+        action parser treats any body as an error). A read-only collaborator gets
+        `{"error": "..."}`.
+      security:
+        - AccountBearer: []
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                alias: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: Empty body on success; `{error}` on failure.
+
+  /api/audit/conn:
+    post:
+      tags: [Client · Audit]
+      summary: Ingest a connection event
+      description: Unauthenticated ingest from hbbs/clients. Returns `{}`.
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                action: { type: string, enum: [new, close] }
+                conn_id: { type: integer }
+                ip: { type: string }
+                session_id: { type: string }
+      responses:
+        "200":
+          description: Empty object.
+          content:
+            application/json:
+              schema: { type: object }
+
+components:
+  securitySchemes:
+    ApiKeyBearer:
+      type: http
+      scheme: bearer
+      description: "Scoped API key as a bearer token (`rdk_…`)."
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: "Scoped API key in the `X-API-Key` header."
+    AccountBearer:
+      type: http
+      scheme: bearer
+      description: "Account access token from `POST /api/login`."
+
+  parameters:
+    Query:
+      name: q
+      in: query
+      schema: { type: string }
+      description: Free-text filter.
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    AddressBookId:
+      name: addressBook
+      in: path
+      required: true
+      schema: { type: integer }
+      description: The address book id.
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid, or expired API key.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: The key lacks the required scope, or the resource is not yours.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+    Paginator:
+      type: object
+      description: Laravel length-aware paginator envelope.
+      properties:
+        current_page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer }
+        last_page: { type: integer }
+        data:
+          type: array
+          items: {}
+    Device:
+      type: object
+      properties:
+        id: { type: integer }
+        rustdesk_id: { type: string }
+        alias: { type: string }
+        hostname: { type: string }
+        os: { type: string }
+        version: { type: string }
+        user_id: { type: [integer, "null"] }
+        device_group_id: { type: [integer, "null"] }
+        strategy_id: { type: [integer, "null"] }
+        is_online: { type: boolean }
+        last_online_at: { type: [string, "null"], format: date-time }
+        last_online_ip: { type: [string, "null"] }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        email: { type: [string, "null"] }
+        is_admin: { type: boolean }
+        status: { type: integer }
+    Strategy:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        enabled: { type: boolean }
+        options: { type: object, additionalProperties: { type: string } }
+        assignments_count: { type: integer }
+    AuditConn:
+      type: object
+      properties:
+        id: { type: integer }
+        peer_id: { type: string }
+        action: { type: string }
+        ip: { type: string }
+        session_id: { type: string }
+        note: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+    AddressBook:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        peers_count: { type: integer }
+        tags_count: { type: integer }
+    AdminPeer:
+      type: object
+      properties:
+        id: { type: integer }
+        rustdesk_id: { type: string }
+        alias: { type: string }
+        hostname: { type: string }
+        platform: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        note: { type: string }
+    AbProfile:
+      type: object
+      description: A shared address book as listed by the client.
+      properties:
+        guid: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        note: { type: string }
+        rule: { type: integer, enum: [1, 2, 3], description: "1 read · 2 read/write · 3 full" }
+    ClientUser:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string }
+        is_admin: { type: boolean }

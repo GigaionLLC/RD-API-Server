@@ -62,7 +62,13 @@
             <span class="rd-muted">Owner: <strong style="color:var(--rd-text-bright);">{{ $owner }}</strong></span>
             <span class="rd-muted">·</span>
             <span class="rd-muted">{{ $peers->total() }} {{ Str::plural('device', $peers->total()) }}</span>
+            @if ($addressBook->is_shared)
+                <span class="rd-badge rd-badge--online"><i class="ri-team-line"></i> Shared with {{ $addressBook->collaborators->count() }}</span>
+            @endif
             <div style="margin-left:auto;display:flex;gap:8px;">
+                <button class="rd-btn rd-btn--ghost" data-bs-toggle="modal" data-bs-target="#shareModal">
+                    <i class="ri-team-line"></i> Share
+                </button>
                 <button class="rd-btn rd-btn--primary" data-bs-toggle="modal" data-bs-target="#peerModal" data-mode="add">
                     <i class="ri-add-line"></i> Add ID
                 </button>
@@ -207,6 +213,77 @@
                 <button type="submit" class="rd-btn rd-btn--primary">Save</button>
             </div>
         </form>
+      </div>
+    </div>
+
+    {{-- Team sharing modal --}}
+    <div class="modal fade" id="shareModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title"><i class="ri-team-line"></i> Share “{{ $addressBook->name ?: 'Default' }}”</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                {{-- Shared flag + note --}}
+                <form method="POST" action="{{ route('admin.address-books.sharing', $addressBook) }}">
+                    @csrf @method('PUT')
+                    <div class="rd-field">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                            <input type="checkbox" name="is_shared" value="1" @checked($addressBook->is_shared)>
+                            Mark as a shared team book
+                        </label>
+                        <span class="rd-help">When shared, the collaborators below see this book in their RustDesk client.</span>
+                    </div>
+                    <div class="rd-field">
+                        <label class="rd-label">Description note</label>
+                        <input class="rd-input" name="note" value="{{ $addressBook->note }}" maxlength="255" placeholder="e.g. Front-desk machines">
+                    </div>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Save sharing</button>
+                </form>
+
+                <hr style="border-color:var(--rd-border);margin:18px 0;">
+
+                {{-- Collaborators --}}
+                <h6 style="color:var(--rd-text-bright);margin-bottom:10px;">Collaborators</h6>
+                <table class="rd-table" style="margin-bottom:14px;">
+                    <thead><tr><th>User</th><th>Permission</th><th></th></tr></thead>
+                    <tbody>
+                    @forelse ($addressBook->collaborators as $collab)
+                        <tr>
+                            <td style="color:var(--rd-text-bright);">{{ $collab->user->username ?? '—' }}</td>
+                            <td class="rd-muted">{{ $ruleList[$collab->rule] ?? $collab->rule }}</td>
+                            <td style="text-align:right;">
+                                <form method="POST" action="{{ route('admin.address-books.collaborators.destroy', $collab) }}" class="m-0">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Remove {{ $collab->user->username ?? 'user' }}?"><i class="ri-close-line"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="3" class="rd-muted" style="text-align:center;">No collaborators yet.</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+
+                {{-- Add collaborator --}}
+                <form method="POST" action="{{ route('admin.address-books.collaborators.store', $addressBook) }}">
+                    @csrf
+                    <div style="display:flex;gap:8px;align-items:flex-start;">
+                        <div class="rd-combo" data-url="/admin/users/search" style="flex:1;">
+                            <input type="hidden" name="user_id" value="">
+                            <input type="text" class="rd-input rd-combo__input" placeholder="Search user…" autocomplete="off">
+                            <div class="rd-combo__menu"></div>
+                        </div>
+                        <select class="rd-input" name="rule" style="width:140px;flex:none;">
+                            @foreach ($ruleList as $value => $label)
+                                <option value="{{ $value }}" @selected($value === \App\Models\AddressBookCollaborator::RULE_READ_WRITE)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="rd-btn rd-btn--primary" style="flex:none;"><i class="ri-user-add-line"></i> Add</button>
+                    </div>
+                    @error('user_id')<span class="rd-help rd-help--error">{{ $message }}</span>@enderror
+                </form>
+            </div>
+        </div>
       </div>
     </div>
 @endsection

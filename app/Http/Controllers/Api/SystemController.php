@@ -9,6 +9,7 @@ use App\Models\Device;
 use App\Models\DeviceGroup;
 use App\Models\Strategy;
 use App\Services\StrategyService;
+use App\Services\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -23,7 +24,10 @@ use Illuminate\Support\Facades\Cache;
  */
 class SystemController extends Controller
 {
-    public function __construct(private readonly StrategyService $strategies) {}
+    public function __construct(
+        private readonly StrategyService $strategies,
+        private readonly WebhookService $webhooks,
+    ) {}
 
     /**
      * POST /api/heartbeat
@@ -60,6 +64,15 @@ class SystemController extends Controller
             'last_online_at' => now(),
             'last_online_ip' => $request->ip(),
         ])->save();
+
+        // Notify webhooks the first time we see a device (auto-registered on this heartbeat).
+        if ($device->wasRecentlyCreated) {
+            $this->webhooks->dispatch('device.new', [
+                'peer_id' => $rustdeskId,
+                'uuid' => $uuid,
+                'ip' => $request->ip(),
+            ]);
+        }
 
         $clientModifiedAt = (int) $request->input('modified_at', 0);
         $payload = $this->strategies->heartbeatPayload($device, $clientModifiedAt);

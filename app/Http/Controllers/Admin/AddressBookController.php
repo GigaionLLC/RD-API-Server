@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AddressBook;
+use App\Models\AddressBookCollaborator;
 use App\Models\AddressBookPeer;
 use App\Models\Tag;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -30,7 +33,7 @@ class AddressBookController extends Controller
 
     public function show(AddressBook $addressBook): View
     {
-        $addressBook->load('user:id,username', 'tags');
+        $addressBook->load('user:id,username', 'tags', 'collaborators.user:id,username');
 
         // Sibling books owned by the same user, for the client-style book switcher.
         $ownerBooks = AddressBook::query()
@@ -40,7 +43,74 @@ class AddressBookController extends Controller
 
         $peers = $addressBook->peers()->orderBy('rustdesk_id')->paginate(60);
 
-        return view('admin.address_books.show', compact('addressBook', 'ownerBooks', 'peers'));
+        return view('admin.address_books.show', [
+            'addressBook' => $addressBook,
+            'ownerBooks' => $ownerBooks,
+            'peers' => $peers,
+            'ruleList' => AddressBookCollaborator::RULES,
+        ]);
+    }
+
+    // --- Sharing ------------------------------------------------------------------------
+
+    /**
+     * Toggle whether a book is a shared team book, and set its description note.
+     */
+    public function updateSharing(Request $request, AddressBook $addressBook): RedirectResponse
+    {
+        $data = $request->validate([
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $addressBook->forceFill([
+            'is_shared' => $request->boolean('is_shared'),
+            'note' => $data['note'] ?? null,
+        ])->save();
+
+        return redirect()
+            ->route('admin.address-books.show', $addressBook)
+            ->with('status', $addressBook->is_shared ? 'Sharing enabled.' : 'Sharing disabled.');
+    }
+
+    /**
+     * Grant a user access to a shared book at a given rule (read / read-write / full control).
+     */
+    public function storeCollaborator(Request $request, AddressBook $addressBook): RedirectResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'rule' => ['required', 'integer', Rule::in(array_keys(AddressBookCollaborator::RULES))],
+        ]);
+
+        if ((int) $data['user_id'] === (int) $addressBook->user_id) {
+            return back()->with('error', 'The owner already has full control.');
+        }
+
+        AddressBookCollaborator::updateOrCreate(
+            ['address_book_id' => $addressBook->id, 'user_id' => $data['user_id']],
+            ['rule' => $data['rule']],
+        );
+
+        // Sharing implies the book is shared; flip the flag on so it surfaces to the client.
+        if (! $addressBook->is_shared) {
+            $addressBook->forceFill(['is_shared' => true])->save();
+        }
+
+        $username = User::whereKey($data['user_id'])->value('username');
+
+        return redirect()
+            ->route('admin.address-books.show', $addressBook)
+            ->with('status', "Shared with {$username}.");
+    }
+
+    public function destroyCollaborator(AddressBookCollaborator $collaborator): RedirectResponse
+    {
+        $bookId = $collaborator->address_book_id;
+        $collaborator->delete();
+
+        return redirect()
+            ->route('admin.address-books.show', $bookId)
+            ->with('status', 'Collaborator removed.');
     }
 
     // --- Peers --------------------------------------------------------------------------

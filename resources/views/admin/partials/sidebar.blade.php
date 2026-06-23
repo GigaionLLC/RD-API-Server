@@ -101,6 +101,11 @@
                 <i class="ri-government-line"></i> LDAP / AD
             </a>
         @endif
+        @if ($u && $u->hasPermission('webhooks.view'))
+            <a href="/admin/webhooks" class="rd-nav__item {{ str_contains($nav, 'webhooks') ? 'active' : '' }}">
+                <i class="ri-send-plane-line"></i> Webhooks
+            </a>
+        @endif
         @if ($u && $u->hasPermission('roles.view'))
             <a href="/admin/roles" class="rd-nav__item {{ str_contains($nav, 'roles') ? 'active' : '' }}">
                 <i class="ri-shield-user-line"></i> Admin Roles

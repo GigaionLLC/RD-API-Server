@@ -34,7 +34,10 @@ required.
 - **Strategies** editor laid out like the RustDesk client's **Settings** (General / Security / Network),
   ~55 catalogued `config_options` with tri‑state toggles + "set all", plus custom keys and
   device/user/group assignment
-- **Address Books** — RustDesk‑client‑style manager (peer cards, tags, add/edit dialogs) for **any** user's book
+- **Address Books** — RustDesk‑client‑style manager (peer cards, tags, add/edit dialogs) for **any** user's book,
+  with **shared / team books** (collaborators at read · read‑write · full‑control)
+- **Webhooks / notifications** — push alarms and connection / device events to **Slack**, **Telegram**,
+  or a generic **HMAC‑signed** JSON endpoint, with per‑hook test + delivery status
 - **Client Config generator** — produce a server‑config string, mobile **QR**, per‑OS `--config`
   command, and renamed‑installer filename to roll out pre‑configured clients
 - **API Keys** — scoped keys for the **admin REST API** (`/api/v1`)
@@ -47,7 +50,8 @@ required.
 
 **Admin REST API (`/api/v1`)** — programmatic access with scoped API keys
 (`Authorization: Bearer <key>` or `X-API-Key`): devices, users, strategies, audit, address‑book
-peers. See **[docs/api/README.md](docs/api/README.md)**.
+peers. Ships an **OpenAPI 3.1 spec** plus **Postman** and **Bruno** collections. See
+**[docs/api/README.md](docs/api/README.md)**.
 
 ## 🚀 Quick start
 
@@ -111,6 +115,14 @@ relay. Set `RUSTDESK_ID_SERVER`, `RUSTDESK_RELAY_SERVER`, and `RUSTDESK_KEY` (se
 ## 📄 License
 
 MIT. See [LICENSE](LICENSE). © Gigaion LLC.
+
+## 🤖 AI‑enhanced project
+
+RustDesk API is developed, modernized, and maintained with extensive use of AI coding agents.
+The PHP 8.5 / Laravel rewrite, the wire‑compatible client API, the Strategy/Settings‑push and
+preset auto‑registration features, the security hardening, the test suites (PHPUnit +
+Playwright), and the documentation were all produced and verified with AI assistance. Agent and
+contributor guidance follows the **[AGENT.md](AGENT.md)** standard.
 
 ## Acknowledgements
 

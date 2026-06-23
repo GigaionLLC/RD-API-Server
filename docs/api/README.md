@@ -66,5 +66,23 @@ curl -s -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/js
 curl -s -H "X-API-Key: $KEY" "$BASE/api/v1/audit/connections?peer_id=123456789"
 ```
 
-> An OpenAPI spec + Postman/Bruno collection are planned (roadmap); until then this page is the
-> reference. Endpoints are additive — new resources/scopes will be appended here.
+## Machine-readable specs
+
+This folder ships ready-to-import artifacts covering both the admin API and the client API:
+
+| File | Use |
+|------|-----|
+| [`openapi.yaml`](openapi.yaml) | OpenAPI 3.1 spec — import into Swagger UI, Redoc, Stoplight, or generate clients. |
+| [`postman_collection.json`](postman_collection.json) | Postman collection (v2.1). Set `base_url` + `api_key`; the Client API → Login request captures `account_token`. |
+| [`bruno/`](bruno/) | [Bruno](https://www.usebruno.com/) collection — open the folder, pick the **Local** environment. |
+
+## Related surfaces
+
+- **Shared / team address books** — the client lists them via `POST /api/ab/shared/profiles`
+  (returns each book's `rule`: 1 read · 2 read/write · 3 full control). Owners and collaborators
+  are managed in the console under **Address Books → Share**.
+- **Webhooks / notifications** — outbound, not part of this inbound API. Configure Slack /
+  Telegram / generic JSON targets in the console under **Webhooks**; generic deliveries carry an
+  `X-RustDesk-Signature: sha256=…` HMAC when a secret is set.
+
+> Endpoints are additive — new resources/scopes are appended here and to `openapi.yaml`.

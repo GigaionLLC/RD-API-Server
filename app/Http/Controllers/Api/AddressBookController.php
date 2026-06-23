@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AddressBook;
+use App\Models\AddressBookCollaborator;
 use App\Models\AddressBookPeer;
 use App\Models\Tag;
 use App\Models\User;
@@ -94,16 +95,35 @@ class AddressBookController extends Controller
     }
 
     /**
-     * POST /api/ab/shared/profiles — shared (non-personal) collections accessible to the user.
+     * POST /api/ab/shared/profiles — shared (non-personal) collections accessible to the user:
+     * the shared books they own, plus books shared with them as a collaborator. Each profile
+     * carries the user's `rule` (ShareRule) so the client knows whether to allow edits.
      * Returns the standard paginated DataResponse shape.
      */
     public function sharedProfiles(Request $request): JsonResponse
     {
-        // Shared address books are not owned by the requesting user (user_id null or other).
-        // Profile sharing is not modelled yet, so the list is empty but well-formed.
+        $user = $request->user();
+        $profiles = [];
+
+        // Shared books the user owns (full control).
+        foreach (AddressBook::where('user_id', $user->id)->where('is_shared', true)->get() as $book) {
+            $profiles[] = $this->profileShape($book, (string) $user->username, AddressBookCollaborator::RULE_FULL);
+        }
+
+        // Books shared with the user by someone else.
+        $collabs = AddressBookCollaborator::with('addressBook.user')
+            ->where('user_id', $user->id)
+            ->get();
+        foreach ($collabs as $collab) {
+            $book = $collab->addressBook;
+            if ($book !== null) {
+                $profiles[] = $this->profileShape($book, (string) ($book->user->username ?? ''), (int) $collab->rule);
+            }
+        }
+
         return response()->json([
-            'total' => 0,
-            'data' => [],
+            'total' => count($profiles),
+            'data' => $profiles,
         ]);
     }
 
@@ -154,6 +174,9 @@ class AddressBookController extends Controller
     public function peerAdd(Request $request, string $guid): JsonResponse|Response
     {
         $book = $this->resolveBook($request->user(), $guid);
+        if ($deny = $this->denyIfReadOnly($book, $request->user())) {
+            return $deny;
+        }
         $data = $this->peerInput($request);
 
         $id = (string) ($data['id'] ?? '');
@@ -176,6 +199,9 @@ class AddressBookController extends Controller
     public function peerUpdate(Request $request, string $guid): JsonResponse|Response
     {
         $book = $this->resolveBook($request->user(), $guid);
+        if ($deny = $this->denyIfReadOnly($book, $request->user())) {
+            return $deny;
+        }
         $data = $this->peerInput($request);
 
         $id = (string) ($data['id'] ?? '');
@@ -199,6 +225,9 @@ class AddressBookController extends Controller
     public function peerDelete(Request $request, string $guid): JsonResponse|Response
     {
         $book = $this->resolveBook($request->user(), $guid);
+        if ($deny = $this->denyIfReadOnly($book, $request->user())) {
+            return $deny;
+        }
         $ids = $this->idList($request);
 
         if ($ids !== []) {
@@ -218,6 +247,9 @@ class AddressBookController extends Controller
     public function tagAdd(Request $request, string $guid): JsonResponse|Response
     {
         $book = $this->resolveBook($request->user(), $guid);
+        if ($deny = $this->denyIfReadOnly($book, $request->user())) {
+            return $deny;
+        }
         $name = $this->tagName($request);
 
         if ($name === '') {
@@ -238,6 +270,9 @@ class AddressBookController extends Controller
     public function tagUpdate(Request $request, string $guid): JsonResponse|Response
     {
         $book = $this->resolveBook($request->user(), $guid);
+        if ($deny = $this->denyIfReadOnly($book, $request->user())) {
+            return $deny;
+        }
         $name = $this->tagName($request);
 
         $tag = Tag::where('address_book_id', $book->id)->where('name', $name)->first();
@@ -256,6 +291,9 @@ class AddressBookController extends Controller
     public function tagRename(Request $request, string $guid): JsonResponse|Response
     {
         $book = $this->resolveBook($request->user(), $guid);
+        if ($deny = $this->denyIfReadOnly($book, $request->user())) {
+            return $deny;
+        }
 
         $old = (string) ($request->input('old') ?? $request->input('oldName') ?? '');
         $new = (string) ($request->input('new') ?? $request->input('newName') ?? '');
@@ -297,6 +335,9 @@ class AddressBookController extends Controller
     public function tagDelete(Request $request, string $guid): JsonResponse|Response
     {
         $book = $this->resolveBook($request->user(), $guid);
+        if ($deny = $this->denyIfReadOnly($book, $request->user())) {
+            return $deny;
+        }
         $names = $this->idList($request);
 
         if ($names === [] && ($single = $this->tagName($request)) !== '') {
@@ -346,21 +387,49 @@ class AddressBookController extends Controller
     }
 
     /**
-     * Resolve a collection guid to an AddressBook owned by the user. Unknown / "personal"
-     * guids fall back to the personal collection.
+     * Resolve a collection guid to an AddressBook the user can at least read — their own book,
+     * or a shared book they collaborate on. Unknown / "personal" guids, and guids the user has
+     * no access to, fall back to the personal collection.
      */
     private function resolveBook(User $user, string $guid): AddressBook
     {
         if ($guid !== '' && $guid !== 'personal' && ctype_digit($guid)) {
-            $book = AddressBook::where('id', (int) $guid)
-                ->where('user_id', $user->id)
-                ->first();
-            if ($book) {
+            $book = AddressBook::find((int) $guid);
+            if ($book !== null && $book->canRead($user)) {
                 return $book;
             }
         }
 
         return $this->personalBook($user);
+    }
+
+    /**
+     * Guard a mutation: returns an error response when the user lacks write permission on the
+     * resolved book (a read-only collaborator), or null when the write may proceed.
+     */
+    private function denyIfReadOnly(AddressBook $book, User $user): ?JsonResponse
+    {
+        if ($book->canWrite($user)) {
+            return null;
+        }
+
+        return response()->json(['error' => 'You do not have permission to modify this address book']);
+    }
+
+    /**
+     * Shape a shared address book as the AbProfile the client lists under shared/profiles.
+     *
+     * @return array<string, mixed>
+     */
+    private function profileShape(AddressBook $book, string $owner, int $rule): array
+    {
+        return [
+            'guid' => (string) $book->id,
+            'name' => (string) $book->name,
+            'owner' => $owner,
+            'note' => (string) ($book->note ?? ''),
+            'rule' => $rule,
+        ];
     }
 
     /**

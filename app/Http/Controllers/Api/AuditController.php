@@ -7,6 +7,7 @@ use App\Models\AuditConn;
 use App\Models\AuditFile;
 use App\Models\Device;
 use App\Services\AlarmService;
+use App\Services\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +43,7 @@ class AuditController extends Controller
      *  - host connection event:  { id, action:"new"|"close", conn_id, peer:[id,name]?, ip, session_id, type, uuid }
      *  - operator session note:  { id, session_id, note }   (no `action`)
      */
-    public function conn(Request $request, AlarmService $alarms): JsonResponse
+    public function conn(Request $request, AlarmService $alarms, WebhookService $webhooks): JsonResponse
     {
         // Operator session note (posted by the controlling side) — attach to the open session.
         $note = $request->input('note');
@@ -101,6 +102,17 @@ class AuditController extends Controller
                 ]);
             }
         }
+
+        // Notify webhooks of the session lifecycle (distinct from the alarm above).
+        $webhooks->dispatch(
+            $action === AuditConn::ACTION_CLOSE ? 'connection.closed' : 'connection.new',
+            [
+                'peer_id' => $peerId,
+                'from' => (string) ($peer[1] ?? $peer[0] ?? ''),
+                'ip' => $ip,
+                'session_id' => $sessionId,
+            ]
+        );
 
         return response()->json((object) []);
     }
