@@ -222,6 +222,11 @@ class OauthService
         ]);
         $session->save();
 
+        Log::info('OIDC callback resolved user', [
+            'code' => $state, 'op' => $provider->op, 'user_id' => $user->id,
+            'username' => $user->username, 'status' => (int) $user->status,
+        ]);
+
         return ['ok' => true, 'error' => ''];
     }
 
@@ -468,11 +473,21 @@ class OauthService
         $session = OauthSession::find($code);
 
         if ($session && ! $session->isExpired() && ! empty($session->auth_body)) {
-            // One-shot: consume the session once the token is delivered.
             $body = $session->auth_body;
-            $session->delete();
+            $json = (string) json_encode($body);
 
-            return (string) json_encode($body);
+            // Diagnostic: the client must deserialize this into its AuthBody. Log the delivered
+            // shape (token masked) so any field/type mismatch is visible in the API logs.
+            $masked = $body;
+            if (isset($masked['access_token'])) {
+                $masked['access_token'] = '***';
+            }
+            Log::info('OIDC auth-query delivering token', ['code' => $code, 'bytes' => strlen($json), 'payload' => $masked]);
+
+            // Idempotent: keep the session until it expires (do NOT consume on first read), so a
+            // client that re-polls — or a momentary parse hiccup — can still pick up the token.
+            // The row is pruned on expiry by beginAuth's cleanup.
+            return $json;
         }
 
         return (string) json_encode(['error' => 'No authed oidc is found']);
@@ -511,7 +526,11 @@ class OauthService
                 'avatar' => (string) ($user->avatar ?? ''),
                 'email' => (string) ($user->email ?? ''),
                 'note' => (string) ($user->note ?? ''),
-                'status' => (int) $user->status,
+                // The client's UserStatus enum only accepts -1 / 0 / 1; clamp anything else so a
+                // stray DB value can't break deserialization of the whole AuthBody.
+                'status' => in_array((int) $user->status, [User::STATUS_DISABLED, User::STATUS_NORMAL, User::STATUS_UNVERIFIED], true)
+                    ? (int) $user->status
+                    : User::STATUS_NORMAL,
                 'is_admin' => (bool) $user->is_admin,
                 'third_auth_type' => $op,
                 'info' => [

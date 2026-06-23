@@ -119,8 +119,10 @@ class OidcPkceTest extends TestCase
         $body = app()->make(OauthService::class)->pollResult($code);
         $this->assertStringContainsString('access_token', $body);
 
-        // One-shot: the row is consumed after delivery.
-        $this->assertDatabaseMissing('oauth_sessions', ['code' => $code]);
+        // Idempotent: a re-poll still returns the token (not consumed on first read), so a
+        // client retry can't lose it. The row is pruned on expiry, not on delivery.
+        $this->assertStringContainsString('access_token', app()->make(OauthService::class)->pollResult($code));
+        $this->assertDatabaseHas('oauth_sessions', ['code' => $code]);
     }
 
     public function test_provider_without_pkce_still_completes(): void

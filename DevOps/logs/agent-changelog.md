@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 16:50] - SSO: idempotent token delivery + diagnostics (client received token but kept polling)
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Services/OauthService.php`: `pollResult` no longer **one-shot-deletes** the session — it keeps returning the token until the session expires (pruned by `beginAuth`), so a client re-poll / parse retry can't lose it; logs the delivered payload (token masked) for diagnosis. `handleCallback` logs the resolved user. `authBody` clamps `status` to the client's valid `UserStatus` set (-1/0/1) so a stray value can't break AuthBody deserialization.
+- `tests/Feature/OidcPkceTest.php`: updated the cross-instance test to assert **idempotent** delivery (token returned on re-poll; row persists until expiry).
+**Database/API Changes:** None. Behaviour: the OIDC auth-query keeps returning the token for the session's lifetime instead of consuming it on first read.
+**Summary:** From the user's API access logs the callback succeeded (success page, 200) and one `auth-query` poll returned the full token (745 B) — yet the client kept polling, i.e. it received the token but didn't complete. The auth body is byte-identical in shape to `LoginController::userPayload` (which the client accepts for password login), so the shape isn't the cause; the OIDC-specific risks were the **one-shot delete** (only one delivery chance) and any field that fails the client's strict deserialization. Made delivery idempotent, hardened `status`, and added payload/user logging so the next capture pinpoints any field mismatch. Verified: Pint 193 files clean, PHPStan L5 0 errors, **155 PHPUnit passed** (522 assertions).
+
 ## [2026-06-23 16:20] - Docs: clarify "override" vs default settings (can't be server-pushed)
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**
