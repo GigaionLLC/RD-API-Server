@@ -24,8 +24,8 @@ rules read / read-write / full).
 
 | # | Feature | Value | Effort | Client-ready? | One-line |
 |---|---------|:-----:|:------:|:-------------:|----------|
-| 1 | **`is_pro` capability advertisement** | ★★★ | S | **Yes** | Advertise the Pro feature set so the client unlocks UI for things we now implement. |
-| 2 | **Write coverage for `/api/v1`** (+ write scopes) | ★★★ | M | n/a | Device assign, strategy & user CRUD, AB CRUD, webhook mgmt — make the REST API two-way. |
+| 1 | **Write coverage for `/api/v1`** (+ write scopes) ✅ | ★★★ | M | n/a | Device assign, strategy & user create/update, AB book CRUD — make the REST API two-way. **Done 2026-06-22.** |
+| — | ~~`is_pro` capability advertisement~~ | — | — | — | **Not needed — see correction below.** |
 | 3 | **Webhook delivery log + retry/backoff** | ★★ | S-M | n/a | Persist deliveries, retry transient failures, show a per-hook history. |
 | 4 | **Audit / device CSV export** | ★★ | S | n/a | One-click export of connection, file, login audit + device inventory. |
 | 5 | **Dashboard metrics + `/metrics` (Prometheus)** | ★★ | M | n/a | Session/device/online trends in-console and a scrape endpoint. |
@@ -40,33 +40,39 @@ rules read / read-write / full).
 | 14 | **Audit retention / pruning policy** | ★ | S | n/a | Scheduled cleanup with a configurable window; keeps SQLite installs lean. |
 | 15 | **Multi-relay / geo management** | ★ | L | needs hbbs | Manage the relay list via server-cmd; true geo lives in `hbbs`. |
 
-## Why #1 is the recommended next build
+## Correction — `is_pro` is **not** a feature we need to build
 
-`is_pro` (a.k.a. capability advertisement) is the highest ROI item left: **Small effort, high
-value, zero client changes.** The RustDesk client decides whether to show several "Pro" panels
-(shared address books tab, recording, strategy-driven UI, etc.) based on what the server
-advertises. We now *actually implement* the features behind those panels — shared address
-books (this wave), recording upload, strategy push, 2FA — but the client may still hide them
-because the server hasn't said it supports them.
+An earlier draft of this doc recommended advertising an `is_pro` capability flag so the client
+would unlock Pro UI. Verifying against the client source
+([`src/hbbs_http/sync.rs`](file:///d:/git/rustdesk/src/hbbs_http/sync.rs)) shows that was wrong:
 
-- **Anchor:** the client reads server capability/version metadata from `GET /api/` (and the
-  login/`user/info` payloads). Confirm the exact key the target client builds gate on
-  (`version`, an `is_pro`/`pro` flag, or a capability list) against `D:\git\rustdesk` before
-  emitting it — do **not** guess; mis-advertising a capability we don't fully support degrades
-  the client UX. This is the same discipline that fixed the `extra:{}` and empty-ack bugs.
-- **Scope:** add the advertised flag(s) to the index/login responses behind a config toggle
-  (`RUSTDESK_ADVERTISE_PRO`, default on now that the features exist), plus a test that pins the
-  exact JSON shape.
+- `is_pro()` is **inferred, not advertised**. The client's `PRO` flag starts `false` and flips
+  to `true` when the server answers the sysinfo handshake — `POST /api/sysinfo` returning
+  `"SYSINFO_UPDATED"` (sync.rs:219), or `/api/sysinfo_ver` responding (sync.rs:195).
+- **Our server already implements both** (`SystemController::sysinfo` + `/api/sysinfo_ver`), so a
+  logged-in device that uploads sysinfo already makes the client treat us as Pro.
+- What `is_pro()` actually gates is small (e.g. `hide_cm` in `ipc.rs`). The big Pro **panels**
+  (shared address-book tab, etc.) are driven by their own API responses
+  (`/api/ab/shared/profiles`, now populated), not by a single pro flag.
 
-## Suggested sequencing
+Lesson reaffirmed: verify client-facing assumptions against `D:\git\rustdesk` parser/source code
+before scheduling work — the same discipline that fixed the `extra:{}` and empty-ack bugs.
 
-1. **`is_pro` advertisement** (#1) — unlock the UI for everything already built. *Verify the key
-   in client source first.*
-2. **`/api/v1` write coverage + write scopes** (#2) — turns the read-only REST API into a real
-   automation surface; pairs naturally with the OpenAPI spec just shipped.
-3. **Webhook delivery log + retry** (#3) and **CSV export** (#4) — small, operational polish on
+## #1 (done) — `/api/v1` write coverage
+
+The genuinely high-value item was making the read-only REST API two-way. Shipped 2026-06-22:
+
+- `PUT /api/v1/devices/{id}` — reassign owner / device group / strategy / alias (`devices.write`).
+- `POST` + `PUT /api/v1/strategies[/{id}]` — create/update a strategy's options, bumping
+  `modified_at` so the heartbeat pushes it (`strategies.write`).
+- `POST` + `PUT /api/v1/users[/{id}]` — provision/update accounts (`users.write`).
+- `POST /api/v1/address-books` + `DELETE /api/v1/address-books/{id}` — book CRUD (`address_book.write`).
+
+## Suggested sequencing (remaining)
+
+1. **Webhook delivery log + retry** (#3) and **CSV export** (#4) — small, operational polish on
    the two subsystems added this wave.
-4. Then platform depth: **metrics/observability** (#5), **quotas** (#7), **WoL** (#10).
+2. Then platform depth: **metrics/observability** (#5), **quotas** (#7), **WoL** (#10).
 
 ## Guardrails (unchanged)
 

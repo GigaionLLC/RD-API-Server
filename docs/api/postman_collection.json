@@ -104,6 +104,46 @@
               "path": ["api", "v1", "address-books", "{{address_book_id}}", "peers", "1"]
             }
           }
+        },
+        {
+          "name": "Reassign a device (write)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": 1,\n  \"strategy_id\": 1,\n  \"alias\": \"Front desk PC\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/devices/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "devices", "1"]
+            }
+          }
+        },
+        {
+          "name": "Create a strategy (write)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Locked down\",\n  \"enabled\": true,\n  \"options\": { \"enable-audio\": \"N\", \"access-mode\": \"view\" }\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/strategies", "host": ["{{base_url}}"], "path": ["api", "v1", "strategies"] }
+          }
+        },
+        {
+          "name": "Create a user (write)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"techy\",\n  \"password\": \"changeme123\",\n  \"email\": \"techy@example.com\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/users", "host": ["{{base_url}}"], "path": ["api", "v1", "users"] }
+          }
+        },
+        {
+          "name": "Create an address book (write)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Warehouse\",\n  \"is_shared\": true\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/address-books", "host": ["{{base_url}}"], "path": ["api", "v1", "address-books"] }
+          }
         }
       ]
     },

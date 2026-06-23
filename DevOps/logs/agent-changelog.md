@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 06:30] - /api/v1 write coverage + is_pro research correction
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Models/ApiKey.php` (new scopes `devices.write`, `users.write`, `strategies.write`; `address_book.write` label widened)
+- `app/Http/Controllers/Api/V1/DeviceController.php` (`update` — reassign owner/group/strategy/alias), `.../UserController.php` (`store`+`update` — provision/update accounts; password auto-hashed), `.../StrategyController.php` (`store`+`update` — options write, bumps `modified_at`), `.../AddressBookController.php` (`store`+`destroy` — book create/delete, owner-scoped)
+- `routes/api.php` (`PUT /api/v1/devices/{id}`, `POST`+`PUT /api/v1/users[/{id}]`, `POST`+`PUT /api/v1/strategies[/{id}]`, `POST /api/v1/address-books`, `DELETE /api/v1/address-books/{id}`)
+- `docs/api/openapi.yaml` (write ops + `StrategyWrite` schema; 17 paths/11 schemas), `docs/api/postman_collection.json` (+4 write requests), `docs/api/bruno/Admin API/Create strategy.bru` (NEW), `docs/api/README.md` (scopes + endpoints tables updated)
+- `docs/modernization/17-feature-research-2026-06.md` (**corrected**: `is_pro` is inferred from the sysinfo handshake — `sync.rs:195/219` — which we already answer, so it needs no work; reframed `/api/v1` write coverage as the shipped #1)
+- `tests/Feature/ApiV1WriteTest.php` (NEW, 7)
+**Database/API Changes:** No schema change. New write endpoints under `/api/v1` gated by the new write scopes; address-book writes stay scoped to the key owner (403 otherwise). Strategy writes bump `modified_at` so connected clients re-pull on the next heartbeat.
+**Summary:** Turned the read-only admin REST API two-way (research doc #1). Added device reassignment, strategy + user create/update, and address-book create/delete, each behind a dedicated write scope; updated the OpenAPI spec + Postman/Bruno collections + reference to match. Also corrected the earlier `is_pro` recommendation after verifying the client source: `is_pro()` is inferred when the server answers `/api/sysinfo` (`SYSINFO_UPDATED`) / `/api/sysinfo_ver` — both already implemented — so it required no new work; the big Pro panels are driven by their own endpoints (e.g. `/api/ab/shared/profiles`). Verified: Pint 168 files clean, PHPStan L5 0 errors, **89 PHPUnit passed** (296 assertions; +7), OpenAPI/Postman parse-validated.
+
 ## [2026-06-23 05:30] - Webhooks + shared address books + OpenAPI/Postman/Bruno + research + AI-enhanced README
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

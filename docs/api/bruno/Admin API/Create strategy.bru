@@ -1,0 +1,23 @@
+meta {
+  name: Create strategy
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/v1/strategies
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{api_key}}
+}
+
+body:json {
+  {
+    "name": "Locked down",
+    "enabled": true,
+    "options": { "enable-audio": "N", "access-mode": "view" }
+  }
+}

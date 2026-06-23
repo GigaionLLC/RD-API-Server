@@ -65,6 +65,34 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/v1/devices/{device}:
+    parameters:
+      - { name: device, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin · Devices]
+      summary: Reassign a device
+      description: "Requires the `devices.write` scope. Only supplied fields change; pass an explicit null to clear an assignment."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id: { type: [integer, "null"] }
+                device_group_id: { type: [integer, "null"] }
+                strategy_id: { type: [integer, "null"] }
+                alias: { type: [string, "null"] }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Device" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/v1/users:
     get:
       tags: [Admin · Users]
@@ -89,6 +117,65 @@ paths:
                         items: { $ref: "#/components/schemas/User" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin · Users]
+      summary: Create a user
+      description: Requires the `users.write` scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, minLength: 8 }
+                email: { type: string, format: email }
+                display_name: { type: string }
+                is_admin: { type: boolean }
+                status: { type: integer, enum: [0, 1] }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/User" }
+        "422": { description: Validation failed. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/users/{user}:
+    parameters:
+      - { name: user, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin · Users]
+      summary: Update a user
+      description: "Requires the `users.write` scope. Partial: only supplied fields change; `password` is re-hashed only when present."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string, minLength: 8 }
+                email: { type: [string, "null"], format: email }
+                display_name: { type: [string, "null"] }
+                is_admin: { type: boolean }
+                status: { type: integer, enum: [0, 1] }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/v1/strategies:
     get:
@@ -112,6 +199,47 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/Strategy" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin · Strategies]
+      summary: Create a strategy
+      description: Requires the `strategies.write` scope. Sets `modified_at` so clients pull the options.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StrategyWrite" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Strategy" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/strategies/{strategy}:
+    parameters:
+      - { name: strategy, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin · Strategies]
+      summary: Update a strategy
+      description: Requires the `strategies.write` scope. Any change bumps `modified_at`, so clients re-pull on the next heartbeat.
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StrategyWrite" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Strategy" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/v1/audit/connections:
@@ -159,6 +287,49 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AddressBook" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin · Address Books]
+      summary: Create an address book
+      description: Requires the `address_book.write` scope. The book is owned by the key's user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                note: { type: string }
+                is_shared: { type: boolean }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AddressBook" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/address-books/{addressBook}:
+    parameters:
+      - { $ref: "#/components/parameters/AddressBookId" }
+    delete:
+      tags: [Admin · Address Books]
+      summary: Delete an address book
+      description: Requires the `address_book.write` scope. Removes the book and its peers + tags.
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: boolean, example: true }
         "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/v1/address-books/{addressBook}/peers:
@@ -502,9 +673,22 @@ components:
       properties:
         id: { type: integer }
         name: { type: string }
+        note: { type: [string, "null"] }
         enabled: { type: boolean }
         options: { type: object, additionalProperties: { type: string } }
+        modified_at: { type: integer }
         assignments_count: { type: integer }
+    StrategyWrite:
+      type: object
+      description: Strategy create/update body. `name` is required on create.
+      properties:
+        name: { type: string }
+        note: { type: [string, "null"] }
+        enabled: { type: boolean }
+        options:
+          type: object
+          additionalProperties: { type: [string, "null"] }
+          description: 'config_options map; tri-state "" / "Y" / "N" or free text.'
     AuditConn:
       type: object
       properties:
@@ -520,6 +704,7 @@ components:
       properties:
         id: { type: integer }
         name: { type: string }
+        is_shared: { type: boolean }
         peers_count: { type: integer }
         tags_count: { type: integer }
     AdminPeer:

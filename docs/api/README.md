@@ -22,10 +22,13 @@ A missing/invalid/expired key → `401`. A key without the route's scope → `40
 | Scope | Grants |
 |-------|--------|
 | `devices.read` | list devices |
+| `devices.write` | reassign a device's owner / group / strategy / alias |
 | `users.read` | list users |
+| `users.write` | create / update users |
 | `strategies.read` | list strategies |
+| `strategies.write` | create / update strategies (options pushed via heartbeat) |
 | `address_book.read` | list the key owner's address books + peers |
-| `address_book.write` | add / delete peers in the key owner's books |
+| `address_book.write` | create / delete books and add / delete peers in the key owner's books |
 | `audit.read` | read the connection audit log |
 
 A key may hold any combination. (A `*` scope, if ever issued, grants all.)
@@ -38,10 +41,17 @@ paginator shape: `{ "data": [...], "total", "per_page", "current_page", ... }`.
 | Method | Path | Scope | Notes |
 |--------|------|-------|-------|
 | GET | `/api/v1/devices` | `devices.read` | `?q=` filters id/host/alias |
+| PUT | `/api/v1/devices/{id}` | `devices.write` | body `{ user_id?, device_group_id?, strategy_id?, alias? }`; null clears |
 | GET | `/api/v1/users` | `users.read` | `?q=` filters username/email |
+| POST | `/api/v1/users` | `users.write` | body `{ username, password, email?, display_name?, is_admin?, status? }` → `201` |
+| PUT | `/api/v1/users/{id}` | `users.write` | partial update; `password` re-hashed only if sent |
 | GET | `/api/v1/strategies` | `strategies.read` | includes `options`, `assignments_count` |
+| POST | `/api/v1/strategies` | `strategies.write` | body `{ name, note?, enabled?, options? }` → `201` |
+| PUT | `/api/v1/strategies/{id}` | `strategies.write` | partial update; bumps `modified_at` so clients re-pull |
 | GET | `/api/v1/audit/connections` | `audit.read` | `?peer_id=` filter |
 | GET | `/api/v1/address-books` | `address_book.read` | the key owner's books |
+| POST | `/api/v1/address-books` | `address_book.write` | body `{ name, note?, is_shared? }` → `201` |
+| DELETE | `/api/v1/address-books/{id}` | `address_book.write` | deletes the book + its peers/tags |
 | GET | `/api/v1/address-books/{id}/peers` | `address_book.read` | peers in a book you own |
 | POST | `/api/v1/address-books/{id}/peers` | `address_book.write` | body `{ id, alias?, note?, tags?[] }` → `201` |
 | DELETE | `/api/v1/address-books/{id}/peers/{peer}` | `address_book.write` | |

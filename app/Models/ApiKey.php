@@ -29,10 +29,13 @@ class ApiKey extends Model
      */
     public const SCOPES = [
         'devices.read' => 'Read devices',
+        'devices.write' => 'Modify devices (owner / group / strategy)',
         'users.read' => 'Read users',
+        'users.write' => 'Create / update users',
         'strategies.read' => 'Read strategies',
+        'strategies.write' => 'Create / update strategies',
         'address_book.read' => 'Read address books',
-        'address_book.write' => 'Modify address-book peers',
+        'address_book.write' => 'Modify address books & peers',
         'audit.read' => 'Read audit logs',
     ];
 

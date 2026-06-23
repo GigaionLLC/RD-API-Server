@@ -20,9 +20,46 @@ class AddressBookController extends Controller
             ->where('user_id', $request->user()->id)
             ->withCount(['peers', 'tags'])
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'is_shared']);
 
         return response()->json(['data' => $books]);
+    }
+
+    /**
+     * POST /api/v1/address-books — create a book owned by the key's user. Needs
+     * `address_book.write`.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:255'],
+            'is_shared' => ['sometimes', 'boolean'],
+        ]);
+
+        $book = AddressBook::create([
+            'user_id' => $request->user()->id,
+            'name' => $data['name'],
+            'note' => $data['note'] ?? null,
+            'is_shared' => $data['is_shared'] ?? false,
+        ]);
+
+        return response()->json(['data' => $book->only(['id', 'name', 'is_shared'])], 201);
+    }
+
+    /**
+     * DELETE /api/v1/address-books/{addressBook} — delete a book (and its peers + tags). Needs
+     * `address_book.write`; the book must belong to the key's user.
+     */
+    public function destroy(Request $request, AddressBook $addressBook): JsonResponse
+    {
+        $this->authorizeBook($request, $addressBook);
+
+        $addressBook->peers()->delete();
+        $addressBook->tags()->delete();
+        $addressBook->delete();
+
+        return response()->json(['data' => true]);
     }
 
     public function peers(Request $request, AddressBook $addressBook): JsonResponse

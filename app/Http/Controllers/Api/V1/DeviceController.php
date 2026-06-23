@@ -8,7 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Admin REST API (v1) — devices. Authenticated by a scoped API key (devices.read).
+ * Admin REST API (v1) — devices. Read needs `devices.read`; reassigning a device's owner,
+ * device group, strategy or alias needs `devices.write`.
  */
 class DeviceController extends Controller
 {
@@ -30,5 +31,25 @@ class DeviceController extends Controller
             ]);
 
         return response()->json($devices);
+    }
+
+    /**
+     * PUT /api/v1/devices/{device} — reassign owner / device group / strategy / alias. Only the
+     * supplied keys are changed; pass an explicit null to clear an assignment.
+     */
+    public function update(Request $request, Device $device): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'device_group_id' => ['sometimes', 'nullable', 'integer', 'exists:device_groups,id'],
+            'strategy_id' => ['sometimes', 'nullable', 'integer', 'exists:strategies,id'],
+            'alias' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        $device->fill($data)->save();
+
+        return response()->json(['data' => $device->only([
+            'id', 'rustdesk_id', 'alias', 'user_id', 'device_group_id', 'strategy_id',
+        ])]);
     }
 }

@@ -65,11 +65,21 @@ Route::post('/devices/cli', [DevicesController::class, 'cli']);
  */
 Route::prefix('v1')->group(function (): void {
     Route::get('/devices', [DeviceController::class, 'index'])->middleware('apikey:devices.read');
+    Route::put('/devices/{device}', [DeviceController::class, 'update'])->middleware('apikey:devices.write');
+
     Route::get('/users', [UserController::class, 'index'])->middleware('apikey:users.read');
+    Route::post('/users', [UserController::class, 'store'])->middleware('apikey:users.write');
+    Route::put('/users/{user}', [UserController::class, 'update'])->middleware('apikey:users.write');
+
     Route::get('/strategies', [StrategyController::class, 'index'])->middleware('apikey:strategies.read');
+    Route::post('/strategies', [StrategyController::class, 'store'])->middleware('apikey:strategies.write');
+    Route::put('/strategies/{strategy}', [StrategyController::class, 'update'])->middleware('apikey:strategies.write');
+
     Route::get('/audit/connections', [App\Http\Controllers\Api\V1\AuditController::class, 'connections'])->middleware('apikey:audit.read');
 
     Route::get('/address-books', [App\Http\Controllers\Api\V1\AddressBookController::class, 'index'])->middleware('apikey:address_book.read');
+    Route::post('/address-books', [App\Http\Controllers\Api\V1\AddressBookController::class, 'store'])->middleware('apikey:address_book.write');
+    Route::delete('/address-books/{addressBook}', [App\Http\Controllers\Api\V1\AddressBookController::class, 'destroy'])->middleware('apikey:address_book.write');
     Route::get('/address-books/{addressBook}/peers', [App\Http\Controllers\Api\V1\AddressBookController::class, 'peers'])->middleware('apikey:address_book.read');
     Route::post('/address-books/{addressBook}/peers', [App\Http\Controllers\Api\V1\AddressBookController::class, 'storePeer'])->middleware('apikey:address_book.write');
     Route::delete('/address-books/{addressBook}/peers/{peer}', [App\Http\Controllers\Api\V1\AddressBookController::class, 'destroyPeer'])->middleware('apikey:address_book.write');
