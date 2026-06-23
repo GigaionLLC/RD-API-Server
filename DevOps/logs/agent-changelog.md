@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 15:00] - Strategy catalog: add the missing advanced client settings
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `config/strategy_options.php` (+~22 options, audited against the client's `keys::KEYS_SETTINGS` + `keys::KEYS_BUILDIN_SETTINGS` in `libs/hbb_common/src/config.rs` — the canonical server-pushable policy sets): Performance — `enable-directx-capture`, `keep-awake-during-incoming-sessions`; Permissions — `enable-perm-change-in-accept-window`, `one-way-file-transfer`, `one-way-clipboard-redirection`, `file-transfer-max-files`; Password — `default-connect-password`, `remove-preset-password-warning`, `disable-unlock-pin`; Connection — `allow-insecure-tls-fallback`, `allow-hostname-as-id`, `register-device`, `allow-deep-link-password`, `allow-deep-link-server-settings`; Network — `disable-udp`, `allow-https-21114`, `use-raw-tcp-for-api`; new **Proxy** section — `proxy-url`/`proxy-username`/`proxy-password`; Restrictions — `main-window-always-on-top`, `allow-command-line-settings-when-settings-disabled`
+- `tests/Feature/StrategyCatalogTest.php` (NEW, 3 — catalog completeness vs the new keys, editor render incl. Proxy section, save round-trip)
+**Database/API Changes:** None (catalog/UI only; keys are the client's exact wire keys). Any key not in the catalog was already addable as a custom row — this just promotes the documented ones to first-class toggles/inputs.
+**Summary:** Audited the strategy editor against RustDesk's advanced client settings (the rustdesk.com page 403s the fetcher, so grounded directly in the client source's `KEYS_SETTINGS`/`KEYS_BUILDIN_SETTINGS` — the authoritative list of what `config_options` can push). Added the ~22 documented policy options we were missing — proxy config, one-way transfer/clipboard, deep-link controls, insecure-TLS fallback, disable-UDP, DirectX capture, default connect password, unlock-PIN/ID restrictions, and more — each as the correct control type (toggle / number / text) using the client's exact keys. Verified: Pint 191 files clean, PHPStan L5 0 errors, **149 PHPUnit passed** (501 assertions; +3).
+
 ## [2026-06-23 14:35] - Sidebar: separate "Device Groups" from "User Groups"
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

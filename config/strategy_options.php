@@ -5,8 +5,9 @@
  * heartbeat `config_options` map, organised to mirror the RustDesk client's own Settings
  * window (General / Security / Network) so the admin editor feels like the client.
  *
- * Keys are the exact wire keys the client honours (libs/hbb_common/src/config.rs `keys` +
- * password_security.rs); do NOT rename them.
+ * Keys are the exact wire keys the client honours — taken verbatim from the client's
+ * libs/hbb_common/src/config.rs `keys::KEYS_SETTINGS` and `keys::KEYS_BUILDIN_SETTINGS` (the
+ * server-pushable policy sets) + password_security.rs; do NOT rename them.
  *
  * Control types:
  *   - 'toggle' : tri-state select "" (client default) / "Y" / "N". Works uniformly because
@@ -38,9 +39,11 @@ return [
                     'options' => [
                         ['key' => 'enable-abr', 'label' => 'Adaptive bitrate', 'type' => 'toggle'],
                         ['key' => 'enable-hwcodec', 'label' => 'Hardware codec', 'type' => 'toggle'],
+                        ['key' => 'enable-directx-capture', 'label' => 'DirectX capture (Windows)', 'type' => 'toggle'],
                         ['key' => 'allow-always-software-render', 'label' => 'Always software render', 'type' => 'toggle'],
                         ['key' => 'allow-linux-headless', 'label' => 'Linux headless support', 'type' => 'toggle'],
                         ['key' => 'allow-remove-wallpaper', 'label' => 'Remove wallpaper during session', 'type' => 'toggle'],
+                        ['key' => 'keep-awake-during-incoming-sessions', 'label' => 'Keep screen awake during incoming sessions', 'type' => 'toggle'],
                     ],
                 ],
                 [
@@ -78,6 +81,10 @@ return [
                         ['key' => 'enable-privacy-mode', 'label' => 'Enable privacy mode', 'type' => 'toggle'],
                         ['key' => 'enable-remote-printer', 'label' => 'Enable remote printer', 'type' => 'toggle'],
                         ['key' => 'allow-remote-config-modification', 'label' => 'Enable remote configuration modification', 'type' => 'toggle'],
+                        ['key' => 'enable-perm-change-in-accept-window', 'label' => 'Allow choosing permissions in the accept dialog', 'type' => 'toggle'],
+                        ['key' => 'one-way-file-transfer', 'label' => 'One-way file transfer (receive only)', 'type' => 'toggle'],
+                        ['key' => 'one-way-clipboard-redirection', 'label' => 'One-way clipboard (remote → local only)', 'type' => 'toggle'],
+                        ['key' => 'file-transfer-max-files', 'label' => 'Max files per transfer (0 = unlimited)', 'type' => 'number'],
                     ],
                 ],
                 [
@@ -94,6 +101,9 @@ return [
                             '' => 'Password or click (default)', 'password' => 'Password only', 'click' => 'Accept manually only',
                         ]],
                         ['key' => 'enable-trusted-devices', 'label' => 'Trusted devices (2FA)', 'type' => 'toggle'],
+                        ['key' => 'default-connect-password', 'label' => 'Default connect password (pre-set)', 'type' => 'text'],
+                        ['key' => 'remove-preset-password-warning', 'label' => 'Remove preset-password warning', 'type' => 'toggle'],
+                        ['key' => 'disable-unlock-pin', 'label' => 'Disable the unlock PIN', 'type' => 'toggle'],
                     ],
                 ],
                 [
@@ -108,6 +118,11 @@ return [
                         ['key' => 'allow-only-conn-window-open', 'label' => 'Only allow connection if window open', 'type' => 'toggle'],
                         ['key' => 'allow-logon-screen-password', 'label' => 'Allow logon-screen password', 'type' => 'toggle'],
                         ['key' => 'allow-remote-cm-modification', 'label' => 'Allow modifying connection-manager', 'type' => 'toggle'],
+                        ['key' => 'allow-insecure-tls-fallback', 'label' => 'Allow insecure TLS fallback', 'type' => 'toggle'],
+                        ['key' => 'allow-hostname-as-id', 'label' => 'Allow hostname as ID', 'type' => 'toggle'],
+                        ['key' => 'register-device', 'label' => 'Register device with the server', 'type' => 'toggle'],
+                        ['key' => 'allow-deep-link-password', 'label' => 'Allow password via deep link', 'type' => 'toggle'],
+                        ['key' => 'allow-deep-link-server-settings', 'label' => 'Allow server settings via deep link', 'type' => 'toggle'],
                     ],
                 ],
             ],
@@ -123,6 +138,18 @@ return [
                         ['key' => 'allow-websocket', 'label' => 'Use WebSocket', 'type' => 'toggle'],
                         ['key' => 'enable-udp-punch', 'label' => 'UDP hole punching', 'type' => 'toggle'],
                         ['key' => 'enable-ipv6-punch', 'label' => 'IPv6 hole punching', 'type' => 'toggle'],
+                        ['key' => 'disable-udp', 'label' => 'Disable UDP', 'type' => 'toggle'],
+                        ['key' => 'allow-https-21114', 'label' => 'Allow HTTPS on port 21114', 'type' => 'toggle'],
+                        ['key' => 'use-raw-tcp-for-api', 'label' => 'Use raw TCP for the API', 'type' => 'toggle'],
+                    ],
+                ],
+                [
+                    'label' => 'Proxy',
+                    'help' => 'Route the client through an HTTP/SOCKS proxy. Leave blank to use no proxy.',
+                    'options' => [
+                        ['key' => 'proxy-url', 'label' => 'Proxy URL', 'type' => 'text'],
+                        ['key' => 'proxy-username', 'label' => 'Proxy username', 'type' => 'text'],
+                        ['key' => 'proxy-password', 'label' => 'Proxy password', 'type' => 'text'],
                     ],
                 ],
             ],
@@ -159,6 +186,8 @@ return [
                     'options' => [
                         ['key' => 'disable-change-id', 'label' => 'Disable changing ID', 'type' => 'toggle'],
                         ['key' => 'disable-change-permanent-password', 'label' => 'Disable changing permanent password', 'type' => 'toggle'],
+                        ['key' => 'main-window-always-on-top', 'label' => 'Main window always on top', 'type' => 'toggle'],
+                        ['key' => 'allow-command-line-settings-when-settings-disabled', 'label' => 'Allow CLI settings even when settings are hidden', 'type' => 'toggle'],
                     ],
                 ],
             ],
