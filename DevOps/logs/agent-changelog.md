@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 14:00] - Harden: enforce a single default device group
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Models/DeviceGroup.php` (`booted()` `saved` hook clears `is_default` on all other groups whenever one is saved as default — single-default invariant enforced on every code path, including direct `create`/`save`; `defaultId()` now `orderBy('id')` so the oldest wins deterministically if stray duplicates exist; `ensureDefaultId()` uses `firstOrCreate` to avoid duplicate "Default" groups under concurrent first-heartbeats)
+- `tests/Feature/DefaultDeviceGroupTest.php` (+2: saving-as-default clears others; deterministic defaultId with stray duplicates)
+**Database/API Changes:** None. Behaviour: at most one device group can be the default; if duplicates ever exist (manual DB edit), `defaultId()` deterministically picks the lowest id and the next save of any default collapses them to one.
+**Summary:** Answered "what if multiple default groups exist?" by closing the gap. Previously the UI couldn't create duplicates (set-default clears-then-sets; `is_default` isn't form-editable), but a direct DB edit or a rare zero-groups registration race could. Now a model `saved` hook guarantees exactly one default regardless of path, `defaultId()` is deterministic, and the auto-create uses `firstOrCreate` to dodge the race. Verified: Pint 190 files clean, PHPStan L5 0 errors, **145 PHPUnit passed** (465 assertions; +2).
+
 ## [2026-06-23 13:45] - Auto-default device group (new devices never land in "None")
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

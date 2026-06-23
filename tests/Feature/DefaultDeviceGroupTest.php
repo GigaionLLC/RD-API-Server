@@ -104,6 +104,28 @@ class DefaultDeviceGroupTest extends TestCase
             ->assertJsonPath('strategy.config_options.enable-audio', 'N');
     }
 
+    public function test_saving_a_group_as_default_clears_any_other_default(): void
+    {
+        // Even bypassing the controller (e.g. a direct create with is_default=true), the model
+        // hook enforces exactly one default.
+        $a = DeviceGroup::create(['name' => 'A', 'is_default' => true]);
+        $b = DeviceGroup::create(['name' => 'B', 'is_default' => true]);
+
+        $this->assertFalse($a->fresh()->is_default);
+        $this->assertTrue($b->fresh()->is_default);
+        $this->assertSame(1, DeviceGroup::where('is_default', true)->count());
+    }
+
+    public function test_default_id_is_deterministic_with_stray_duplicates(): void
+    {
+        // Simulate a direct DB edit that left two defaults: defaultId picks the oldest (lowest id).
+        $a = DeviceGroup::create(['name' => 'A']);
+        $b = DeviceGroup::create(['name' => 'B']);
+        DeviceGroup::query()->whereIn('id', [$a->id, $b->id])->update(['is_default' => true]);
+
+        $this->assertSame($a->id, DeviceGroup::defaultId());
+    }
+
     public function test_set_default_is_exclusive_and_toggles(): void
     {
         $admin = User::create([

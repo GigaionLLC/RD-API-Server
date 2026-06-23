@@ -24,12 +24,30 @@ class DeviceGroup extends Model
     }
 
     /**
+     * Enforce the single-default invariant: whenever a group is saved as the default, clear the
+     * flag on every other group. (Mass update — does not re-fire model events, so no recursion.)
+     * This makes "multiple defaults" structurally impossible regardless of the code path.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (self $group): void {
+            if ($group->is_default) {
+                static::query()
+                    ->whereKeyNot($group->getKey())
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
+            }
+        });
+    }
+
+    /**
      * The id of the default device group (the one new/ungrouped devices fall into), or null
-     * when none is designated.
+     * when none is designated. Ordered so the oldest wins deterministically if duplicates ever
+     * exist (e.g. from a direct DB edit).
      */
     public static function defaultId(): ?int
     {
-        $id = static::query()->where('is_default', true)->value('id');
+        $id = static::query()->where('is_default', true)->orderBy('id')->value('id');
 
         return $id === null ? null : (int) $id;
     }
@@ -52,8 +70,10 @@ class DeviceGroup extends Model
         }
 
         // Prefer promoting the oldest existing group; otherwise create a "Default" group.
+        // firstOrCreate avoids spawning duplicate "Default" groups under concurrent first
+        // heartbeats; saving with is_default=true clears any other default via the model hook.
         $group = static::query()->orderBy('id')->first()
-            ?? static::create(['name' => 'Default']);
+            ?? static::firstOrCreate(['name' => 'Default']);
 
         $group->forceFill(['is_default' => true])->save();
 
