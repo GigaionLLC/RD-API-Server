@@ -90,6 +90,39 @@ class OidcPkceTest extends TestCase
         $this->assertStringNotContainsString('No authed oidc is found', $body);
     }
 
+    public function test_pending_session_is_persisted_in_the_database(): void
+    {
+        $this->fakeOidc();
+        $this->provider(true);
+        $oauth = app(OauthService::class);
+
+        [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
+
+        // Persisted in the DB (shared across instances), not just an in-memory cache.
+        $this->assertDatabaseHas('oauth_sessions', ['code' => $code, 'op' => 'keycloak']);
+    }
+
+    public function test_poll_resolves_across_separate_service_instances(): void
+    {
+        // Simulates a load-balanced deployment: the callback and the poll are handled by
+        // different OauthService instances (different workers). The DB-backed session must
+        // still bridge them — this is exactly the "Waiting account auth" hang.
+        $this->fakeOidc();
+        $this->provider(true);
+
+        [$code] = app(OauthService::class)->beginAuth('keycloak', 'dev', 'uuid', []);
+
+        // Callback handled by one instance...
+        $this->assertTrue(app()->make(OauthService::class)->handleCallback($code, 'auth-code')['ok']);
+
+        // ...client poll handled by a freshly-resolved instance.
+        $body = app()->make(OauthService::class)->pollResult($code);
+        $this->assertStringContainsString('access_token', $body);
+
+        // One-shot: the row is consumed after delivery.
+        $this->assertDatabaseMissing('oauth_sessions', ['code' => $code]);
+    }
+
     public function test_provider_without_pkce_still_completes(): void
     {
         $this->fakeOidc();

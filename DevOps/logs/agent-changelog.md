@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 16:00] - Fix: client SSO hang ("Waiting account auth") on multi-instance deploys
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `database/migrations/2026_06_23_100004_create_oauth_sessions_table.php` (NEW — `oauth_sessions`, PK = polling `code`, carries op/ids/nonce/code_verifier/device + `auth_body` + `expires_at`)
+- `app/Models/OauthSession.php` (NEW — string PK, `auth_body` json cast, `isExpired()`)
+- `app/Services/OauthService.php` (the OIDC pending session now lives in the DB, not the cache: `beginAuth` inserts a row + prunes expired; `handleCallback` loads/updates it; `pollResult` reads + one-shot-deletes it; removed `Cache` + `cacheKey`)
+- `tests/Feature/OidcPkceTest.php` (+2 — session persisted in DB; poll resolves across separate service instances)
+**Database/API Changes:** New `oauth_sessions` table. No wire change — `/api/oidc/auth`, `/api/oauth/callback`, `/api/oidc/auth-query` behave identically, but the pending session is now shared storage.
+**Summary:** Root-caused the client SSO hang from the user's screenshots: the browser reached our "Sign-in complete" page (so the callback succeeded and stored the AuthBody) yet the client stayed on "Waiting account auth" — i.e. the client's `/api/oidc/auth-query` poll never saw what the callback wrote. On a load-balanced deployment (host `rdr-api-1…`) the callback and the poll hit different instances/workers, and the pending session lived in a per-instance **cache**, so the poll missed it. Moved the pending OIDC session into the **database** (shared by every instance), which is also how a DB-backed reference server avoids this. Added a regression test that resolves the callback and the poll through **separate** OauthService instances. Verified: Pint 193 files clean, PHPStan L5 0 errors, **155 PHPUnit passed** (521 assertions; +2).
+
 ## [2026-06-23 15:30] - Client Config: deploy-time unlock PIN + Strategy→install-script generator
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

@@ -4,10 +4,10 @@ namespace App\Services;
 
 use App\Models\AuthToken;
 use App\Models\OauthProvider;
+use App\Models\OauthSession;
 use App\Models\User;
 use App\Models\UserThird;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -26,7 +26,9 @@ use Laravel\Socialite\Two\User as SocialiteUser;
  *                                 store the issued AuthBody against the pending session
  *   - GET  /api/oidc/auth-query → poll the pending session for the AuthBody
  *
- * The pending session lives in the cache under "oidc:<code>" for 5 minutes.
+ * The pending session is persisted in the `oauth_sessions` table (NOT the cache) for 5 minutes,
+ * so the provider callback and the client's poll resolve the same session even when the API
+ * runs as multiple instances / workers behind a load balancer.
  */
 class OauthService
 {
@@ -49,14 +51,6 @@ class OauthService
     public static function types(): array
     {
         return [self::TYPE_GITHUB, self::TYPE_GOOGLE, self::TYPE_OIDC];
-    }
-
-    /**
-     * Cache key for a pending session.
-     */
-    private function cacheKey(string $code): string
-    {
-        return "oidc:{$code}";
     }
 
     /**
@@ -88,9 +82,14 @@ class OauthService
             return ['', ''];
         }
 
-        Cache::put($this->cacheKey($code), [
+        // Opportunistically clear expired sessions, then persist this one in the DB so the
+        // provider callback and the client's poll resolve it even across multiple API instances.
+        OauthSession::where('expires_at', '<', now())->delete();
+
+        OauthSession::create([
+            'code' => $code,
             'op' => $provider->op,
-            'id' => $id,
+            'rustdesk_id' => $id,
             'uuid' => $uuid,
             'nonce' => $nonce,
             'code_verifier' => $verifier,
@@ -98,7 +97,8 @@ class OauthService
             'device_type' => (string) ($deviceInfo['type'] ?? ''),
             'device_name' => (string) ($deviceInfo['name'] ?? ''),
             'auth_body' => null,
-        ], self::CACHE_TTL);
+            'expires_at' => now()->addSeconds(self::CACHE_TTL),
+        ]);
 
         return [$code, $url];
     }
@@ -184,22 +184,22 @@ class OauthService
             return ['ok' => false, 'error' => 'Missing state'];
         }
 
-        $session = Cache::get($this->cacheKey($state));
-        if (! is_array($session)) {
+        $session = OauthSession::find($state);
+        if (! $session || $session->isExpired()) {
             return ['ok' => false, 'error' => 'Session expired'];
         }
 
         // Already resolved — nothing more to do (idempotent).
-        if (! empty($session['auth_body'])) {
+        if (! empty($session->auth_body)) {
             return ['ok' => true, 'error' => ''];
         }
 
-        $provider = $this->enabledProvider((string) $session['op']);
+        $provider = $this->enabledProvider((string) $session->op);
         if (! $provider) {
             return ['ok' => false, 'error' => 'Provider not found'];
         }
 
-        $oauthUser = $this->fetchOauthUser($provider, $code, null, (string) ($session['code_verifier'] ?? ''));
+        $oauthUser = $this->fetchOauthUser($provider, $code, null, (string) ($session->code_verifier ?? ''));
         if ($oauthUser === null) {
             return ['ok' => false, 'error' => 'Failed to fetch user info'];
         }
@@ -213,8 +213,14 @@ class OauthService
             return ['ok' => false, 'error' => 'This account is disabled'];
         }
 
-        $session['auth_body'] = $this->authBody($user, $provider->op, $session);
-        Cache::put($this->cacheKey($state), $session, self::CACHE_TTL);
+        $session->auth_body = $this->authBody($user, $provider->op, [
+            'id' => $session->rustdesk_id,
+            'uuid' => $session->uuid,
+            'device_os' => $session->device_os,
+            'device_type' => $session->device_type,
+            'device_name' => $session->device_name,
+        ]);
+        $session->save();
 
         return ['ok' => true, 'error' => ''];
     }
@@ -459,13 +465,14 @@ class OauthService
      */
     public function pollResult(string $code): string
     {
-        $session = Cache::get($this->cacheKey($code));
+        $session = OauthSession::find($code);
 
-        if (is_array($session) && ! empty($session['auth_body'])) {
+        if ($session && ! $session->isExpired() && ! empty($session->auth_body)) {
             // One-shot: consume the session once the token is delivered.
-            Cache::forget($this->cacheKey($code));
+            $body = $session->auth_body;
+            $session->delete();
 
-            return (string) json_encode($session['auth_body']);
+            return (string) json_encode($body);
         }
 
         return (string) json_encode(['error' => 'No authed oidc is found']);
