@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 03:00] - Docs: deep review/refresh after the feature wave
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `README.md` (Features section rewritten to current reality: client‑Settings strategy editor, address‑book manager, device bulk‑assign + live‑search, Client Config generator, API Keys, default device group, admin 2FA, login throttling; new "Admin REST API" subsection)
+- `docs/api/README.md` (NEW — `/api/v1` reference: auth, scopes, endpoints, curl examples)
+- `docs/modernization/04-gap-analysis.md` (top "Current status 2026‑06‑23" banner: done ✅ / remaining roadmap / new opportunities)
+- `docs/modernization/09-port-status.md` (banner: Go retired, port complete, file now historical)
+- Client Config generator: auto‑fill server host/relay/api/**public key** from env / mounted key file (`ClientConfigController::serverDefaults`), and per‑OS `--config` examples (Windows/macOS/Linux)
+**Database/API Changes:** None (docs + Client Config UX).
+**Summary:** Brought the documentation up to date after a large feature wave and made the Client Config generator pre‑fill this deployment's servers + key automatically with copy‑ready per‑OS command lines. Catalogued the remaining roadmap (OpenAPI/Postman, webhooks, shared address books) and newly‑surfaced opportunities (more `/api/v1` coverage + write scopes, audit export, bulk user/AB actions, WoL, dashboard metrics, per‑AB quotas, a CLI) in doc 04.
+
 ## [2026-06-23 02:30] - Feature: scoped API keys + admin REST API (/api/v1)
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

@@ -1,5 +1,33 @@
 # 04 · Gap Analysis
 
+> ## 🟢 Current status (updated 2026-06-23)
+>
+> The table below is the **original baseline** from the start of the rewrite. Since then the
+> vast majority has shipped. Accurate current picture:
+>
+> **Done ✅** — Strategy/Settings‑push (client‑Settings‑style editor, ~55 catalogued options,
+> "set all", custom keys) · preset auto‑registration + `--assign` (`/api/devices/cli`) +
+> default device group · force‑disconnect / Live Sessions · 2FA (client **and** admin console)
+> · SMTP + email verification · device deploy/approval · session‑recording upload · alarms +
+> connection/file/console audit · granular access control · Admin Roles · OIDC · LDAP ·
+> address books (+ a **RustDesk‑client‑style admin manager** for any user's book, tags,
+> end‑of‑connection notes) · device **bulk‑assign** + **live‑search** pickers ·
+> **Client Config generator** (config string + mobile QR + per‑OS `--config` + installer) ·
+> **scoped API keys + admin REST API** (`/api/v1`, see [../api/README.md](../api/README.md)) ·
+> login brute‑force throttling.
+>
+> **Remaining roadmap (chosen 2026‑06‑23):**
+> 1. ~~Scoped API keys + REST API~~ ✅ done · 2. **OpenAPI spec + Postman/Bruno** collection ·
+> 3. **Webhooks / notifications** (alarms + events → Slack/Telegram/generic) ·
+> 4. **Shared / team address books** (collaborators + R/RW/Full rules — contract captured in
+> [11](11-client-feature-opportunities.md) §7).
+>
+> **New opportunities surfaced while building** (not yet scheduled): more `/api/v1` coverage
+> (device/strategy create+update, address‑book tags) and write scopes · CSV/export of audit
+> logs · bulk actions on users/address‑books · Wake‑on‑LAN (client‑local; needs a relay hook) ·
+> dashboard metrics/observability · per‑AB max‑peer + licensed‑device quotas · a packaged
+> server‑management CLI wrapping `/api/v1`.
+
 `rustdesk-api` (have) vs. the client contract ([02](02-client-api-contract.md)) and Pro
 catalog ([03](03-pro-feature-catalog.md)). Ratings are guidance, not gospel.
 

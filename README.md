@@ -20,23 +20,34 @@ required.
 - Account login with **2FA** (TOTP + email codes), **OIDC/OAuth** (GitHub, Google, generic
   OIDC) and **LDAP/AD**
 - **Heartbeat Strategy push** — remotely manage client security settings (the Pro
-  "Settings sync"), with `modified_at` change‑detection
+  "Settings sync"), with `modified_at` change‑detection and live force‑disconnect
 - **Sysinfo + preset auto‑registration** — devices auto‑file into a strategy / device group /
-  address book on first contact (`--assign` / custom‑client presets)
-- Personal & shared **address books** (legacy + Flutter transports)
-- **Audit ingestion** (connections, file transfers) and **session‑recording upload**
-- **Device deployment** tokens + approval queue
+  address book on first contact (`--assign` → `/api/devices/cli`, custom‑client presets)
+- Personal **address books** (legacy + Flutter granular transports), tags, end‑of‑connection notes
+- **Audit ingestion** (connections, file transfers, security alarms) and **session‑recording upload**
+- **Device deployment** tokens + approval queue (`/api/devices/deploy`)
 - Group endpoints (`/api/users`, `/api/peers`, `/api/device-group/accessible`)
 
 **Admin console (dark dashboard)**
-- Dashboard with live stats & charts
-- Devices, Users, Groups & Device Groups, Address Books
-- **Strategies** editor (key/value `config_options` + device/user/group assignment)
-- **Access control** (cumulative user‑group + device‑group grants)
-- **Admin Roles** — scoped, delegated console permissions (`is_admin` = full access)
-- **Alarms**, **Recordings**, **Deploy Tokens**, **Pending Devices**
-- **OAuth providers**, **LDAP/AD**, **SMTP** settings; connection / file / login audit logs
+- Dashboard with live stats & charts; brute‑force‑throttled login with optional **TOTP 2FA**
+- **Devices** — searchable list with **bulk‑assign** owner / device group / strategy, live‑search pickers
+- **Strategies** editor laid out like the RustDesk client's **Settings** (General / Security / Network),
+  ~55 catalogued `config_options` with tri‑state toggles + "set all", plus custom keys and
+  device/user/group assignment
+- **Address Books** — RustDesk‑client‑style manager (peer cards, tags, add/edit dialogs) for **any** user's book
+- **Client Config generator** — produce a server‑config string, mobile **QR**, per‑OS `--config`
+  command, and renamed‑installer filename to roll out pre‑configured clients
+- **API Keys** — scoped keys for the **admin REST API** (`/api/v1`)
+- **Device groups** (with a designated default for new devices), Users, User Groups
+- **Access control** (cumulative user‑group + device‑group grants) and **Admin Roles**
+  (scoped, delegated console permissions; `is_admin` = full access)
+- **Live Sessions** + force‑disconnect, **Alarms**, **Recordings**, **Deploy Tokens**, **Pending Devices**
+- **OAuth providers**, **LDAP/AD**, **SMTP** settings; connection / file / login / console‑operation audit logs
 - Email subsystem with DB‑managed templates + send logs
+
+**Admin REST API (`/api/v1`)** — programmatic access with scoped API keys
+(`Authorization: Bearer <key>` or `X-API-Key`): devices, users, strategies, audit, address‑book
+peers. See **[docs/api/README.md](docs/api/README.md)**.
 
 ## 🚀 Quick start
 

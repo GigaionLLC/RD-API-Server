@@ -1,5 +1,13 @@
 # 09 · Port Status — Parity Checklist (Go ➜ PHP)
 
+> ## ✅ Port complete — this checklist is historical
+> The Go server has been **retired**; the repo is single‑stack PHP. The entire client API
+> (`/api/*`), the admin console, and the Pro‑parity feature set have shipped and are verified
+> green (Pint, PHPStan L5, PHPUnit + Playwright). The ⬜/🟦 marks in the **PHP** columns below
+> are from the in‑progress rewrite and are **out of date** — for the accurate current feature
+> status and remaining roadmap, see **[04-gap-analysis.md](04-gap-analysis.md)** (top section).
+> This file is kept for history only.
+
 Tracks parity of the PHP rewrite against the legacy Go implementation and the client
 contract. Status: ⬜ not started · 🟦 in progress · ✅ done+verified.
 
