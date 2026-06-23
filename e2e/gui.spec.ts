@@ -52,6 +52,23 @@ test('strategy editor renders the client-style Settings sub-nav and switches pan
     await expect(page.locator('.rd-spane[data-pane="security"]')).toBeVisible();
     await expect(page.locator('.rd-spane[data-pane="general"]')).toBeHidden();
     await expect(page.locator('.rd-sec__title', { hasText: 'Permissions' })).toBeVisible();
+
+    // "All on" sets every toggle in the active (Security) tab.
+    await page.locator('.rd-stoolbar [data-setall="Y"]').click();
+    await expect(page.locator('select[name="opt[enable-keyboard]"]')).toHaveValue('Y');
+});
+
+test('devices list shows the bulk-assign bar once a device is selected', async ({ page, request }) => {
+    // Auto-register a device via the client heartbeat so the list isn't empty.
+    await request.post('/api/heartbeat', { data: { id: 'bulk-dev-1', uuid: 'bulk-dev-1', modified_at: 0 } });
+    await signIn(page);
+    await page.goto('/admin/devices', { waitUntil: 'domcontentloaded' });
+    await jqueryReady(page);
+
+    await expect(page.locator('#bulkForm')).toBeHidden();
+    await page.locator('.dev-check').first().check();
+    await expect(page.locator('#bulkForm')).toBeVisible();
+    await expect(page.locator('#bulkCount')).toContainText('selected');
 });
 
 test('address book manager opens a dark Add ID dialog', async ({ page, request }) => {

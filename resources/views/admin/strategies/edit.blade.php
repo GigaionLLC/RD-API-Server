@@ -37,6 +37,7 @@
         .rd-optrow__ctrl { width:240px; flex:none; }
         .rd-optrow__ctrl .rd-select, .rd-optrow__ctrl .rd-input { width:100%; }
         .rd-opt-set { box-shadow:inset 3px 0 0 var(--rd-primary); }
+        .rd-stoolbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
     </style>
 
     {{-- Meta + options (live-save) --}}
@@ -83,6 +84,12 @@
 
                     {{-- Panes --}}
                     <div class="rd-settings__body">
+                        <div class="rd-stoolbar">
+                            <span class="rd-muted" style="font-size:12px;">Apply to this tab:</span>
+                            <button type="button" class="rd-btn rd-btn--ghost" data-setall="Y"><i class="ri-toggle-line"></i> All on</button>
+                            <button type="button" class="rd-btn rd-btn--ghost" data-setall="N"><i class="ri-toggle-line"></i> All off</button>
+                            <button type="button" class="rd-btn rd-btn--ghost" data-setall="D"><i class="ri-restart-line"></i> All default</button>
+                        </div>
                         @foreach ($tabs as $i => $tab)
                             <div class="rd-spane @if($i === 0) active @endif" data-pane="{{ $tab['key'] }}">
                                 @foreach ($tab['sections'] as $section)
@@ -160,17 +167,19 @@
                     <option value="device_group">Device Group</option>
                 </select>
 
-                <select class="rd-select" name="target_id" data-target="device" style="width:200px;">
-                    @foreach ($devices as $d)
-                        <option value="{{ $d->id }}">{{ $d->hostname ?: $d->alias ?: $d->rustdesk_id }} ({{ $d->rustdesk_id }})</option>
-                    @endforeach
-                </select>
-                <select class="rd-select" name="target_id" data-target="user" style="width:200px;display:none;" disabled>
-                    @foreach ($users as $u)
-                        <option value="{{ $u->id }}">{{ $u->username }}</option>
-                    @endforeach
-                </select>
-                <select class="rd-select" name="target_id" data-target="device_group" style="width:200px;display:none;" disabled>
+                {{-- Device: searchable combobox — scales to thousands of clients. --}}
+                <div class="rd-combo" data-target="device" data-url="{{ route('admin.devices.search') }}" style="width:280px;">
+                    <input type="hidden" name="target_id">
+                    <input type="text" class="rd-input rd-combo__input" placeholder="Search device by id / host / alias…" autocomplete="off">
+                    <div class="rd-combo__menu"></div>
+                </div>
+                {{-- User: searchable combobox. --}}
+                <div class="rd-combo" data-target="user" data-url="{{ route('admin.users.search') }}" style="width:240px;display:none;">
+                    <input type="hidden" name="target_id" disabled>
+                    <input type="text" class="rd-input rd-combo__input" placeholder="Search user…" autocomplete="off">
+                    <div class="rd-combo__menu"></div>
+                </div>
+                <select class="rd-select" name="target_id" data-target="device_group" style="width:240px;display:none;" disabled>
                     @foreach ($deviceGroups as $g)
                         <option value="{{ $g->id }}">{{ $g->name }}</option>
                     @endforeach
@@ -256,12 +265,35 @@
             $(this).toggleClass('rd-opt-set', $(this).val() !== '');
         });
 
-        // Assignment target switcher: enable only the relevant select.
+        // Bulk set every option in the ACTIVE tab: All on (Y) / All off (N) / All default ("").
+        $('.rd-stoolbar [data-setall]').on('click', function () {
+            var mode = String($(this).data('setall'));      // 'Y' | 'N' | 'D'
+            var $pane = $('.rd-spane.active');
+            $pane.find('select[name^="opt["]').each(function () {
+                var $s = $(this);
+                if (mode === 'D') { $s.val(''); }
+                else if ($s.find('option[value="' + mode + '"]').length) { $s.val(mode); } // toggles only
+                $s.trigger('change');
+            });
+            if (mode === 'D') {
+                $pane.find('input[name^="opt["]').each(function () { $(this).val('').trigger('change'); });
+            }
+            $('#strategyForm').trigger('change');
+        });
+
+        // Assignment target switcher: show + enable only the relevant control (combo or select).
         function syncTarget() {
             var type = $('#targetType').val();
-            $('select[data-target]').each(function () {
-                var match = $(this).data('target') === type;
-                $(this).prop('disabled', !match).toggle(match);
+            $('[data-target]').each(function () {
+                var $el = $(this), match = $el.data('target') === type;
+                $el.toggle(match);
+                if ($el.is('select')) {
+                    $el.prop('disabled', !match);
+                } else { // combobox: its hidden input is the submitted field
+                    var $hidden = $el.find('input[type="hidden"]');
+                    $hidden.prop('disabled', !match);
+                    if (!match) { $hidden.val(''); $el.find('.rd-combo__input').val(''); }
+                }
             });
         }
         $('#targetType').on('change', syncTarget);

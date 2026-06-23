@@ -20,13 +20,14 @@
                     <input class="rd-input" id="alias" name="alias" value="{{ $device->alias }}" placeholder="Friendly name">
                 </div>
                 <div class="rd-field">
-                    <label class="rd-label" for="user_id">Assigned user</label>
-                    <select class="rd-select" id="user_id" name="user_id">
-                        <option value="">— None —</option>
-                        @foreach ($users as $u)
-                            <option value="{{ $u->id }}" @selected($device->user_id == $u->id)>{{ $u->username }}</option>
-                        @endforeach
-                    </select>
+                    <label class="rd-label">Assigned user</label>
+                    <div class="rd-combo" data-url="{{ route('admin.users.search') }}">
+                        <input type="hidden" name="user_id" value="{{ $device->user_id }}">
+                        <input type="text" class="rd-input rd-combo__input" value="{{ $device->user?->username }}"
+                               placeholder="Search user… (blank = none)" autocomplete="off">
+                        <div class="rd-combo__menu"></div>
+                    </div>
+                    <span class="rd-help">Type to search; clear the box for no owner.</span>
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="device_group_id">Device group</label>

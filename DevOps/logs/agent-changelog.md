@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 00:45] - Device bulk-assign + reusable live-search combobox + strategy "set all"
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `public/assets/js/app.js` (NEW `RD.bindCombobox` — reusable server-backed searchable picker), `public/assets/css/theme-dark.css` (`.rd-combo` styles)
+- `app/Http/Controllers/Admin/DeviceController.php` (`bulkUpdate` — bulk owner/group/strategy; `search` endpoint; edit() no longer loads all users), `app/Http/Controllers/Admin/UserController.php` (`search` endpoint)
+- `routes/web.php` (`devices/bulk`, `devices/search`, `users/search`)
+- `resources/views/admin/devices/index.blade.php` (row checkboxes + bulk-assign bar with combo user picker), `resources/views/admin/devices/edit.blade.php` (owner → combo)
+- `resources/views/admin/strategies/edit.blade.php` (assignment device+user pickers → combos; "Apply to this tab: All on / All off / All default" toolbar), `app/Http/Controllers/Admin/StrategyController.php` (edit() loads only assigned targets for labels, not every device/user)
+- Tests: `tests/Feature/DeviceBulkAndSearchTest.php` (NEW, 6) + `e2e/gui.spec.ts` (+set-all + bulk-bar specs)
+**Database/API Changes:** New admin endpoints `POST /admin/devices/bulk`, `GET /admin/devices/search`, `GET /admin/users/search`. No client-API change.
+**Summary:** Three requested admin improvements: (1) bulk-assign owner / device group / strategy from the devices list via row checkboxes + an action bar; (2) a reusable live-search combobox (`RD.bindCombobox`) that replaces the huge device/user `<select>`s — the strategy-assignment device picker no longer loads thousands of rows, querying `/admin/devices|users/search` as you type — also applied to the device-edit owner field and the bulk-assign user picker; (3) a per-tab "All on / All off / All default" toolbar on the strategy editor. Verified: Pint 145, PHPStan L5 0 errors, ESLint clean, 60 PHPUnit + 8 Playwright passed.
+
 ## [2026-06-22 23:30] - Strategy editor reskinned as client Settings + dark modals + Playwright
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

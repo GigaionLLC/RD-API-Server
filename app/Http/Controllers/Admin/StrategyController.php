@@ -58,13 +58,16 @@ class StrategyController extends Controller
     {
         $strategy->load('assignments');
 
-        $devices = Device::orderBy('rustdesk_id')->get(['id', 'rustdesk_id', 'hostname', 'alias']);
-        $users = User::orderBy('username')->get(['id', 'username']);
+        // Device groups are few, so the picker stays a plain select; devices and users are
+        // chosen with a searchable combobox (so we never load thousands of rows here).
         $deviceGroups = DeviceGroup::orderBy('name')->get(['id', 'name']);
 
-        // Build readable labels for the existing assignments.
-        $deviceMap = $devices->keyBy('id');
-        $userMap = $users->keyBy('id');
+        // Readable labels for the EXISTING assignments only — look up just the referenced ids.
+        $byType = $strategy->assignments->groupBy('target_type');
+        $deviceMap = Device::whereIn('id', ($byType['device'] ?? collect())->pluck('target_id'))
+            ->get(['id', 'rustdesk_id'])->keyBy('id');
+        $userMap = User::whereIn('id', ($byType['user'] ?? collect())->pluck('target_id'))
+            ->get(['id', 'username'])->keyBy('id');
         $deviceGroupMap = $deviceGroups->keyBy('id');
 
         // The known-option catalog (client-Settings-style tabs → sections → options) plus any
@@ -83,8 +86,6 @@ class StrategyController extends Controller
 
         return view('admin.strategies.edit', compact(
             'strategy',
-            'devices',
-            'users',
             'deviceGroups',
             'deviceMap',
             'userMap',

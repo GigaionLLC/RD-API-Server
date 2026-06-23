@@ -166,11 +166,76 @@
     return chart;
   };
 
+  /* ------------------------------------------------------- Searchable combobox
+   * A live, server-backed picker for lists too large for a plain <select>.
+   * Markup:
+   *   <div class="rd-combo" data-url="/admin/devices/search">
+   *     <input type="hidden" name="target_id" value="">
+   *     <input type="text" class="rd-input rd-combo__input" placeholder="Search…" autocomplete="off">
+   *     <div class="rd-combo__menu"></div>
+   *   </div>
+   * The endpoint returns JSON [{ id, text }, …]; typing queries it (debounced),
+   * choosing a row fills the hidden input, clearing the text clears the value.
+   */
+  RD.bindCombobox = function (root) {
+    $(root || document).find('.rd-combo').each(function () {
+      var $combo = $(this);
+      if ($combo.data('rdBound')) { return; }
+      $combo.data('rdBound', true);
+
+      var $hidden = $combo.find('input[type="hidden"]').first();
+      var $input = $combo.find('.rd-combo__input');
+      var $menu = $combo.find('.rd-combo__menu');
+      var url = $combo.data('url');
+      var timer = null;
+
+      function close() { $menu.removeClass('is-open').empty(); }
+
+      function render(items) {
+        $menu.empty();
+        if (!items || !items.length) {
+          $menu.append('<div class="rd-combo__empty">No matches</div>');
+        } else {
+          $.each(items, function (_, it) {
+            $('<div class="rd-combo__item"></div>').text(it.text).attr('data-id', it.id).appendTo($menu);
+          });
+        }
+        $menu.addClass('is-open');
+      }
+
+      function search() {
+        var q = $.trim($input.val());
+        RD.api({ url: url + (url.indexOf('?') < 0 ? '?' : '&') + 'q=' + encodeURIComponent(q) })
+          .done(render).fail(close);
+      }
+
+      $input.on('input', function () {
+        $hidden.val('');                       // typing invalidates the prior choice
+        window.clearTimeout(timer);
+        timer = window.setTimeout(search, 200);
+      });
+      $input.on('focus', function () {
+        if ($menu.children().length) { $menu.addClass('is-open'); } else { search(); }
+      });
+      $menu.on('mousedown', '.rd-combo__item', function (e) {
+        e.preventDefault();
+        $hidden.val($(this).attr('data-id'));
+        $input.val($(this).text());
+        close();
+        $hidden.trigger('change'); // notify live-save / other listeners
+      });
+      $(document).on('click', function (e) {
+        if (!$.contains($combo[0], e.target)) { close(); }
+      });
+    });
+  };
+
   /* --------------------------------------------------------------------- Init */
   $(function () {
     RD.bindShell();
     RD.bindLiveForms(document);
     RD.bindConfirms(document);
+    RD.bindCombobox(document);
   });
 
   window.RD = RD;

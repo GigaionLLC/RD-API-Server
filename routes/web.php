@@ -49,12 +49,15 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
 
     // Devices
     Route::get('/admin/devices', [DeviceController::class, 'index'])->middleware('permission:devices.view')->name('admin.devices.index');
+    Route::get('/admin/devices/search', [DeviceController::class, 'search'])->middleware('permission:devices.view')->name('admin.devices.search');
+    Route::post('/admin/devices/bulk', [DeviceController::class, 'bulkUpdate'])->middleware('permission:devices.edit')->name('admin.devices.bulk');
     Route::get('/admin/devices/{device}/edit', [DeviceController::class, 'edit'])->middleware('permission:devices.view')->name('admin.devices.edit');
     Route::put('/admin/devices/{device}', [DeviceController::class, 'update'])->middleware('permission:devices.edit')->name('admin.devices.update');
     Route::delete('/admin/devices/{device}', [DeviceController::class, 'destroy'])->middleware('permission:devices.edit')->name('admin.devices.destroy');
 
     // Users
     Route::get('/admin/users', [UserController::class, 'index'])->middleware('permission:users.view')->name('admin.users.index');
+    Route::get('/admin/users/search', [UserController::class, 'search'])->middleware('permission:users.view')->name('admin.users.search');
     Route::get('/admin/users/create', [UserController::class, 'create'])->middleware('permission:users.edit')->name('admin.users.create');
     Route::post('/admin/users', [UserController::class, 'store'])->middleware('permission:users.edit')->name('admin.users.store');
     Route::get('/admin/users/{user}/edit', [UserController::class, 'edit'])->middleware('permission:users.view')->name('admin.users.edit');

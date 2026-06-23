@@ -17,6 +17,28 @@ use Illuminate\View\View;
  */
 class UserController extends Controller
 {
+    /**
+     * GET /admin/users/search?q= — live picker results (id + username) for the searchable
+     * combobox, capped, so user pickers stay usable with many accounts.
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        $users = User::query()
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('username', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%")))
+            ->orderBy('username')
+            ->limit(20)
+            ->get(['id', 'username']);
+
+        return response()->json($users->map(fn (User $u) => [
+            'id' => $u->id,
+            'text' => (string) $u->username,
+        ])->all());
+    }
+
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
