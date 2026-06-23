@@ -15,6 +15,26 @@
                     <i class="ri-error-warning-line"></i><span>{{ $errors->first() }}</span>
                 </div>
             @endif
+            {{-- Guided setup: pick a provider to prefill type / scopes / PKCE / issuer shape. --}}
+            <div class="rd-field">
+                <label class="rd-label" for="preset"><i class="ri-magic-line"></i> Quick setup</label>
+                <select class="rd-select" id="preset">
+                    <option value="">— Choose a provider to prefill —</option>
+                    @foreach ($presets as $key => $p)
+                        <option value="{{ $key }}">{{ $p['label'] }}</option>
+                    @endforeach
+                </select>
+                <span class="rd-help" id="presetHint">Optional. You still enter the client ID + secret (and the real issuer host).</span>
+            </div>
+
+            <div class="rd-field">
+                <label class="rd-label">Redirect URI <span class="rd-muted">(register this with the provider)</span></label>
+                <div class="rd-row" style="gap:8px;">
+                    <input class="rd-input" id="redirectUri" value="{{ $redirectUri }}" readonly style="font-family:monospace;">
+                    <button type="button" class="rd-btn rd-btn--ghost" onclick="navigator.clipboard.writeText(document.getElementById('redirectUri').value);RD.toast('Copied','success');"><i class="ri-file-copy-line"></i></button>
+                </div>
+            </div>
+
             <form method="POST" action="{{ route('admin.oauth-providers.store') }}">
                 @csrf
 
@@ -87,3 +107,24 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    $(function () {
+        var presets = @json($presets);
+        $('#preset').on('change', function () {
+            var p = presets[this.value];
+            if (!p) { $('#presetHint').text('Optional. You still enter the client ID + secret (and the real issuer host).'); return; }
+            // Prefill the key with the preset id only if the field is still empty.
+            if (!$('#op').val()) { $('#op').val(this.value); }
+            $('#type').val(p.type);
+            $('#scopes').val(p.scopes);
+            $('#issuer').attr('placeholder', p.issuer_placeholder || 'https://accounts.example.com');
+            if (p.issuer_placeholder) { $('#issuer').val(p.issuer_placeholder); }
+            $('#pkce_method').val(p.pkce_method);
+            $('input[name="pkce_enable"]').prop('checked', !!p.pkce_enable);
+            $('#presetHint').text(p.hint);
+        });
+    });
+</script>
+@endpush

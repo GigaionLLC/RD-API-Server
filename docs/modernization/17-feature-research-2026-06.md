@@ -35,7 +35,7 @@ rules read / read-write / full).
 | 9 | **Scheduled email digests / reports** | ★★ | S | n/a | Daily alarm + connection summary email (reuses SMTP + the new event layer). |
 | 10 | ~~Wake-on-LAN orchestration~~ | — | — | — | **Not a server feature — see correction below.** |
 | 11 | **Packaged server-management CLI** | ★★ | M | n/a | Thin wrapper over `/api/v1` (artisan + shell) for scripted ops. |
-| 12 | **SSO provider presets (Azure / Okta / Authentik)** | ★ | S | n/a | Guided OIDC setup instead of raw endpoint entry. |
+| 12 | **SSO provider presets (Keycloak / Azure / Okta / Authentik / Google / GitHub)** ✅ | ★ | S | n/a | Guided setup that prefills type/scopes/PKCE/issuer-shape + shows the redirect URI. **Done 2026-06-23.** |
 | 13 | **API-key hardening** ✅ | ★ | S | n/a | Per-IP allowlist, last-used IP, in-place rotation. **Done 2026-06-23.** |
 | 14 | **Audit retention / pruning policy** ✅ | ★ | S | n/a | Scheduled `audit:prune` with a configurable window (`RUSTDESK_AUDIT_RETENTION_DAYS`). **Done 2026-06-23.** |
 | — | **Address book CSV import/export** ✅ | ★★ | S | n/a | Per-book peer export + CSV import (skips existing/over-cap). **Done 2026-06-23.** |
@@ -81,9 +81,10 @@ The genuinely high-value item was making the read-only REST API two-way. Shipped
    enable/disable/set-group/delete bulk actions on the Users list.
 3. ~~AB import/export (#6 follow-up), API-key hardening (#13), audit retention (#14)~~ — **done
    2026-06-23**.
-4. ~~per-book quota overrides~~ — **done 2026-06-23** (`address_books.max_peers`, null = use the
-   global default). Still open: **SSO provider presets** (#12), richer **in-console metric
-   trends** (#5 follow-up — a 14-day connections sparkline already ships).
+4. ~~per-book quota overrides~~ · ~~SSO provider presets (#12, Keycloak-first)~~ · ~~richer
+   in-console metric trends (#5: a 14-day **Connections + New-devices** activity chart and a
+   period-over-period delta on the Sessions card)~~ — all **done 2026-06-23**. The doc-17
+   backlog is now exhausted of clean server-side wins; further work is net-new product scope.
 
 ## Correction — Wake-on-LAN is **not** a server feature
 

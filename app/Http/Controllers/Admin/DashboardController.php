@@ -26,12 +26,16 @@ class DashboardController extends Controller
         $sessions24h = AuditConn::where('action', AuditConn::ACTION_NEW)
             ->where('created_at', '>=', $since)
             ->count();
+        // Prior 24h (24–48h ago) for a trend delta on the Sessions card.
+        $sessionsPrev24h = AuditConn::where('action', AuditConn::ACTION_NEW)
+            ->whereBetween('created_at', [Carbon::now()->subHours(48), $since])
+            ->count();
 
         $stats = [
             ['label' => 'Total Devices', 'value' => number_format($deviceCount), 'icon' => 'ri-computer-line', 'tone' => 'primary', 'trend' => null],
             ['label' => 'Online Now', 'value' => number_format($onlineCount), 'icon' => 'ri-base-station-line', 'tone' => 'success', 'trend' => null],
             ['label' => 'Users', 'value' => number_format($userCount), 'icon' => 'ri-user-line', 'tone' => 'warning', 'trend' => null],
-            ['label' => 'Sessions (24h)', 'value' => number_format($sessions24h), 'icon' => 'ri-exchange-line', 'tone' => 'danger', 'trend' => null],
+            ['label' => 'Sessions (24h)', 'value' => number_format($sessions24h), 'icon' => 'ri-exchange-line', 'tone' => 'danger', 'trend' => $this->trend($sessions24h, $sessionsPrev24h)],
         ];
 
         $recentDevices = Device::orderByDesc('last_online_at')
@@ -57,12 +61,21 @@ class DashboardController extends Controller
             ->pluck('c', 'd')
             ->all();
 
+        // New devices per day over the same window (by first-seen / created_at).
+        $deviceCounts = Device::where('created_at', '>=', $start)
+            ->select(DB::raw('DATE(created_at) as d'), DB::raw('COUNT(*) as c'))
+            ->groupBy('d')
+            ->pluck('c', 'd')
+            ->all();
+
         $chartSeries = [];
+        $deviceSeries = [];
         $chartCategories = [];
         for ($i = 0; $i < $days; $i++) {
             $day = $start->copy()->addDays($i);
             $key = $day->toDateString();
             $chartSeries[] = (int) ($counts[$key] ?? 0);
+            $deviceSeries[] = (int) ($deviceCounts[$key] ?? 0);
             $chartCategories[] = $day->format('M j');
         }
 
@@ -70,7 +83,25 @@ class DashboardController extends Controller
             'stats',
             'recentDevices',
             'chartSeries',
+            'deviceSeries',
             'chartCategories'
         ));
+    }
+
+    /**
+     * A simple period-over-period trend descriptor for a stat card, or null when there's no
+     * prior baseline to compare against.
+     *
+     * @return array{dir: string, pct: int}|null
+     */
+    private function trend(int $current, int $previous): ?array
+    {
+        if ($previous <= 0) {
+            return null;
+        }
+
+        $pct = (int) round((($current - $previous) / $previous) * 100);
+
+        return ['dir' => $pct < 0 ? 'down' : 'up', 'pct' => abs($pct)];
     }
 }

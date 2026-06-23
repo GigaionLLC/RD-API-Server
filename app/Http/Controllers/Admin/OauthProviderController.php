@@ -36,8 +36,10 @@ class OauthProviderController extends Controller
         ]);
 
         $types = OauthService::types();
+        $presets = config('oauth_presets', []);
+        $redirectUri = app(OauthService::class)->redirectUri();
 
-        return view('admin.oauth_providers.create', compact('provider', 'types'));
+        return view('admin.oauth_providers.create', compact('provider', 'types', 'presets', 'redirectUri'));
     }
 
     public function store(Request $request): RedirectResponse

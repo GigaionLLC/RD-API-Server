@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 11:30] - SSO provider presets (Keycloak-first) + dashboard activity metrics
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- **SSO presets (research #12):** `config/oauth_presets.php` (NEW — Keycloak first, then Authentik / Entra ID / Okta / Google / GitHub / generic OIDC; each carries type, scopes, PKCE, issuer placeholder + setup hint), `app/Http/Controllers/Admin/OauthProviderController.php` (`create` passes `$presets` + `$redirectUri`), `resources/views/admin/oauth_providers/create.blade.php` ("Quick setup" picker that prefills the form via JS + a copyable Redirect URI to register with the IdP)
+- **Dashboard metrics (research #5 follow-up):** `app/Http/Controllers/Admin/DashboardController.php` (new-devices-per-day 14-day series + a period-over-period `trend()` delta on the Sessions card), `resources/views/admin/dashboard.blade.php` (two-series "Activity" chart + trend pill on stat cards), `public/assets/js/app.js` (`RD.areaChart` now accepts an array of colors — backward-compatible)
+- `docs/modernization/17-feature-research-2026-06.md` (marked #12 + metrics follow-up done; backlog noted exhausted of clean server-side wins)
+- **Tests:** `tests/Feature/OauthPresetsTest.php` (NEW, 3 — presets + redirect URI render, Keycloak first, dashboard activity renders)
+**Database/API Changes:** None. The OAuth create form gains a guided-setup picker (UI only — login flow unchanged); the dashboard shows a second trend series + a sessions delta.
+**Summary:** Guided SSO setup with a Keycloak emphasis — pick a provider and the form prefills type/scopes/PKCE and the issuer shape, and the exact Redirect URI to register is shown + copyable (Keycloak issuer `https://<host>/realms/<realm>`). Also enriched the dashboard: the activity chart now plots Connections **and** New devices over 14 days, and the Sessions (24h) card shows an up/down delta vs the prior 24h. Verified: Pint 186 files clean, PHPStan L5 0 errors, ESLint clean, **125 PHPUnit passed** (400 assertions; +3).
+
 ## [2026-06-23 10:30] - Per-book peer-quota override + Wake-on-LAN research correction
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

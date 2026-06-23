@@ -12,6 +12,7 @@
     $recentDevices = $recentDevices ?? [];
     // Inline array literals can't go directly inside @json(); compute defaults here.
     $chartSeries = $chartSeries ?? [3, 5, 4, 7, 6, 9, 8, 11, 7, 10, 12, 9, 13, 11];
+    $deviceSeries = $deviceSeries ?? [];
     $chartCategories = $chartCategories ?? [];
 @endphp
 
@@ -24,7 +25,15 @@
                 <div class="rd-stat">
                     <div class="rd-stat__icon rd-stat__icon--{{ $s['tone'] }}"><i class="{{ $s['icon'] }}"></i></div>
                     <div>
-                        <div class="rd-stat__value">{{ $s['value'] }}</div>
+                        <div class="rd-stat__value">
+                            {{ $s['value'] }}
+                            @if (!empty($s['trend']))
+                                @php($t = $s['trend'])
+                                <span style="font-size:12px;font-weight:600;margin-left:6px;color:{{ $t['dir'] === 'down' ? 'var(--rd-danger)' : 'var(--rd-success)' }};" title="vs previous 24h">
+                                    <i class="{{ $t['dir'] === 'down' ? 'ri-arrow-down-line' : 'ri-arrow-up-line' }}"></i>{{ $t['pct'] }}%
+                                </span>
+                            @endif
+                        </div>
                         <div class="rd-stat__label">{{ $s['label'] }}</div>
                     </div>
                 </div>
@@ -35,7 +44,7 @@
     <div class="rd-grid rd-grid--2">
         <div class="rd-card">
             <div class="rd-card__header">
-                <h3 class="rd-card__title">Connections (last 14 days)</h3>
+                <h3 class="rd-card__title">Activity (last 14 days)</h3>
             </div>
             <div class="rd-card__body"><div id="connChart"></div></div>
         </div>
@@ -76,8 +85,12 @@
 <script>
     $(function () {
         var series = @json($chartSeries);
+        var devices = @json($deviceSeries);
         var cats   = @json($chartCategories);
-        RD.areaChart('#connChart', [{ name: 'Connections', data: series }], cats, '#6571ff');
+        RD.areaChart('#connChart', [
+            { name: 'Connections', data: series },
+            { name: 'New devices', data: devices }
+        ], cats, ['#6571ff', '#22c55e']);
     });
 </script>
 @endpush

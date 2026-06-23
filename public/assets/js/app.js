@@ -153,7 +153,7 @@
       chart: { type: 'area', height: 280, toolbar: { show: false }, fontFamily: 'inherit', background: 'transparent' },
       theme: { mode: 'dark' },
       series: series,
-      colors: [color || '#6571ff'],
+      colors: Array.isArray(color) ? color : [color || '#6571ff'],
       dataLabels: { enabled: false },
       stroke: { curve: 'smooth', width: 2 },
       fill: { type: 'gradient', gradient: { opacityFrom: 0.4, opacityTo: 0.05 } },
