@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\RecordingController;
 use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\StrategyController;
+use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,9 +29,20 @@ Route::redirect('/', '/admin');
 Route::get('/admin/login', [AuthController::class, 'showLogin'])->name('admin.login');
 Route::post('/admin/login', [AuthController::class, 'login']);
 
+// Post-password TOTP challenge — gated by a session marker, NOT `auth` (the user is logged
+// out between supplying their password and their second factor). See TwoFactorController.
+Route::get('/admin/2fa/challenge', [TwoFactorController::class, 'challenge'])->name('admin.2fa.challenge');
+Route::post('/admin/2fa/challenge', [TwoFactorController::class, 'verifyChallenge'])->name('admin.2fa.challenge.verify');
+
 Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     // Logout is available to any signed-in console user (no permission gate).
     Route::post('/admin/logout', [AuthController::class, 'logout'])->name('admin.logout');
+
+    // Personal two-factor management (any signed-in console user manages their own — no gate).
+    Route::get('/admin/2fa', [TwoFactorController::class, 'show'])->name('admin.2fa.show');
+    Route::post('/admin/2fa/enable', [TwoFactorController::class, 'enable'])->name('admin.2fa.enable');
+    Route::post('/admin/2fa/confirm', [TwoFactorController::class, 'confirm'])->name('admin.2fa.confirm');
+    Route::delete('/admin/2fa', [TwoFactorController::class, 'disable'])->name('admin.2fa.disable');
 
     // Dashboard — real stats from the DashboardController.
     Route::get('/admin', [DashboardController::class, 'index'])->middleware('permission:dashboard.view')->name('admin.dashboard');

@@ -113,6 +113,12 @@ class AuthController extends Controller
             return back()->withErrors(['username' => 'This account is disabled.']);
         }
 
+        // Second factor: if TOTP is enabled, defer login to the challenge step (the user is
+        // logged back out and only re-authenticated once a valid code is supplied).
+        if ($user->two_factor_enabled && $user->two_factor_secret) {
+            return TwoFactorController::startChallenge($request, $user, $request->boolean('remember'));
+        }
+
         $request->session()->regenerate();
 
         $user->forceFill([

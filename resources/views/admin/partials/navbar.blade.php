@@ -17,6 +17,7 @@
             <span>{{ auth()->user()?->username ?? 'admin' }}</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="{{ route('admin.2fa.show') }}">Two-factor auth</a></li>
             <li><a class="dropdown-item" href="/admin/settings">Settings</a></li>
             <li><hr class="dropdown-divider"></li>
             <li>

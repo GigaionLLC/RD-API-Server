@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-22 16:30] - Admin console 2FA (TOTP) with post-password challenge
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Services/TwoFactorService.php` (added `verifyCode`, `generateSecret`, `provisioningUri`, `generateRecoveryCodes`, `verifyRecoveryCode`, `currentCode`; `verifyTotp` now delegates to `verifyCode`)
+- `app/Http/Controllers/Admin/TwoFactorController.php` (NEW — enrollment show/enable/confirm/disable + session-gated challenge/verifyChallenge; rate-limited challenge)
+- `app/Http/Controllers/Admin/AuthController.php` (defers login to the challenge when `two_factor_enabled`)
+- `routes/web.php` (challenge routes outside `auth`; personal management routes inside the auth group)
+- `resources/views/admin/two_factor/{show,challenge}.blade.php` (NEW), `resources/views/admin/partials/navbar.blade.php` (menu link)
+- `tests/Feature/AdminTwoFactorTest.php` (NEW — 6 tests incl. render checks)
+**Database/API Changes:** None (reuses existing `users.two_factor_*` columns). Enabling sets `login_verify='totp'`, so the same TOTP also protects the account's client login.
+**Summary:** The client login already had TOTP/email 2FA but the web admin panel had none. Added TOTP enrollment (manual-key entry + otpauth URI — dependency-free, no QR lib/network needed) with one-time recovery codes, and a post-password challenge step: a correct password defers login (the user is logged back out and re-authenticated only after a valid code). Recovery codes and the challenge are rate-limited. Verified: Pint 139, PHPStan L5 0 errors, 38 PHPUnit passed (full suite) + all Blade views compile.
+
 ## [2026-06-22 15:40] - Security: brute-force throttling on both login surfaces
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**
