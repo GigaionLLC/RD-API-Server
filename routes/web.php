@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AdminRoleController;
 use App\Http\Controllers\Admin\AlarmController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\ClientConfigController;
 use App\Http\Controllers\Admin\ConsoleAuditController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeployTokenController;
@@ -145,6 +146,7 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::get('/admin/deploy-tokens', [DeployTokenController::class, 'index'])->middleware('permission:deploy.view')->name('admin.deploy-tokens.index');
     Route::post('/admin/deploy-tokens', [DeployTokenController::class, 'store'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.store');
     Route::delete('/admin/deploy-tokens/{deployToken}', [DeployTokenController::class, 'destroy'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.destroy');
+    Route::get('/admin/client-config', [ClientConfigController::class, 'index'])->middleware('permission:deploy.view')->name('admin.client-config.index');
     Route::get('/admin/devices/pending', [DeployTokenController::class, 'pending'])->middleware('permission:deploy.view')->name('admin.devices.pending');
     Route::put('/admin/devices/{device}/approve', [DeployTokenController::class, 'approve'])->middleware('permission:deploy.edit')->name('admin.devices.approve');
     Route::delete('/admin/devices/{device}/reject', [DeployTokenController::class, 'reject'])->middleware('permission:deploy.edit')->name('admin.devices.reject');

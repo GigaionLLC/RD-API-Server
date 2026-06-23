@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 01:30] - Feature: Client Config generator (config string + mobile QR + installer)
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `composer.json` / `composer.lock` (added `endroid/qr-code` for server-side SVG QR, no GD needed)
+- `app/Services/ClientConfigService.php` (NEW — encodes the RustDesk server-config string, QR payload, installer filename, SVG QR)
+- `app/Http/Controllers/Admin/ClientConfigController.php` (NEW), `routes/web.php`, `resources/views/admin/client_config/index.blade.php` (NEW), `resources/views/admin/partials/sidebar.blade.php` (nav link)
+- `tests/Feature/ClientConfigTest.php` (NEW — 4, incl. client-exact round-trip)
+**Database/API Changes:** New admin page `GET /admin/client-config`. No client-API change.
+**Summary:** Implemented the open-source equivalent of RustDesk Pro's client generator (the explicit ask). An admin enters ID/relay/API/key and gets: the **config string** (desktop "Import Server Config" / `rustdesk --config`), a **mobile QR** (payload `config=…`, scanned in the mobile app), and the **renamed-installer filename** (`rustdesk-host=…,key=….exe`). Encoding verified against the client's own `ServerConfig.decode` / `custom_server.rs` (`reverse(url-safe-base64-no-pad(json{host,relay,api,key}))`) — one string satisfies every client import path. Verified: Pint 148, PHPStan L5 0 errors, 64 PHPUnit passed.
+
 ## [2026-06-23 00:45] - Device bulk-assign + reusable live-search combobox + strategy "set all"
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

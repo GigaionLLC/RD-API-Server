@@ -42,6 +42,9 @@
             <a href="/admin/deploy-tokens" class="rd-nav__item {{ str_contains($nav, 'deploy') ? 'active' : '' }}">
                 <i class="ri-key-2-line"></i> Deploy Tokens
             </a>
+            <a href="/admin/client-config" class="rd-nav__item {{ str_contains($nav, 'client-config') ? 'active' : '' }}">
+                <i class="ri-qr-code-line"></i> Client Config
+            </a>
         @endif
 
         @if ($u && ($u->hasPermission('strategies.view') || $u->hasPermission('sessions.view')))

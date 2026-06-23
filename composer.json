@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.5",
         "ext-ldap": "*",
+        "endroid/qr-code": "^6.1",
         "laravel/framework": "^13.8",
         "laravel/socialite": "^5.0",
         "laravel/tinker": "^3.0"
