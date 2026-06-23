@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-22 22:30] - Feature: RustDesk-client-style admin address-book manager
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Http/Controllers/Admin/AddressBookController.php` (full peer + tag CRUD on ANY user's book: storePeer/updatePeer + storeTag/updateTag with hex→ARGB colour, tag rename propagation, blank-password-keeps-existing)
+- `routes/web.php` (peer store/update, tag store/update routes)
+- `resources/views/admin/address_books/show.blade.php` (rebuilt as a client-style manager: book switcher, Tags rail with colour dots + filter, peer cards with platform banner + ⋮ Edit/Delete, Add/Edit ID + tag Bootstrap modals)
+- `app/Models/AddressBookPeer.php` (`@property array $tags`), `phpstan-baseline.neon` (dropped 3 now-resolved entries)
+- `tests/Feature/AdminAddressBookTest.php` (NEW — 7 tests)
+**Database/API Changes:** New admin routes (peer/tag create+update). No client-API change.
+**Summary:** Replaced the read-mostly admin address-book page with a RustDesk-client-style manager — peer cards (platform-coloured banner, alias, tags, ⋮ menu), a Tags side panel with colour swatches and click-to-filter, and Add/Edit dialogs (ID, alias, note, tags, password). The admin operates directly on models, so it can fully manage **other users'** books, not just its own. Verified: Pint 144, PHPStan L5 0 errors, 54 PHPUnit passed, views compile.
+
 ## [2026-06-22 21:30] - Fix: address-book mutation ack must be an EMPTY 200 (not {})
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

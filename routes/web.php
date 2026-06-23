@@ -83,7 +83,13 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::get('/admin/address-books', [AddressBookController::class, 'index'])->middleware('permission:address_books.view')->name('admin.address-books.index');
     Route::get('/admin/address-books/{addressBook}', [AddressBookController::class, 'show'])->middleware('permission:address_books.view')->name('admin.address-books.show');
     Route::delete('/admin/address-books/{addressBook}', [AddressBookController::class, 'destroy'])->middleware('permission:address_books.edit')->name('admin.address-books.destroy');
+    // Peer add/edit/delete (RustDesk-client-style manager).
+    Route::post('/admin/address-books/{addressBook}/peers', [AddressBookController::class, 'storePeer'])->middleware('permission:address_books.edit')->name('admin.address-books.peers.store');
+    Route::put('/admin/address-books/peers/{peer}', [AddressBookController::class, 'updatePeer'])->middleware('permission:address_books.edit')->name('admin.address-books.peers.update');
     Route::delete('/admin/address-books/peers/{peer}', [AddressBookController::class, 'destroyPeer'])->middleware('permission:address_books.edit')->name('admin.address-books.peers.destroy');
+    // Tag add/edit/delete.
+    Route::post('/admin/address-books/{addressBook}/tags', [AddressBookController::class, 'storeTag'])->middleware('permission:address_books.edit')->name('admin.address-books.tags.store');
+    Route::put('/admin/address-books/tags/{tag}', [AddressBookController::class, 'updateTag'])->middleware('permission:address_books.edit')->name('admin.address-books.tags.update');
     Route::delete('/admin/address-books/tags/{tag}', [AddressBookController::class, 'destroyTag'])->middleware('permission:address_books.edit')->name('admin.address-books.tags.destroy');
 
     // Strategies

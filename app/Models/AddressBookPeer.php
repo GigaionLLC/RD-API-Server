@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * A single peer entry within an address book collection.
+ *
+ * @property array<int, string>|null $tags
  */
 #[Fillable([
     'address_book_id', 'user_id', 'rustdesk_id', 'username', 'password', 'hostname',

@@ -25,26 +25,8 @@ parameters:
 			path: app/Http/Controllers/Api/AddressBookController.php
 
 		-
-			message: '#^Parameter \#1 \$array \(array\{string\}\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
-			count: 1
-			path: app/Http/Controllers/Api/AddressBookController.php
-
-		-
 			message: '#^Parameter \#1 \$array of function array_values contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Api/AddressBookController.php
-
-		-
-			message: '#^Property App\\Models\\AddressBookPeer\:\:\$tags \(string\|null\) does not accept array\<int, string\>\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Http/Controllers/Api/AddressBookController.php
-
-		-
-			message: '#^Property App\\Models\\AddressBookPeer\:\:\$tags \(string\|null\) does not accept list\<string\>\.$#'
-			identifier: assign.propertyType
 			count: 1
 			path: app/Http/Controllers/Api/AddressBookController.php
 
