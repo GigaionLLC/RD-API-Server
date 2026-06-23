@@ -104,6 +104,22 @@ class DefaultDeviceGroupTest extends TestCase
             ->assertJsonPath('strategy.config_options.enable-audio', 'N');
     }
 
+    public function test_index_explains_default_replacement(): void
+    {
+        $admin = User::create([
+            'username' => 'admin', 'password' => 'secret12345', 'is_admin' => true, 'status' => User::STATUS_NORMAL,
+        ]);
+        DeviceGroup::create(['name' => 'Alpha', 'is_default' => true]);
+        DeviceGroup::create(['name' => 'Beta']);
+
+        $this->actingAs($admin)->get(route('admin.device-groups.index'))
+            ->assertOk()
+            ->assertSee('Currently')
+            ->assertSee('Alpha')                       // names the current default
+            ->assertSee('replaces the current default', false)  // explicit replace warning on Beta
+            ->assertSee('reverts to a normal group', false);    // and what happens to the old one
+    }
+
     public function test_saving_a_group_as_default_clears_any_other_default(): void
     {
         // Even bypassing the controller (e.g. a direct create with is_default=true), the model

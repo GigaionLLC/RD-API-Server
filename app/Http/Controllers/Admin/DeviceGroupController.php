@@ -19,8 +19,11 @@ class DeviceGroupController extends Controller
     public function index(): View
     {
         $deviceGroups = DeviceGroup::withCount('devices')->orderBy('name')->paginate(20);
+        // The current default (may be on another page) so the UI can name it in the
+        // replace-confirmation.
+        $defaultGroup = DeviceGroup::where('is_default', true)->first(['id', 'name']);
 
-        return view('admin.device_groups.index', compact('deviceGroups'));
+        return view('admin.device_groups.index', compact('deviceGroups', 'defaultGroup'));
     }
 
     public function create(): View

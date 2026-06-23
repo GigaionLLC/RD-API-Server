@@ -3,6 +3,15 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 14:20] - Make default-group replacement explicit in the UI
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Http/Controllers/Admin/DeviceGroupController.php` (`index` passes the current `$defaultGroup` so the UI can name it)
+- `resources/views/admin/device_groups/index.blade.php` (explanatory banner naming the current default; the "Set as default" button now carries a confirm that names the group it replaces and states the old default reverts to a normal group; badge reads "Default — new devices land here")
+- `tests/Feature/DefaultDeviceGroupTest.php` (+1: index explains replacement)
+**Database/API Changes:** None (UI/UX only).
+**Summary:** Made it obvious that there is exactly **one** default device group and that choosing a new one replaces the current default. The list shows a banner ("Currently <name>… setting another replaces it; the previous default reverts to a normal group, its devices stay put") and the Set-as-default action confirms with the named current default before switching. Clarified the terminology after the user asked whether the old default becomes "shared" — it does not; "shared" is an address-book concept, device groups only have the single `is_default` flag, so the previous default simply becomes a normal group. Verified: Pint 190 files clean, PHPStan L5 0 errors, **146 PHPUnit passed** (470 assertions; +1).
+
 ## [2026-06-23 14:00] - Harden: enforce a single default device group
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**
