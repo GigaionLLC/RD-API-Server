@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-22 19:45] - Fix: heartbeat strategy push dropped on client (extra:[] vs {})
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Services/StrategyService.php` (`heartbeatPayload`: cast `config_options` and `extra` to `(object)` so empty encodes as `{}` not `[]`)
+- `tests/Feature/HeartbeatStrategyTest.php` (NEW — 2 tests: objects-not-arrays + no-push-when-in-sync)
+**Database/API Changes:** None (response-shape correction; wire-compatible).
+**Summary:** Diagnosed live on a production client (id 345890346, SSH to the Komodo stack): the device had the correct strategy assigned and its `strategy_timestamp` matched the server, yet the policy options never applied. Root cause: the heartbeat `strategy` block sent `"extra":[]` (and would send `"config_options":[]` when empty) because PHP's `(array)` casts an empty array to a JSON array. The client deserializes both into `HashMap<String,String>` (sync.rs `StrategyOptions`); an array fails serde, so the **whole** strategy is discarded — but `modified_at` is parsed separately and stored, leaving the client "in sync" yet never applying the options. Same `[]`-vs-`{}` class the response-contract audit fixed elsewhere but missed inside the nested strategy block. Verified: Pint 141, PHPStan L5 0 errors, 43 PHPUnit passed. NOTE: after deploy, bump a strategy's modified_at (re-save) so already-synced clients re-pull.
+
 ## [2026-06-22 17:30] - Strategy editor: full known-option catalog with toggles + selects
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

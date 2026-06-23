@@ -78,8 +78,13 @@ class StrategyService
         return [
             'modified_at' => $serverModifiedAt,
             'strategy' => [
-                'config_options' => (array) ($strategy->options ?? []),
-                'extra' => (array) ($strategy->extra ?? []),
+                // Both MUST serialize as JSON objects: the client deserializes them into
+                // HashMap<String,String> (sync.rs StrategyOptions). An empty PHP array encodes
+                // as "[]", which fails serde (expects a map) and silently drops the whole
+                // strategy — the client keeps modified_at but never applies config_options.
+                // Cast to object so empty becomes "{}".
+                'config_options' => (object) ($strategy->options ?? []),
+                'extra' => (object) ($strategy->extra ?? []),
             ],
         ];
     }
