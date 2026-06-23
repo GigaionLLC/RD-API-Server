@@ -20,7 +20,12 @@
             <p class="rd-help" style="margin-top:0;">
                 Pre-configure RustDesk clients so users don't enter server details by hand. Fill in your
                 servers, then share the QR (mobile), the config string (desktop → <em>Import Server Config</em>),
-                or rename the installer.
+                the command line, or rename the installer.
+            </p>
+            <p class="rd-help" style="margin-top:0;">
+                Fields are pre-filled from this server's config (<code>RUSTDESK_ID_SERVER</code>,
+                <code>RUSTDESK_RELAY_SERVER</code>, <code>RUSTDESK_KEY</code> / <code>RUSTDESK_KEY_FILE</code>,
+                <code>RUSTDESK_API_SERVER</code>). Override any of them below.
             </p>
             <form method="GET" action="{{ route('admin.client-config.index') }}">
                 <div class="rd-grid rd-grid--2" style="align-items:start;">
@@ -57,6 +62,32 @@
                             <textarea readonly id="cfgString">{{ $configString }}</textarea>
                             <button type="button" class="rd-btn rd-btn--ghost rd-copy" data-copy="#cfgString"><i class="ri-file-copy-line"></i></button>
                         </div>
+                    </div>
+                </div>
+
+                <div class="rd-card" style="margin-bottom:18px;">
+                    <div class="rd-card__header"><h3 class="rd-card__title">Command line (<code>--config</code>)</h3></div>
+                    <div class="rd-card__body">
+                        <p class="rd-help" style="margin-top:0;">Run once on an already-installed client to apply the server config.</p>
+                        @php
+                            $cli = [
+                                'Windows' => 'ri-windows-fill',
+                                'macOS' => 'ri-apple-fill',
+                                'Linux' => 'ri-ubuntu-fill',
+                            ];
+                            $cmds = [
+                                'Windows' => '"%ProgramFiles%\\RustDesk\\rustdesk.exe" --config '.$configString,
+                                'macOS' => '/Applications/RustDesk.app/Contents/MacOS/rustdesk --config '.$configString,
+                                'Linux' => 'rustdesk --config '.$configString,
+                            ];
+                        @endphp
+                        @foreach ($cmds as $os => $cmd)
+                            <label class="rd-label" style="margin-top:6px;"><i class="{{ $cli[$os] }}"></i> {{ $os }}</label>
+                            <div class="rd-out">
+                                <textarea readonly id="cli{{ $os }}">{{ $cmd }}</textarea>
+                                <button type="button" class="rd-btn rd-btn--ghost rd-copy" data-copy="#cli{{ $os }}"><i class="ri-file-copy-line"></i></button>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
 
