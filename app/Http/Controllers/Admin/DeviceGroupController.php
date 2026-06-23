@@ -86,6 +86,28 @@ class DeviceGroupController extends Controller
         }
     }
 
+    /**
+     * Toggle this group as THE default for new/ungrouped devices. Marking one clears any
+     * previous default (at most one is default at a time); toggling the current default off
+     * leaves no default.
+     */
+    public function setDefault(DeviceGroup $deviceGroup): RedirectResponse
+    {
+        $makeDefault = ! $deviceGroup->is_default;
+
+        DeviceGroup::query()->where('is_default', true)->update(['is_default' => false]);
+
+        if ($makeDefault) {
+            $deviceGroup->forceFill(['is_default' => true])->save();
+        }
+
+        return redirect()
+            ->route('admin.device-groups.index')
+            ->with('status', $makeDefault
+                ? "\"{$deviceGroup->name}\" is now the default group for new devices."
+                : 'Default device group cleared.');
+    }
+
     public function destroy(DeviceGroup $deviceGroup): RedirectResponse
     {
         $deviceGroup->delete();

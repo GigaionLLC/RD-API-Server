@@ -76,6 +76,7 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::post('/admin/device-groups', [DeviceGroupController::class, 'store'])->middleware('permission:device_groups.edit')->name('admin.device-groups.store');
     Route::get('/admin/device-groups/{deviceGroup}/edit', [DeviceGroupController::class, 'edit'])->middleware('permission:device_groups.view')->name('admin.device-groups.edit');
     Route::put('/admin/device-groups/{deviceGroup}', [DeviceGroupController::class, 'update'])->middleware('permission:device_groups.edit')->name('admin.device-groups.update');
+    Route::post('/admin/device-groups/{deviceGroup}/default', [DeviceGroupController::class, 'setDefault'])->middleware('permission:device_groups.edit')->name('admin.device-groups.default');
     Route::delete('/admin/device-groups/{deviceGroup}', [DeviceGroupController::class, 'destroy'])->middleware('permission:device_groups.edit')->name('admin.device-groups.destroy');
 
     // Address Books

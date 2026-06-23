@@ -26,11 +26,24 @@
                 <tbody>
                 @forelse ($deviceGroups as $group)
                     <tr>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">{{ $group->name }}</td>
+                        <td style="color:var(--rd-text-bright);font-weight:600;">
+                            {{ $group->name }}
+                            @if ($group->is_default)
+                                <span class="rd-badge rd-badge--online" title="New devices are placed in this group">Default</span>
+                            @endif
+                        </td>
                         <td class="rd-muted">{{ $group->devices_count }}</td>
                         <td class="rd-muted">{{ $group->note ?: '—' }}</td>
                         <td style="text-align:right;">
                             <div class="rd-row" style="justify-content:flex-end;">
+                                <form method="POST" action="{{ route('admin.device-groups.default', $group) }}" class="m-0">
+                                    @csrf
+                                    @if ($group->is_default)
+                                        <button type="submit" class="rd-btn rd-btn--ghost" title="Stop placing new devices here"><i class="ri-star-fill"></i> Unset default</button>
+                                    @else
+                                        <button type="submit" class="rd-btn rd-btn--ghost" title="Place new/ungrouped devices in this group"><i class="ri-star-line"></i> Set default</button>
+                                    @endif
+                                </form>
                                 <a href="{{ route('admin.device-groups.edit', $group) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
                                 <form method="POST" action="{{ route('admin.device-groups.destroy', $group) }}" class="m-0">
                                     @csrf

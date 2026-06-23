@@ -3,6 +3,23 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-22 20:40] - Docs: mark the project Beta + recommend established servers
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:** `README.md` (prominent Beta callout near the top)
+**Database/API Changes:** None.
+**Summary:** Added a Beta notice stating the project is young and heavily under test, expect rough edges/breaking changes, and recommending the established `lejianwen/rustdesk-api` and `lantongxue/rustdesk-api-server-pro` for production today (plain repo names, consistent with the existing Acknowledgements style).
+
+## [2026-06-22 20:30] - Feature: default device group for new/ungrouped devices
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `database/migrations/2026_06_18_100032_add_is_default_to_device_groups_table.php` (NEW — `device_groups.is_default`)
+- `app/Models/DeviceGroup.php` (`is_default` fillable+cast; `defaultId()` helper)
+- `app/Http/Controllers/Admin/DeviceGroupController.php` (`setDefault` toggle — exclusive), `routes/web.php`, `resources/views/admin/device_groups/index.blade.php` (Default badge + Set/Unset button)
+- `app/Http/Controllers/Api/SystemController.php` (heartbeat + sysinfo place ungrouped devices in the default group), `app/Services/DeploymentService.php` (deploy + assign do the same when no group preset)
+- `tests/Feature/DefaultDeviceGroupTest.php` (NEW — 5 tests)
+**Database/API Changes:** `device_groups.is_default` column; new `POST /admin/device-groups/{id}/default`. No client-API change.
+**Summary:** Previously a freshly-registered device had `device_group_id = NULL` ("None") and matched no group-level strategy. An admin can now flag one device group as the **default** (star button on the Device Groups page); new — and currently ungrouped — devices are placed into it on their next heartbeat/sysinfo/deploy, so a group strategy applies automatically (an explicit `device_group_name` preset still wins). At most one default at a time; toggling it off leaves none. Verified: Pint 143, PHPStan L5 0 errors, 48 PHPUnit passed, views compile.
+
 ## [2026-06-22 19:45] - Fix: heartbeat strategy push dropped on client (extra:[] vs {})
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

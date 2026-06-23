@@ -48,6 +48,10 @@ class SystemController extends Controller
             $device = new Device(['rustdesk_id' => $rustdeskId, 'uuid' => $uuid]);
         }
 
+        // Place new / still-ungrouped devices into the default group (when one is designated)
+        // so a group-level strategy applies instead of them sitting in "None".
+        $device->device_group_id ??= DeviceGroup::defaultId();
+
         $conns = $request->input('conns', []);
         $device->fill([
             'uuid' => $uuid !== '' ? $uuid : $device->uuid,
@@ -114,6 +118,10 @@ class SystemController extends Controller
         if ($v = $request->input('note')) {
             $device->note = $v;
         }
+
+        // Default group for new / ungrouped devices (a device_group_name preset, applied in
+        // applyPresets() below, still takes precedence over this).
+        $device->device_group_id ??= DeviceGroup::defaultId();
 
         $device->save();
 

@@ -73,6 +73,7 @@ class DeploymentService
         }
 
         $device = $existing ?: new Device(['rustdesk_id' => $id]);
+        $device->device_group_id ??= DeviceGroup::defaultId();
 
         $device->fill([
             'uuid' => $uuid,
@@ -142,6 +143,9 @@ class DeploymentService
         if (! empty($input['device_group_name'])) {
             $device->device_group_id = DeviceGroup::firstOrCreate(['name' => (string) $input['device_group_name']])->id;
         }
+
+        // Fall back to the default group when no explicit group was named.
+        $device->device_group_id ??= DeviceGroup::defaultId();
 
         foreach (['device_username', 'device_name', 'note'] as $field) {
             if (! empty($input[$field])) {
