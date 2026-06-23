@@ -62,7 +62,9 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - name: Serve app
-        run: php artisan serve --host=127.0.0.1 --port=8088 &
+        # PHP_CLI_SERVER_WORKERS lets the built-in server handle concurrent requests
+        # (Playwright runs specs in parallel; a single worker would serialise/stall them).
+        run: PHP_CLI_SERVER_WORKERS=8 php artisan serve --host=127.0.0.1 --port=8088 &
       - name: Wait for app
         run: for i in $(seq 1 30); do curl -sf http://127.0.0.1:8088/api/version && break; sleep 2; done
       - name: Run E2E

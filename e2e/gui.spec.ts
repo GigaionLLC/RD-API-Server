@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, APIRequestContext } from '@playwright/test';
 
 const USER = process.env.E2E_ADMIN_USER || 'admin';
 const PASS = process.env.E2E_ADMIN_PASS || 'admin123456';
@@ -15,9 +15,27 @@ async function jqueryReady(page: Page) {
     await page.waitForFunction(() => (window as any).jQuery !== undefined, null, { timeout: 15000 });
 }
 
+// Create the admin's personal address book + a peer through the real client API, so the test
+// is self-sufficient (CI seeds only the admin account).
+async function seedAddressBook(request: APIRequestContext) {
+    const login = await request.post('/api/login', {
+        data: { username: USER, password: PASS, id: 'e2e-gui', uuid: 'e2e-gui' },
+    });
+    const token = (await login.json()).access_token;
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    await request.post('/api/ab/peer/add/personal', { headers, data: { id: '999111', alias: 'E2E PC' } });
+}
+
 test('strategy editor renders the client-style Settings sub-nav and switches panes', async ({ page }) => {
     await signIn(page);
-    await page.goto('/admin/strategies', { waitUntil: 'domcontentloaded' });
+
+    // Ensure a strategy exists, then open its editor.
+    await page.goto('/admin/strategies/create', { waitUntil: 'domcontentloaded' });
+    await page.fill('#name', 'E2E Policy');
+    await Promise.all([
+        page.waitForURL(/\/admin\/strategies$/, { waitUntil: 'domcontentloaded' }),
+        page.locator('button', { hasText: 'Create strategy' }).click(),
+    ]);
     await page.locator('a[href*="/edit"]').first().click();
 
     // Structure (server-rendered HTML + local theme CSS — no CDN needed).
@@ -36,15 +54,16 @@ test('strategy editor renders the client-style Settings sub-nav and switches pan
     await expect(page.locator('.rd-sec__title', { hasText: 'Permissions' })).toBeVisible();
 });
 
-test('address book manager shows peer cards and opens a dark Add ID dialog', async ({ page }) => {
+test('address book manager opens a dark Add ID dialog', async ({ page, request }) => {
+    await seedAddressBook(request);
     await signIn(page);
-    const bookId = process.env.E2E_BOOK_ID || '1';
-    await page.goto(`/admin/address-books/${bookId}`, { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/address-books', { waitUntil: 'domcontentloaded' });
+    await page.locator('a:has-text("View")').first().click();
 
-    // Structure: the client-style manager header + Add ID button.
+    // Structure: the client-style manager + Add ID button.
     const addBtn = page.locator('button', { hasText: 'Add ID' });
     await expect(addBtn).toBeVisible();
-    await expect(page.locator('.rd-ab')).toBeVisible(); // the cards/tags layout
+    await expect(page.locator('.rd-ab')).toBeVisible();
 
     // Interactivity: the Add ID modal opens with the ID field (Bootstrap JS).
     await jqueryReady(page);
