@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ApiKeyAuth;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\LogConsoleOperation;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => CheckPermission::class,
             'rustauth' => RustAuth::class,
             'console.audit' => LogConsoleOperation::class,
+            'apikey' => ApiKeyAuth::class,
         ]);
         // Unauthenticated admin requests go to the admin login page.
         $middleware->redirectGuestsTo('/admin/login');

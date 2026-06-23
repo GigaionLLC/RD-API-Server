@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AddressBookController;
 use App\Http\Controllers\Admin\AdminRoleController;
 use App\Http\Controllers\Admin\AlarmController;
+use App\Http\Controllers\Admin\ApiKeyController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\ClientConfigController;
@@ -147,6 +148,11 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::post('/admin/deploy-tokens', [DeployTokenController::class, 'store'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.store');
     Route::delete('/admin/deploy-tokens/{deployToken}', [DeployTokenController::class, 'destroy'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.destroy');
     Route::get('/admin/client-config', [ClientConfigController::class, 'index'])->middleware('permission:deploy.view')->name('admin.client-config.index');
+
+    // Scoped API keys for the admin REST API (/api/v1).
+    Route::get('/admin/api-keys', [ApiKeyController::class, 'index'])->name('admin.api-keys.index');
+    Route::post('/admin/api-keys', [ApiKeyController::class, 'store'])->name('admin.api-keys.store');
+    Route::delete('/admin/api-keys/{apiKey}', [ApiKeyController::class, 'destroy'])->name('admin.api-keys.destroy');
     Route::get('/admin/devices/pending', [DeployTokenController::class, 'pending'])->middleware('permission:deploy.view')->name('admin.devices.pending');
     Route::put('/admin/devices/{device}/approve', [DeployTokenController::class, 'approve'])->middleware('permission:deploy.edit')->name('admin.devices.approve');
     Route::delete('/admin/devices/{device}/reject', [DeployTokenController::class, 'reject'])->middleware('permission:deploy.edit')->name('admin.devices.reject');

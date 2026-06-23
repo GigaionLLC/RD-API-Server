@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 02:30] - Feature: scoped API keys + admin REST API (/api/v1)
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `database/migrations/..._create_api_keys_table.php` + `app/Models/ApiKey.php` (hashed secret, prefix, scopes, expiry; `hasScope`, `generateSecret`)
+- `app/Http/Middleware/ApiKeyAuth.php` (NEW, alias `apikey:<scope>`), `bootstrap/app.php`
+- `app/Http/Controllers/Api/V1/{Device,User,Strategy,Audit,AddressBook}Controller.php` (NEW), `routes/api.php` (`/api/v1/*`)
+- `app/Http/Controllers/Admin/ApiKeyController.php` (NEW), `routes/web.php`, `resources/views/admin/api_keys/index.blade.php` (NEW), sidebar link
+- `tests/Feature/ApiKeyTest.php` (NEW, 7)
+**Database/API Changes:** New `api_keys` table; new admin REST API `GET /api/v1/{devices,users,strategies,audit/connections,address-books}` (+ AB peer read/write), authenticated by `Authorization: Bearer <key>` or `X-API-Key`, each gated by a scope. New admin page `/admin/api-keys`.
+**Summary:** Implemented the Pro-style programmatic API (roadmap #1). Admins mint scoped keys (devices/users/strategies/address_book.read|write/audit.read; secret shown once, SHA-256-stored, optional expiry) and call `/api/v1` endpoints; AB writes are scoped to the key owner's books. The API Keys page shows a curl quickstart. Verified: Pint 158, PHPStan L5 0 errors, 71 PHPUnit passed.
+
 ## [2026-06-23 01:30] - Feature: Client Config generator (config string + mobile QR + installer)
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

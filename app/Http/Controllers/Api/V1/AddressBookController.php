@@ -1,0 +1,82 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\AddressBook;
+use App\Models\AddressBookPeer;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+/**
+ * Admin REST API (v1) — address books owned by the API key's user. Read needs
+ * address_book.read; peer create/delete need address_book.write.
+ */
+class AddressBookController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $books = AddressBook::query()
+            ->where('user_id', $request->user()->id)
+            ->withCount(['peers', 'tags'])
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json(['data' => $books]);
+    }
+
+    public function peers(Request $request, AddressBook $addressBook): JsonResponse
+    {
+        $this->authorizeBook($request, $addressBook);
+
+        $peers = $addressBook->peers()
+            ->orderBy('rustdesk_id')
+            ->paginate(min(100, max(1, (int) $request->query('per_page', 50))),
+                ['id', 'rustdesk_id', 'alias', 'hostname', 'platform', 'tags', 'note']);
+
+        return response()->json($peers);
+    }
+
+    public function storePeer(Request $request, AddressBook $addressBook): JsonResponse
+    {
+        $this->authorizeBook($request, $addressBook);
+
+        $data = $request->validate([
+            'id' => ['required', 'string', 'max:255'],
+            'alias' => ['nullable', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:300'],
+            'tags' => ['nullable', 'array'],
+            'tags.*' => ['string', 'max:255'],
+        ]);
+
+        if (AddressBookPeer::where('address_book_id', $addressBook->id)->where('rustdesk_id', $data['id'])->exists()) {
+            return response()->json(['error' => 'ID already exists in this address book'], 422);
+        }
+
+        $peer = AddressBookPeer::create([
+            'address_book_id' => $addressBook->id,
+            'user_id' => $addressBook->user_id,
+            'rustdesk_id' => $data['id'],
+            'alias' => $data['alias'] ?? null,
+            'note' => $data['note'] ?? null,
+            'tags' => array_values($data['tags'] ?? []),
+        ]);
+
+        return response()->json(['data' => ['id' => $peer->rustdesk_id]], 201);
+    }
+
+    public function destroyPeer(Request $request, AddressBook $addressBook, AddressBookPeer $peer): JsonResponse
+    {
+        $this->authorizeBook($request, $addressBook);
+
+        abort_if($peer->address_book_id !== $addressBook->id, 404);
+        $peer->delete();
+
+        return response()->json(['data' => true]);
+    }
+
+    private function authorizeBook(Request $request, AddressBook $book): void
+    {
+        abort_if($book->user_id !== $request->user()->id, 403, 'Not your address book');
+    }
+}

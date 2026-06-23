@@ -45,6 +45,9 @@
             <a href="/admin/client-config" class="rd-nav__item {{ str_contains($nav, 'client-config') ? 'active' : '' }}">
                 <i class="ri-qr-code-line"></i> Client Config
             </a>
+            <a href="/admin/api-keys" class="rd-nav__item {{ str_contains($nav, 'api-keys') ? 'active' : '' }}">
+                <i class="ri-terminal-box-line"></i> API Keys
+            </a>
         @endif
 
         @if ($u && ($u->hasPermission('strategies.view') || $u->hasPermission('sessions.view')))

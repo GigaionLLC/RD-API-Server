@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\OauthController;
 use App\Http\Controllers\Api\RecordController;
 use App\Http\Controllers\Api\SystemController;
+use App\Http\Controllers\Api\V1\DeviceController;
+use App\Http\Controllers\Api\V1\StrategyController;
+use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -54,6 +57,23 @@ Route::post('/record', [RecordController::class, 'store']);
 Route::post('/devices/deploy', [DevicesController::class, 'deploy']);
 // `rustdesk --assign --token …`: register + apply strategy/address-book/group/owner presets.
 Route::post('/devices/cli', [DevicesController::class, 'cli']);
+
+/*
+ * Admin REST API (v1) — programmatic access authenticated by a scoped API key
+ * (Authorization: Bearer <key> or X-API-Key). Manage keys + scopes in the admin console
+ * (API Keys). Documented in docs/api/README.md.
+ */
+Route::prefix('v1')->group(function (): void {
+    Route::get('/devices', [DeviceController::class, 'index'])->middleware('apikey:devices.read');
+    Route::get('/users', [UserController::class, 'index'])->middleware('apikey:users.read');
+    Route::get('/strategies', [StrategyController::class, 'index'])->middleware('apikey:strategies.read');
+    Route::get('/audit/connections', [App\Http\Controllers\Api\V1\AuditController::class, 'connections'])->middleware('apikey:audit.read');
+
+    Route::get('/address-books', [App\Http\Controllers\Api\V1\AddressBookController::class, 'index'])->middleware('apikey:address_book.read');
+    Route::get('/address-books/{addressBook}/peers', [App\Http\Controllers\Api\V1\AddressBookController::class, 'peers'])->middleware('apikey:address_book.read');
+    Route::post('/address-books/{addressBook}/peers', [App\Http\Controllers\Api\V1\AddressBookController::class, 'storePeer'])->middleware('apikey:address_book.write');
+    Route::delete('/address-books/{addressBook}/peers/{peer}', [App\Http\Controllers\Api\V1\AddressBookController::class, 'destroyPeer'])->middleware('apikey:address_book.write');
+});
 
 // Bearer-token (account) authenticated client API.
 Route::middleware('rustauth')->group(function (): void {
