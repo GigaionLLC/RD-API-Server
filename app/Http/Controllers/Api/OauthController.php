@@ -85,16 +85,30 @@ class OauthController extends Controller
 
     /**
      * GET /api/oidc/auth-query?code=&id=&uuid=
-     * Returns {"body": "<json>"} where body is the AuthBody, or the pending error
-     * ("No authed oidc is found") while the user has not finished authenticating.
+     *
+     * Returns the AuthBody once login completes, or the pending error
+     * ("No authed oidc is found") while it hasn't.
+     *
+     * Dual shape for cross-version client compatibility:
+     *   - the AuthBody (or {error}) is returned at the TOP LEVEL — this is what stable
+     *     RustDesk clients (and the reference Go server, lejianwen/rustdesk-api) parse:
+     *     `HbbHttpResponse::parse(&resp)` → serde `AuthBody` directly;
+     *   - the same JSON is ALSO mirrored under `body` — newer (post-2026-04) clients read
+     *     `{"body":"<json string>"}` first.
+     * serde ignores unknown fields, so each client generation parses the response it expects.
      */
     public function authQuery(Request $request): JsonResponse
     {
         $code = (string) $request->query('code', '');
+        $json = $this->oauth->pollResult($code);
 
-        return response()->json([
-            'body' => $this->oauth->pollResult($code),
-        ]);
+        $payload = json_decode($json, true);
+        if (! is_array($payload)) {
+            $payload = [];
+        }
+        $payload['body'] = $json;
+
+        return response()->json($payload);
     }
 
     /**

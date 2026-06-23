@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 17:40] - Fix (real root cause): OIDC auth-query must return the AuthBody at top level
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `app/Http/Controllers/Api/OauthController.php`: `authQuery` now returns the AuthBody (or `{error}`) **at the top level** AND mirrored under `body` (dual shape).
+- `tests/Feature/OidcPkceTest.php` (+2: top-level + body for ready and pending).
+**Database/API Changes:** `/api/oidc/auth-query` response shape: previously `{"body":"<json>"}` only; now `{<authbody fields>, "body":"<json>"}` (and `{error, body}` while pending).
+**Summary:** Root-caused via a **verbatim diff against the working reference** (lejianwen/rustdesk-api), per the user's prompt. lejianwen's `OidcAuthQuery` returns `c.JSON(LoginRes{access_token,type,user})` and pending `gin.H{message,error}` — both **at the top level, no `body` wrapper**. The RustDesk client's `{body:String}` unwrap is a recent master change (client commit 4e30ee8d1, 2026-04-03) not yet in stable releases, so stable clients (and the reference) parse the auth-query response **directly** as `serde AuthBody`. Our server wrapped everything in `{"body":"…"}`, so the user's client ran `from_value::<AuthBody>` on `{"body":"…"}`, found no `access_token`/`user` at top level, failed deserialization, and polled forever — which is why the earlier `info:{}` change had no effect (the client never reached the inner body). Now we return the AuthBody at the top level (matching lejianwen + stable clients) and keep `body` for post-April clients; serde ignores unknown fields so both generations parse it. Verified: Pint 193 files clean, PHPStan L5 0 errors, **157 PHPUnit passed** (530 assertions; +2).
+
 ## [2026-06-23 17:10] - Fix: client OIDC rejected token (serde flatten) — shrink user.info to {}
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

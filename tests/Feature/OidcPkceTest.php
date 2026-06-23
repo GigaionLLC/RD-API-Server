@@ -125,6 +125,35 @@ class OidcPkceTest extends TestCase
         $this->assertDatabaseHas('oauth_sessions', ['code' => $code]);
     }
 
+    public function test_auth_query_returns_token_at_top_level_and_in_body(): void
+    {
+        $this->fakeOidc();
+        $this->provider(true);
+        $oauth = app(OauthService::class);
+
+        [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
+        $oauth->handleCallback($code, 'auth-code');
+
+        $res = $this->getJson("/api/oidc/auth-query?code={$code}&id=dev&uuid=uuid")->assertOk();
+
+        // Top level (stable clients / lejianwen-style parse the response directly).
+        $res->assertJsonPath('access_token', fn ($t) => is_string($t) && $t !== '');
+        $res->assertJsonPath('type', 'access_token');
+        $res->assertJsonPath('user.name', 'u');
+        // Also mirrored in `body` for newer clients that read {"body":"<json>"}.
+        $this->assertStringContainsString('access_token', $res->json('body'));
+    }
+
+    public function test_auth_query_pending_has_error_at_top_level_and_in_body(): void
+    {
+        $this->provider(true);
+
+        $res = $this->getJson('/api/oidc/auth-query?code=nope&id=d&uuid=u')->assertOk();
+
+        $res->assertJsonPath('error', 'No authed oidc is found');           // top level
+        $this->assertStringContainsString('No authed oidc is found', $res->json('body')); // and body
+    }
+
     public function test_provider_without_pkce_still_completes(): void
     {
         $this->fakeOidc();
