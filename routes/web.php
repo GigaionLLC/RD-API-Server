@@ -118,6 +118,7 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::get('/admin/strategies', [StrategyController::class, 'index'])->middleware('permission:strategies.view')->name('admin.strategies.index');
     Route::get('/admin/strategies/create', [StrategyController::class, 'create'])->middleware('permission:strategies.edit')->name('admin.strategies.create');
     Route::post('/admin/strategies', [StrategyController::class, 'store'])->middleware('permission:strategies.edit')->name('admin.strategies.store');
+    Route::post('/admin/strategies/{strategy}/default', [StrategyController::class, 'setDefault'])->middleware('permission:strategies.edit')->name('admin.strategies.default');
     Route::get('/admin/strategies/{strategy}/edit', [StrategyController::class, 'edit'])->middleware('permission:strategies.view')->name('admin.strategies.edit');
     Route::put('/admin/strategies/{strategy}', [StrategyController::class, 'update'])->middleware('permission:strategies.edit')->name('admin.strategies.update');
     Route::post('/admin/strategies/{strategy}/assignments', [StrategyController::class, 'storeAssignment'])->middleware('permission:strategies.edit')->name('admin.strategies.assignments.store');

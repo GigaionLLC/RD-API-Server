@@ -29,6 +29,10 @@
         <form method="POST" id="bulkForm" action="{{ route('admin.devices.bulk') }}" class="rd-bulkbar" style="display:none;">
             @csrf
             <span id="bulkCount" class="rd-muted" style="font-size:13px;"></span>
+            <span id="bulkAllWrap" class="rd-muted" style="font-size:13px;display:none;">
+                · <a href="#" id="bulkSelectAll">Select all {{ $devices->total() }} matching this filter</a>
+                <span id="bulkAllOn" style="display:none;color:var(--rd-primary);font-weight:600;">All {{ $devices->total() }} matching selected · <a href="#" id="bulkSelectAllClear">clear</a></span>
+            </span>
             <select class="rd-select" id="bulkField" name="field" style="width:170px;">
                 <option value="user_id">Set owner</option>
                 <option value="device_group_id">Set device group</option>
@@ -109,23 +113,50 @@
         function selectedIds() {
             return $('.dev-check:checked').map(function () { return this.value; }).get();
         }
+        var applyAll = false;        // apply to the whole filtered set, not just checked rows
+        var pageCount = {{ $devices->count() }};
+        var total = {{ $devices->total() }};
+
+        function resetApplyAll() {
+            applyAll = false;
+            $('#bulkAllOn').hide();
+            $('#bulkSelectAll').show();
+        }
         function refreshBulk() {
             var n = selectedIds().length;
-            $('#bulkCount').text(n + ' selected');
+            $('#bulkCount').text(applyAll ? '' : (n + ' selected'));
             $('#bulkForm').toggle(n > 0);
+            // Offer "select all matching" once the whole page is checked and more rows exist.
+            $('#bulkAllWrap').toggle(n > 0 && n === pageCount && total > pageCount);
+            if (n === 0) { resetApplyAll(); }
         }
 
         $('#checkAll').on('change', function () {
             $('.dev-check').prop('checked', this.checked);
+            resetApplyAll();
             refreshBulk();
         });
         $(document).on('change', '.dev-check', function () {
             var all = $('.dev-check'), checked = $('.dev-check:checked');
             $('#checkAll').prop('checked', all.length > 0 && checked.length === all.length);
+            resetApplyAll();
             refreshBulk();
         });
         $('#bulkClear').on('click', function () {
             $('.dev-check, #checkAll').prop('checked', false);
+            resetApplyAll();
+            refreshBulk();
+        });
+        $('#bulkSelectAll').on('click', function (e) {
+            e.preventDefault();
+            applyAll = true;
+            $(this).hide();
+            $('#bulkAllOn').show();
+            $('#bulkCount').text('');
+        });
+        $('#bulkSelectAllClear').on('click', function (e) {
+            e.preventDefault();
+            resetApplyAll();
             refreshBulk();
         });
 
@@ -147,12 +178,19 @@
         $('#bulkField').on('change', syncBulkField);
         syncBulkField();
 
-        // Inject the checked ids and confirm before applying.
+        // Inject the checked ids (or the all-matching flag + filter) and confirm before applying.
         $('#bulkForm').on('submit', function (e) {
             var ids = selectedIds();
+            var $box = $('#bulkIds').empty();
+            if (applyAll) {
+                if (!window.confirm('Apply this change to ALL ' + total + ' device(s) matching the current filter?')) { e.preventDefault(); return; }
+                $('<input type="hidden" name="all" value="1">').appendTo($box);
+                $('<input type="hidden" name="q">').val(@json($q)).appendTo($box);
+                $('<input type="hidden" name="status">').val(@json($status)).appendTo($box);
+                return;
+            }
             if (!ids.length) { e.preventDefault(); return; }
             if (!window.confirm('Apply this change to ' + ids.length + ' device(s)?')) { e.preventDefault(); return; }
-            var $box = $('#bulkIds').empty();
             ids.forEach(function (id) { $('<input type="hidden" name="ids[]">').val(id).appendTo($box); });
         });
     });

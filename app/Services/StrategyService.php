@@ -51,7 +51,9 @@ class StrategyService
             }
         }
 
-        return null;
+        // Lowest-priority fallback: the designated default strategy, so devices with no
+        // device/user/group assignment still receive a policy instead of nothing.
+        return Strategy::default();
     }
 
     /**

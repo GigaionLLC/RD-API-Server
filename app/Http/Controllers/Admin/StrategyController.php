@@ -27,6 +27,25 @@ class StrategyController extends Controller
         return view('admin.strategies.index', compact('strategies'));
     }
 
+    /**
+     * Toggle a strategy as the default fallback. At most one strategy is default at a time;
+     * it applies to any device with no device/user/device-group assignment.
+     */
+    public function setDefault(Strategy $strategy): RedirectResponse
+    {
+        $makeDefault = ! $strategy->is_default;
+
+        Strategy::query()->where('is_default', true)->update(['is_default' => false]);
+
+        if ($makeDefault) {
+            $strategy->forceFill(['is_default' => true])->save();
+        }
+
+        return redirect()
+            ->route('admin.strategies.index')
+            ->with('status', $makeDefault ? "“{$strategy->name}” is now the default strategy." : 'Default strategy cleared.');
+    }
+
     public function create(): View
     {
         $strategy = new Strategy(['enabled' => true, 'options' => []]);

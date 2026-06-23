@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * A configuration strategy whose options are pushed to clients.
  */
-#[Fillable(['name', 'enabled', 'options', 'extra', 'modified_at', 'note'])]
+#[Fillable(['name', 'enabled', 'is_default', 'options', 'extra', 'modified_at', 'note'])]
 class Strategy extends Model
 {
     use HasFactory;
@@ -22,10 +22,20 @@ class Strategy extends Model
     {
         return [
             'enabled' => 'boolean',
+            'is_default' => 'boolean',
             'options' => 'array',
             'extra' => 'array',
             'modified_at' => 'integer',
         ];
+    }
+
+    /**
+     * The designated default strategy (enabled), applied as the lowest-priority fallback, or
+     * null when none is designated.
+     */
+    public static function default(): ?self
+    {
+        return static::query()->where('is_default', true)->where('enabled', true)->first();
     }
 
     /**

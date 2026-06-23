@@ -80,8 +80,12 @@ class DeviceController extends Controller
     public function bulkUpdate(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'ids' => ['required', 'array'],
+            'ids' => ['array'],
             'ids.*' => ['integer'],
+            // When true, apply to every device matching the current filter, not just `ids`.
+            'all' => ['nullable', 'boolean'],
+            'q' => ['nullable', 'string'],
+            'status' => ['nullable', 'string'],
             'field' => ['required', Rule::in(['user_id', 'device_group_id', 'strategy_id'])],
             'value' => ['nullable', 'integer'],
         ]);
@@ -101,7 +105,17 @@ class DeviceController extends Controller
             }
         }
 
-        $count = Device::whereIn('id', $data['ids'])->update([$data['field'] => $value]);
+        if ($request->boolean('all')) {
+            // Whole filtered set (every page), not just the checked rows.
+            $query = $this->devicesQuery(trim((string) ($data['q'] ?? '')), $data['status'] ?? null);
+        } else {
+            if (empty($data['ids'])) {
+                return back()->withErrors(['ids' => 'Select at least one device.']);
+            }
+            $query = Device::whereIn('id', $data['ids']);
+        }
+
+        $count = $query->update([$data['field'] => $value]);
 
         $labels = ['user_id' => 'owner', 'device_group_id' => 'device group', 'strategy_id' => 'strategy'];
 

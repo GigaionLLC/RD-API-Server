@@ -3,6 +3,15 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-06-23 13:15] - Default-strategy fallback + "apply to all matching" device bulk
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- **Default strategy:** `database/migrations/2026_06_23_100003_add_is_default_to_strategies_table.php` (`is_default`), `app/Models/Strategy.php` (fillable + cast + `Strategy::default()`), `app/Services/StrategyService.php` (`resolveForDevice` now falls back to the default strategy when no device/user/device-group assignment matches — lowest priority), `app/Http/Controllers/Admin/StrategyController.php` (`setDefault`, single-default toggle), `routes/web.php`, `resources/views/admin/strategies/index.blade.php` (Default badge + star toggle)
+- **Bulk "all matching":** `app/Http/Controllers/Admin/DeviceController.php` (`bulkUpdate` accepts `all=1`+`q`/`status` to apply across the whole filtered set, not just checked rows; reuses `devicesQuery`), `resources/views/admin/devices/index.blade.php` ("Select all N matching this filter" affordance + JS, sends the filter on submit)
+- **Tests:** `tests/Feature/DefaultStrategyAndBulkAllTest.php` (NEW, 6)
+**Database/API Changes:** `strategies` gains `is_default`. New admin route `POST /admin/strategies/{strategy}/default`. `POST /admin/devices/bulk` now also accepts `all`+`q`+`status`. Heartbeat strategy resolution gains a default fallback (no wire change).
+**Summary:** Two requested fixes. (1) New devices with no assignment previously received no policy ("None"); now a strategy can be marked **Default** (star toggle on the Strategies list) and is pushed as the lowest-priority fallback — complementing the existing default **device group**. (2) The devices bulk-assign bar could only act on rows visible/selected on the current page; it now offers "Select all N matching this filter" to reassign owner / device group / strategy across the entire filtered set in one action. Verified: Pint 190 files clean, PHPStan L5 0 errors, ESLint clean, **140 PHPUnit passed** (450 assertions; +6).
+
 ## [2026-06-23 12:45] - Fix: implement OIDC PKCE (Keycloak login hung at "Waiting account auth")
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

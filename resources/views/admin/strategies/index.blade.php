@@ -25,7 +25,10 @@
                 <tbody>
                 @forelse ($strategies as $strategy)
                     <tr>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">{{ $strategy->name }}</td>
+                        <td style="color:var(--rd-text-bright);font-weight:600;">
+                            {{ $strategy->name }}
+                            @if ($strategy->is_default)<span class="rd-badge rd-badge--online" style="margin-left:6px;"><i class="ri-star-fill"></i> Default</span>@endif
+                        </td>
                         <td>
                             <span class="rd-badge rd-badge--{{ $strategy->enabled ? 'online' : 'offline' }}">
                                 <span class="dot"></span>{{ $strategy->enabled ? 'Enabled' : 'Disabled' }}
@@ -36,6 +39,12 @@
                         <td class="rd-muted">{{ $strategy->note ?: '—' }}</td>
                         <td style="text-align:right;">
                             <div class="rd-row" style="justify-content:flex-end;">
+                                <form method="POST" action="{{ route('admin.strategies.default', $strategy) }}" class="m-0">
+                                    @csrf
+                                    <button type="submit" class="rd-btn rd-btn--ghost" title="{{ $strategy->is_default ? 'Unset as default' : 'Set as default (fallback for unassigned devices)' }}">
+                                        <i class="{{ $strategy->is_default ? 'ri-star-fill' : 'ri-star-line' }}"></i>
+                                    </button>
+                                </form>
                                 <a href="{{ route('admin.strategies.edit', $strategy) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
                                 <form method="POST" action="{{ route('admin.strategies.destroy', $strategy) }}" class="m-0">
                                     @csrf
