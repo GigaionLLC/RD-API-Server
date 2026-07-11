@@ -29,6 +29,9 @@ if [ -z "${APP_KEY:-}" ]; then
 fi
 
 # --- Database ---
+# The compose files set DB_CONNECTION=mysql (MariaDB) by default. SQLite here is only the
+# fallback for a bare `docker run` with no database configured — fine for evaluation / small
+# setups, but use MySQL/MariaDB for a real fleet (SQLite is single-writer). See docker-compose.yml.
 DB_CONNECTION="${DB_CONNECTION:-sqlite}"
 export DB_CONNECTION
 if [ "$DB_CONNECTION" = "sqlite" ]; then

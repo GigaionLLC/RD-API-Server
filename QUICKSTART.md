@@ -1,6 +1,6 @@
 # Quick Start
 
-Self-host the RustDesk API server (admin console + client API) in one command.
+Self-host RD‑API‑Server (admin console + client API for the RustDesk client) in one command.
 
 ## 1. Run it
 
@@ -8,8 +8,8 @@ Self-host the RustDesk API server (admin console + client API) in one command.
 docker compose up -d
 ```
 
-That's the whole setup. It uses **SQLite by default**, so there is no database to install.
-All data persists in a Docker volume.
+The bundled `docker-compose.yml` starts the app behind **MariaDB** (the recommended database —
+SQLite is single-writer and bottlenecks as devices scale). All data persists in Docker volumes.
 
 - **Admin console:** http://localhost:21114/admin
 - **Client API base:** http://localhost:21114/api
@@ -23,6 +23,7 @@ Set these once (e.g. in a `.env` file next to `docker-compose.yml`, or in your s
 
 ```env
 ADMIN_PASS=choose-a-strong-password
+DB_PASSWORD=choose-a-strong-db-password     # used by both the app and the bundled MariaDB
 RUSTDESK_ID_SERVER=your.server:21116
 RUSTDESK_RELAY_SERVER=your.server:21117
 RUSTDESK_API_SERVER=http://your.server:21114
@@ -45,10 +46,12 @@ MAIL_PASSWORD=secret
 MAIL_FROM_ADDRESS=no-reply@example.com
 ```
 
-## 4. Bigger fleets: use MySQL/MariaDB
+## 4. Small setups: SQLite instead of MariaDB
 
-Uncomment the `db` service and the `DB_*` lines in `docker-compose.yml`, then
-`docker compose up -d`. Everything else stays the same.
+MariaDB is the default and recommended for any real fleet. For a small deployment
+(roughly **< 50 devices**) or a quick trial you can drop the database container and use SQLite:
+set `DB_CONNECTION=sqlite`, then remove the `db` service, the `depends_on:` block, and the
+`rustdesk-db` volume from `docker-compose.yml`. Data then lives in the `rustdesk-data` volume.
 
 ## 5. Optional settings
 
@@ -85,5 +88,5 @@ docker compose pull && docker compose up -d   # update
 ```
 
 ---
-Developers: see [AGENT.md](AGENT.md) and [docs/modernization/](docs/modernization/). The dev
-stack with hot tooling/tests is `docker/compose.toolchain.yml`.
+Developers: see **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** for the build/test/lint workflow,
+plus [AGENT.md](AGENT.md) and [docs/modernization/](docs/modernization/).

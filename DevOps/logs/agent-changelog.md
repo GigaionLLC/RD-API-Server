@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-11 13:40] - Default DB → MariaDB (SQLite optional); README production-focus + RD-API-Server rename
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `docker-compose.yml`, `docker-compose.dev.yml`: **MariaDB is now the default** — an active `db` service (mariadb:11 + healthcheck + `rustdesk-db` volume) wired to the app via `DB_*` env with `depends_on: condition: service_healthy`. SQLite demoted to an opt-in (documented "Prefer SQLite?" note). Header explains the performance rationale (SQLite is single-writer; bottlenecks as devices scale).
+- `config/database.php`: default connection `sqlite` → `mysql` (env-overridable).
+- `.env.example`: `DB_CONNECTION=mysql` with host/port/db/user/pass; SQLite shown as a commented alternative.
+- `docker/entrypoint.sh`: clarified the SQLite path is only the bare-`docker run` fallback (compose provides MariaDB).
+- `README.md`: renamed to **RD-API-Server** ("RD" = RustDesk shorthand, to avoid trademark friction) with an explicit "this is a self-hosted API server for the RustDesk client" framing; reworked **Quick start** around the production MariaDB compose with a copy-paste example compose + a pointer to `examples/full-stack.docker-compose.yml`; **extracted the Development section** to `docs/DEVELOPMENT.md`; updated the Stack line (MySQL/MariaDB default, SQLite optional).
+- `docs/DEVELOPMENT.md` (NEW — toolchain build, quality gates, runtime-image build, CLI/admin + screenshot-regen commands, docs map).
+- `QUICKSTART.md`: MariaDB default + `DB_PASSWORD`; flipped the "bigger fleets → MySQL" section to "small setups → SQLite (< ~50 devices)"; dev pointer → `docs/DEVELOPMENT.md`.
+**Database/API Changes:** Default DB connection is now **MySQL/MariaDB** (was SQLite). No schema/wire change. Existing SQLite deployments keep working by setting `DB_CONNECTION=sqlite`.
+**Summary:** Per the user: made the **performant database the default** (SQLite recommended only for < ~50 devices, with the single-writer rationale documented), refocused the README on **spinning up a production environment** via `docker-compose.yml` (+ the copyable full-stack example, one shown inline) and moved developer instructions into their own doc, and set up the **RD-API-Server** name (README explains the RustDesk connection; the GitHub repo rename + description update are done separately via `gh`). Validated: all migrations (incl. the 1.4.9 `audit_conns` one) run clean on **MariaDB** via `migrate:fresh --seed`; all three compose files pass `docker compose config`. Gate: Pint 196 files clean, PHPStan L5 0 errors, **164 PHPUnit passed** (557 assertions).
+
 ## [2026-07-11 13:15] - Docs: not-affiliated disclaimer + demo screenshots of the admin console
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

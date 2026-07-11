@@ -17,7 +17,9 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    // Default to MySQL/MariaDB: SQLite is single-writer and does not scale for a device fleet
+    // (see docker-compose.yml). Set DB_CONNECTION=sqlite to opt into SQLite for small setups.
+    'default' => env('DB_CONNECTION', 'mysql'),
 
     /*
     |--------------------------------------------------------------------------

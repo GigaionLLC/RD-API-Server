@@ -1,13 +1,20 @@
-# rustdesk-api — simplest possible self-host.
+# rustdesk-api — production self-host (recommended).
 #
 #   docker compose up -d
 #
-# That's it. Pulls the published image, runs on http://localhost:21114 (admin at /admin).
-# Uses SQLite by default, so there is NO database to set up. All data persists in the
-# named volume below. Change ADMIN_PASS before first run (it seeds the admin account once).
+# Pulls the published image and runs on http://localhost:21114 (admin at /admin), backed by
+# MariaDB.
 #
-# To use MySQL/MariaDB instead (for larger fleets), uncomment the `db` service and the
-# DB_* environment variables, then run `docker compose up -d`.
+# Why MariaDB by default (not SQLite): SQLite is single-writer — every heartbeat, sysinfo
+# push, connection/audit write, and login takes a database-wide lock, so throughput collapses
+# once many machines report in concurrently. MariaDB/MySQL handles concurrent writes and scales
+# with your fleet. Use MariaDB for any real deployment; SQLite is fine only for small setups
+# (roughly < 50 devices) or evaluation — see "Prefer SQLite?" at the bottom to switch.
+#
+# Before first run, set these (shell env or a .env file next to this compose file):
+#   ADMIN_PASS   - first-run admin password (change from the default)
+#   DB_PASSWORD  - MariaDB password for the app user (change from the default)
+#   RUSTDESK_*   - your hbbs/hbbr endpoints + key (see QUICKSTART.md)
 #
 # Other compose files:
 #   docker-compose.dev.yml                 - build the image locally from source (dev)
@@ -31,15 +38,13 @@ services:
       ADMIN_USER: "${ADMIN_USER:-admin}"
       ADMIN_PASS: "${ADMIN_PASS:-admin}"
 
-      # Database: SQLite by default (no db container needed).
-      DB_CONNECTION: "${DB_CONNECTION:-sqlite}"
-      # For MySQL/MariaDB, uncomment these and the `db` service below:
-      # DB_CONNECTION: mysql
-      # DB_HOST: db
-      # DB_PORT: "3306"
-      # DB_DATABASE: rustdesk_api
-      # DB_USERNAME: rustdesk
-      # DB_PASSWORD: "${DB_PASSWORD:-rustdesk}"
+      # Database — MariaDB by default (matches the `db` service below). CHANGE DB_PASSWORD.
+      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_DATABASE: "${DB_DATABASE:-rustdesk_api}"
+      DB_USERNAME: "${DB_USERNAME:-rustdesk}"
+      DB_PASSWORD: "${DB_PASSWORD:-rustdesk}"
 
       # RustDesk server endpoints handed to clients (set these to your hbbs/hbbr).
       RUSTDESK_ID_SERVER: "${RUSTDESK_ID_SERVER:-}"
@@ -55,23 +60,35 @@ services:
       MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
       MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS:-no-reply@example.com}"
     volumes:
-      # Single volume holds the SQLite DB, recordings, sessions, logs, and the app key.
+      # Holds recordings, sessions, logs, and the app key (the DB lives in the db volume).
       - rustdesk-data:/var/www/html/storage
-    # depends_on:
-    #   - db
+    depends_on:
+      db:
+        condition: service_healthy
 
-  # --- Optional: MySQL/MariaDB for larger deployments (uncomment to use) ---
-  # db:
-  #   image: mariadb:11
-  #   restart: unless-stopped
-  #   environment:
-  #     MARIADB_DATABASE: rustdesk_api
-  #     MARIADB_USER: rustdesk
-  #     MARIADB_PASSWORD: "${DB_PASSWORD:-rustdesk}"
-  #     MARIADB_RANDOM_ROOT_PASSWORD: "yes"
-  #   volumes:
-  #     - rustdesk-db:/var/lib/mysql
+  db:
+    image: mariadb:11
+    container_name: rustdesk-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: "${DB_DATABASE:-rustdesk_api}"
+      MARIADB_USER: "${DB_USERNAME:-rustdesk}"
+      MARIADB_PASSWORD: "${DB_PASSWORD:-rustdesk}"
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - rustdesk-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   rustdesk-data:
-  # rustdesk-db:
+  rustdesk-db:
+
+# --- Prefer SQLite for a small setup (< ~50 devices) or a quick evaluation? ---
+# SQLite needs no database container. To use it instead:
+#   1. set DB_CONNECTION=sqlite (env, or change the default above)
+#   2. delete the `db` service, the `depends_on:` block above, and the `rustdesk-db` volume
+# All data then lives in the rustdesk-data volume (storage/app/database.sqlite).

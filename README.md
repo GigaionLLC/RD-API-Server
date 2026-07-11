@@ -1,15 +1,16 @@
-# RustDesk API
+# RD‑API‑Server
 
-A modern, self‑hosted **API server and admin console for the [RustDesk](https://rustdesk.com)
-remote‑desktop client** — built in **PHP 8.5 / Laravel** with a clean **HTML + jQuery +
-Bootstrap 5** dark dashboard. One command to run, SQLite by default, no external services
-required.
+**RD‑API‑Server** ("RD" = RustDesk) is a modern, self‑hosted **API server and admin console for
+the [RustDesk](https://rustdesk.com) remote‑desktop client** — built in **PHP 8.5 / Laravel**
+with a clean **HTML + jQuery + Bootstrap 5** dark dashboard. Runs with one `docker compose`
+command, backed by MariaDB.
 
 > ⚠️ **Not affiliated with RustDesk.** This is an **independent, third‑party, open‑source
-> project** and is **not** an official RustDesk product, nor endorsed by, sponsored by, or
-> connected to the RustDesk team or Purslane Ltd. "RustDesk" is a trademark of its respective
-> owner; it is used here only to describe compatibility with the RustDesk client. This project
-> is a **separate implementation** of the client's public API, maintained independently.
+> project** — **not** an official RustDesk product, nor endorsed by, sponsored by, or connected
+> to the RustDesk team or Purslane Ltd. "RustDesk" is a trademark of its respective owner; the
+> repo is named **RD‑API‑Server** (shorthand) and references RustDesk only to describe
+> compatibility with its open‑source client. This is a **separate implementation** of the
+> client's public API, maintained independently.
 
 > 🚧 **Beta — under heavy testing.** This is a young project and many features are still being
 > tested and refined, so expect rough edges and occasional breaking changes. If you need
@@ -30,7 +31,8 @@ required.
 - **Sysinfo + preset auto‑registration** — devices auto‑file into a strategy / device group /
   address book on first contact (`--assign` → `/api/devices/cli`, custom‑client presets)
 - Personal **address books** (legacy + Flutter granular transports), tags, end‑of‑connection notes
-- **Audit ingestion** (connections, file transfers, security alarms) and **session‑recording upload**
+- **Audit ingestion** (connections incl. RustDesk 1.4.9 auth details, file transfers, security
+  alarms) and **session‑recording upload**
 - **Device deployment** tokens + approval queue (`/api/devices/deploy`)
 - Group endpoints (`/api/users`, `/api/peers`, `/api/device-group/accessible`)
 
@@ -74,53 +76,91 @@ A quick look at the dark admin console — full set in the
 |---|---|
 | [![Connection logs](docs/screenshots/connection-logs.png)](docs/screenshots/connection-logs.png) | [![Webhooks](docs/screenshots/webhooks.png)](docs/screenshots/webhooks.png) |
 
-## 🚀 Quick start
+## 🚀 Quick start (production · Docker + MariaDB)
+
+The bundled **[`docker-compose.yml`](docker-compose.yml)** runs the published image behind
+**MariaDB** — the recommended setup. Copy it (or the example below), set your admin/DB passwords
+and RustDesk endpoints, then:
 
 ```bash
 docker compose up -d
 ```
 
-Then open **http://localhost:21114/admin** (default `admin` / `admin` — change it). The
-client API base is `http://localhost:21114/api`. That's the whole setup — `docker-compose.yml`
-pulls the published image (`ghcr.io/gigaionllc/rustdesk-api-server:latest`), SQLite by default,
-all data in a Docker volume. See **[QUICKSTART.md](QUICKSTART.md)** for configuration (your
-ID/relay/key, SMTP, MySQL for larger fleets).
+Open **http://localhost:21114/admin** and sign in with `ADMIN_USER` / `ADMIN_PASS`. The client
+API base is `http://localhost:21114/api`; in the RustDesk client, set **API Server** to your
+server's URL and log in.
 
-In the RustDesk client, set **API Server** to your server's URL and log in.
+<details>
+<summary>Example <code>docker-compose.yml</code> (copy &amp; edit the CHANGE_ME values)</summary>
 
-**Compose files:** `docker-compose.yml` (pull the published image) · `docker-compose.dev.yml`
-(build locally from source) · **[examples/full-stack.docker-compose.yml](examples/full-stack.docker-compose.yml)**
-(full hbbs + hbbr + db + api stack) · `docker/compose.toolchain.yml` (dev toolchain for
-composer/artisan/tests).
+```yaml
+services:
+  rustdesk-api:
+    image: ghcr.io/gigaionllc/rustdesk-api-server:latest
+    restart: unless-stopped
+    ports: ["21114:80"]
+    environment:
+      APP_ENV: production
+      APP_URL: https://api.your-domain.com
+      ADMIN_USER: admin
+      ADMIN_PASS: CHANGE_ME_admin            # first-run admin password
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_DATABASE: rustdesk_api
+      DB_USERNAME: rustdesk
+      DB_PASSWORD: CHANGE_ME_db              # must match the db service below
+      RUSTDESK_ID_SERVER: id.your-domain.com:21116
+      RUSTDESK_RELAY_SERVER: relay.your-domain.com:21117
+      RUSTDESK_API_SERVER: https://api.your-domain.com
+      RUSTDESK_KEY: CHANGE_ME_hbbs_public_key
+    volumes: ["rustdesk-data:/var/www/html/storage"]
+    depends_on:
+      db: { condition: service_healthy }
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: rustdesk_api
+      MARIADB_USER: rustdesk
+      MARIADB_PASSWORD: CHANGE_ME_db         # must match DB_PASSWORD above
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+    volumes: ["rustdesk-db:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+volumes:
+  rustdesk-data: {}
+  rustdesk-db: {}
+```
+</details>
+
+**Full stack** — to run the RustDesk `hbbs`/`hbbr` rendezvous + relay alongside the API, copy
+**[examples/full-stack.docker-compose.yml](examples/full-stack.docker-compose.yml)** and follow
+its header. See **[QUICKSTART.md](QUICKSTART.md)** for all configuration (endpoints, SMTP,
+retention, metrics, updates).
+
+> **Database:** MariaDB is the default because SQLite is single‑writer — heartbeats, sysinfo,
+> and audit writes serialize on one lock, so it bottlenecks as devices scale. Use MariaDB for
+> any real fleet. For a small setup (roughly **< 50 devices**) or a quick trial, set
+> `DB_CONNECTION=sqlite` and drop the `db` service (see the note in `docker-compose.yml`).
 
 ## 🧱 Stack
 
 PHP 8.5 · Laravel 13 · Blade + jQuery + Bootstrap 5 (no SPA framework) · Eloquent ·
-SQLite/MySQL · Apache (runtime image) · Mailpit (dev SMTP) · Playwright (E2E).
+**MySQL/MariaDB** (SQLite optional) · Apache (runtime image) · Mailpit (dev SMTP) · Playwright (E2E).
 
 ## 🛠️ Development
 
-The host doesn't need PHP/Composer/Node — everything runs in a Docker toolchain image.
-
-```bash
-# build the dev/test toolchain (PHP 8.5 + Composer + Node + Playwright + linters)
-docker build -f docker/Dockerfile.toolchain -t rustdesk-api-php-toolchain .
-
-# dev stack (app + MariaDB + Mailpit)
-docker compose -f docker/compose.toolchain.yml up -d
-docker compose -f docker/compose.toolchain.yml run --rm app composer install
-docker compose -f docker/compose.toolchain.yml run --rm app php artisan migrate --seed
-
-# quality gates (CI runs these on every push)
-docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash -lc \
-  './vendor/bin/pint --test && ./vendor/bin/phpstan analyse && php artisan test && npx eslint public/assets/js'
-```
-
-Add an admin from the CLI: `php artisan rustdesk:user <name> <password> --admin`.
+Runs entirely in a Docker toolchain image (no host PHP / Composer / Node). The build, test,
+lint, and runtime‑image workflow lives in **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**;
+architecture and conventions are in **[AGENT.md](AGENT.md)**.
 
 ## 📚 Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** — deployment & configuration
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — build, test, lint, contribute
 - **[AGENT.md](AGENT.md)** — the project's source‑of‑truth guide (architecture, conventions,
   task lookup); `CLAUDE.md` points here
 - **[Wiki/](Wiki/)** — architecture knowledge base (design system, core docs)
@@ -147,7 +187,7 @@ an original, separate implementation and is distributed under the MIT license ab
 
 ## 🤖 AI‑enhanced project
 
-RustDesk API is developed, modernized, and maintained with extensive use of AI coding agents.
+RD‑API‑Server is developed, modernized, and maintained with extensive use of AI coding agents.
 The PHP 8.5 / Laravel rewrite, the wire‑compatible client API, the Strategy/Settings‑push and
 preset auto‑registration features, the security hardening, the test suites (PHPUnit +
 Playwright), and the documentation were all produced and verified with AI assistance. Agent and
