@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-11 12:55] - Feat: RustDesk 1.4.9 connection-audit auth details + controller attribution
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `database/migrations/2026_07_11_100001_add_auth_details_to_audit_conns_table.php` (NEW — nullable `primary_auth` (tinyint), `two_factor` (tinyint), `conn_audit_ref` (string, indexed) on `audit_conns`).
+- `app/Models/AuditConn.php`: added the three fields to `#[Fillable]`, cast `primary_auth`/`two_factor` to integer, added `PRIMARY_AUTH`/`TWO_FACTOR` label maps and `primaryAuthLabel()`/`twoFactorLabel()`/`authSummary()` helpers.
+- `app/Http/Controllers/Api/AuditController.php`: `conn()` now parses the three optional 1.4.9 keys (kept null when omitted, distinguishing "not recorded" from an explicit value), enriches the new-connection alarm message with the auth summary, and adds `primary_auth`/`two_factor`/`conn_audit_ref` to the `connection.new`/`connection.closed` webhook payload. `ALARM_TYPES` gains code `9` → "Session-scope permission violation" (PR #15469).
+- `app/Http/Controllers/Admin/AuditController.php`: connection-audit CSV export gains `primary_auth`, `two_factor`, `conn_audit_ref` columns.
+- `resources/views/admin/audit/connections.blade.php`: new **Auth** column (primary-auth + 2FA badges) and a controller-attribution indicator (🔗) on the From cell when `conn_audit_ref` is present.
+- `tests/Feature/AuditConnAuthTest.php` (NEW — 7 tests: persist auth details, backward-compat nulls, close carries none, alarm message includes the auth summary, alarm type 9 labelled, admin view renders labels, CSV includes the columns).
+- `docs/modernization/02-client-api-contract.md`: added §8.1 documenting the three new wire keys (types/values/source PRs), the alarm type 9 addition, and the "audit is the only 1.4.9-affected surface" finding.
+**Database/API Changes:** New nullable columns on `audit_conns`. `POST /api/audit/conn` now accepts optional `primary_auth` (int), `two_factor` (int), `conn_audit_ref` (string) — **no existing wire key renamed**; absent values stay null (backward-compatible with pre-1.4.9 clients and `close` events). `/api/audit/alarm` type `9` now labelled.
+**Summary:** Implements the RustDesk **1.4.9** (2026-07-06) audit enrichments the user asked for — **#15456** (authentication details in the connection audit) and **#15407** (controller-user attribution). Wire keys were verified **verbatim against the raw PR diffs** (`patch-diff.githubusercontent.com/.../15456.diff`, `.../15407.diff`): `primary_auth` (1=Click, 2=TemporaryPassword, 3=PermanentPassword, 4=SwitchSides), `two_factor` (1=TOTP, 2=TrustedDevice) — both omitted client-side when `None`/0 — and the opaque `conn_audit_ref` token (stored verbatim; full user resolution additionally needs Pro **hbbs**-side work, out of scope per the PR, which only requires the API server to accept/store it). Also surfaced PR **#15469**'s new `SessionScopeViolation` alarm (type 9). Consistent with the OIDC wire-format guardrails: integers stay integers, omitted keys stay null (never `0`/`[]`). Verified: Pint 195 files clean, PHPStan L5 0 errors, **164 PHPUnit passed** (557 assertions; +7 in `AuditConnAuthTest`).
+
 ## [2026-06-23 18:20] - Docs: record the OIDC fix + audit other endpoints for the same pitfalls
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

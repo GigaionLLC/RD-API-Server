@@ -38,10 +38,12 @@ class AuditController extends Controller
         $query = $this->connectionsQuery(trim((string) $request->query('q', '')), is_string($action) ? $action : null);
 
         return $this->streamCsv('connection-audit', [
-            'time', 'action', 'peer_id', 'from_peer', 'from_name', 'ip', 'session_id', 'conn_id', 'note',
+            'time', 'action', 'peer_id', 'from_peer', 'from_name', 'ip', 'session_id', 'conn_id',
+            'primary_auth', 'two_factor', 'conn_audit_ref', 'note',
         ], $query, fn (AuditConn $r): array => [
             (string) $r->created_at, $r->action, $r->peer_id, $r->from_peer, $r->from_name,
-            $r->ip, $r->session_id, $r->conn_id, $r->note,
+            $r->ip, $r->session_id, $r->conn_id,
+            $r->primaryAuthLabel(), $r->twoFactorLabel(), $r->conn_audit_ref, $r->note,
         ]);
     }
 

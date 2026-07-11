@@ -26,6 +26,7 @@
                         <th>Action</th>
                         <th>Peer</th>
                         <th>From</th>
+                        <th>Auth</th>
                         <th>IP</th>
                         <th>Session</th>
                     </tr>
@@ -38,12 +39,26 @@
                             <span class="rd-badge rd-badge--{{ $log->action === 'new' ? 'online' : 'muted' }}">{{ ucfirst($log->action) }}</span>
                         </td>
                         <td style="color:var(--rd-text-bright);">{{ $log->peer_id }}</td>
-                        <td class="rd-muted">{{ $log->from_name ?: $log->from_peer ?: '—' }}</td>
+                        <td class="rd-muted">
+                            {{ $log->from_name ?: $log->from_peer ?: '—' }}
+                            @if ($log->conn_audit_ref)
+                                <i class="ri-user-shared-line" title="Controller-attributed session (ref {{ $log->conn_audit_ref }})" style="color:var(--rd-accent);"></i>
+                            @endif
+                        </td>
+                        <td class="rd-muted">
+                            @if ($log->primaryAuthLabel())
+                                <span class="rd-badge rd-badge--muted">{{ $log->primaryAuthLabel() }}</span>
+                            @endif
+                            @if ($log->twoFactorLabel())
+                                <span class="rd-badge rd-badge--online" title="Second factor">{{ $log->twoFactorLabel() }}</span>
+                            @endif
+                            @unless ($log->primaryAuthLabel() || $log->twoFactorLabel())—@endunless
+                        </td>
                         <td class="rd-muted">{{ $log->ip ?: '—' }}</td>
                         <td class="rd-muted">{{ $log->session_id ?: '—' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="rd-muted" style="text-align:center;padding:28px;">No connection logs.</td></tr>
+                    <tr><td colspan="7" class="rd-muted" style="text-align:center;padding:28px;">No connection logs.</td></tr>
                 @endforelse
                 </tbody>
             </table>

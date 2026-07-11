@@ -219,6 +219,35 @@ Already implemented. hbbs/clients post connection (`new`/`close`) and file‑tra
 For parity with Pro's **alarm** logs and **console‑operation** logs we add new categories
 on top of this ingestion path (see catalog §15).
 
+### 8.1 RustDesk 1.4.9 auth‑detail additions (PR #15456, #15407, #15469) ✅
+
+RustDesk **1.4.9** (released 2026‑07‑06) enriched the connection‑audit payload the controlled
+client POSTs to `/api/audit/conn` with three **optional** keys. All three are absent for
+pre‑1.4.9 clients and on `close` events, so the ingest stays backward‑compatible; we persist
+them on `audit_conns` (migration `2026_07_11_100001`) and surface them in the admin
+Connection Logs view + CSV.
+
+| Wire key | Type | Source | Meaning (values) |
+|----------|------|--------|------------------|
+| `primary_auth` | int enum, optional (omitted when `None`/0) | PR #15456, `connection.rs` `send_logon_response_and_keep_alive()` → `audit["primary_auth"]` | First‑factor method: `1`=Click (host accepted, no password), `2`=TemporaryPassword (one‑time), `3`=PermanentPassword (stored/preset), `4`=SwitchSides (account side‑switch). |
+| `two_factor` | int enum, optional (omitted when `None`/0) | PR #15456, `audit["two_factor"]` | Second factor: `1`=TOTP, `2`=TrustedDevice (2FA bypassed via a trusted device). |
+| `conn_audit_ref` | string, optional | PR #15407, `audit["conn_audit_ref"]` | Opaque **controller‑user attribution** token minted by hbbs and echoed back by the controlled peer. We store it verbatim; resolving it to a user account additionally needs Pro **hbbs**-side work (token generation + identity cache), out of scope for the API server, which per the PR must at minimum accept/store it. Never sent for direct‑IP connections. |
+
+Wire‑format notes (per the OIDC guardrails in `16-response-contract.md`): both integer keys
+arrive as **integers, not strings**, and are **omitted** rather than sent as `0`/`null`, so we
+keep them nullable and distinguish "not recorded" from an explicit value. Out‑of‑range codes
+are treated defensively (no label rendered, raw value still stored).
+
+PR **#15469** adds a new `AlarmAuditType` variant **`SessionScopeViolation = 9`** posted to
+`/api/audit/alarm` (`{id, name, ip, conn_type, message}`) when an authenticated session
+attempts an action outside its granted scope. Our alarm ingest already accepts any `typ`; we
+added a human label for code `9` ("Session‑scope permission violation").
+
+**Not affected by 1.4.9:** login/2FA/OIDC endpoints, heartbeat/strategy, address book,
+sysinfo, devices/deploy, and recording are all unchanged — audit ingestion is the only
+surface the 1.4.9 client→API contract touched. (`#15524 "remove feature cli"` removes the
+client's Cargo build feature, **not** the `/api/devices/cli` endpoint.)
+
 ---
 
 ## 9. Server resolution & "Pro" detection ✅ — `src/common.rs`, `sync.rs:308`

@@ -35,13 +35,21 @@ class AuditController extends Controller
         6 => 'IPv6 prefix abuse',
         7 => 'Terminal OS-login backoff',
         8 => 'Terminal session concurrency limit',
+        // RustDesk 1.4.9 (PR #15469): an authenticated session attempted an action outside its
+        // granted scope (remote / file_transfer / port_forward / view_camera / terminal).
+        9 => 'Session-scope permission violation',
     ];
 
     /**
      * POST /api/audit/conn
      * Two shapes:
-     *  - host connection event:  { id, action:"new"|"close", conn_id, peer:[id,name]?, ip, session_id, type, uuid }
+     *  - host connection event:  { id, action:"new"|"close", conn_id, peer:[id,name]?, ip, session_id, type,
+     *                              uuid, primary_auth?, two_factor?, conn_audit_ref? }
      *  - operator session note:  { id, session_id, note }   (no `action`)
+     *
+     * primary_auth / two_factor / conn_audit_ref are the RustDesk 1.4.9 additions (PR #15456,
+     * #15407). All three are optional — the client omits primary_auth/two_factor when None(0)
+     * and conn_audit_ref for direct-IP or pre-1.4.9 connections — so they stay null here.
      */
     public function conn(Request $request, AlarmService $alarms, WebhookService $webhooks): JsonResponse
     {
@@ -67,7 +75,13 @@ class AuditController extends Controller
         $peerId = (string) $request->input('id', '');
         $ip = (string) $request->input('ip', $request->ip());
 
-        AuditConn::create([
+        // RustDesk 1.4.9 auth-detail keys (PR #15456 / #15407). Kept null when the client omits
+        // them so the "not recorded" state is distinguishable from an explicit 0.
+        $primaryAuth = $request->input('primary_auth');
+        $twoFactor = $request->input('two_factor');
+        $connAuditRef = $request->input('conn_audit_ref');
+
+        $audit = AuditConn::create([
             // New connections get a guid the controlling client later looks up via
             // GET /api/audit/conn/active to attach an end-of-session note (see active()).
             'guid' => $action === AuditConn::ACTION_NEW ? (string) Str::uuid() : null,
@@ -79,6 +93,9 @@ class AuditController extends Controller
             'ip' => $ip,
             'session_id' => $sessionId,
             'type' => (int) $request->input('type', 0),
+            'primary_auth' => is_numeric($primaryAuth) ? (int) $primaryAuth : null,
+            'two_factor' => is_numeric($twoFactor) ? (int) $twoFactor : null,
+            'conn_audit_ref' => is_string($connAuditRef) && $connAuditRef !== '' ? $connAuditRef : null,
             'uuid' => (string) $request->input('uuid', ''),
             'closed_at' => $action === AuditConn::ACTION_CLOSE ? now() : null,
         ]);
@@ -88,11 +105,13 @@ class AuditController extends Controller
             try {
                 $device = Device::where('rustdesk_id', $peerId)->first();
                 $fromName = (string) ($peer[1] ?? $peer[0] ?? '');
+                $authSummary = $audit->authSummary();
                 $alarms->raise(
                     $device,
                     $peerId,
                     'new_connection',
-                    'New connection to '.$peerId.($fromName !== '' ? ' from '.$fromName : '').' ('.$ip.')',
+                    'New connection to '.$peerId.($fromName !== '' ? ' from '.$fromName : '').' ('.$ip.')'
+                        .($authSummary !== '' ? ' — authenticated via '.$authSummary : ''),
                     $ip
                 );
             } catch (Throwable $e) {
@@ -111,6 +130,10 @@ class AuditController extends Controller
                 'from' => (string) ($peer[1] ?? $peer[0] ?? ''),
                 'ip' => $ip,
                 'session_id' => $sessionId,
+                // RustDesk 1.4.9 auth attribution (PR #15456/#15407); null when not reported.
+                'primary_auth' => $audit->primaryAuthLabel() ?: null,
+                'two_factor' => $audit->twoFactorLabel() ?: null,
+                'conn_audit_ref' => $audit->conn_audit_ref,
             ]
         );
 
