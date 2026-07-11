@@ -12,6 +12,11 @@ and adding features the RustDesk client supports that no open-source API server 
 **retired** (the repo is single-stack PHP). The historical Go code is recoverable via git
 history; the research that drove the port lives in `docs/modernization/`.
 
+> **Affiliation:** This is an **independent, third-party, open-source** project — **not**
+> affiliated with, endorsed by, or sponsored by RustDesk / Purslane Ltd. "RustDesk" is
+> referenced only to describe compatibility with the client's public API. Never present this
+> project or its UI as an official RustDesk product.
+
 ## 📌 Mandatory reading (the docs hub)
 
 ### 1. 🗺️ Start here: [Wiki/core/00-system-index.md](Wiki/core/00-system-index.md)

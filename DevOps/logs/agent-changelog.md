@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-11 13:15] - Docs: not-affiliated disclaimer + demo screenshots of the admin console
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `README.md`: added a prominent **"Not affiliated with RustDesk"** banner near the top and a **Trademark & affiliation** subsection under License; added a **📸 Screenshots** section (dashboard hero + a 2×2 of devices / strategy editor / connection logs / webhooks) linking to the gallery.
+- `AGENT.md`: added an **Affiliation** note (independent third-party project; never present the UI as an official RustDesk product).
+- `resources/views/admin/login.blade.php`: login footer now reads "Self-hosted API & admin console for the RustDesk client" + a small "Independent open-source project — not affiliated with or endorsed by RustDesk" line.
+- `database/seeders/DemoShowcaseSeeder.php` (NEW — realistic, fictional demo dataset: 14 devices, 5 users, user/device groups, 3 strategies, 63 connection-audit rows incl. the 1.4.9 auth fields, alarms, login logs, address books + tags, webhooks, API keys; NOT wired into the default DatabaseSeeder so production installs stay clean).
+- `e2e/screenshots.spec.ts` (NEW — Playwright capture spec; excluded from the CI gate).
+- `docker/demo-shots.sh` (NEW — boots the app on the default sqlite DB with the showcase seed, backs up/restores your dev DB, and captures the gallery).
+- `docs/screenshots/` (NEW — `README.md` gallery + 13 PNGs: dashboard, devices, strategies, strategy-editor, address-books, connection-logs, webhooks, alarms, sessions, api-keys, client-config, users, settings).
+**Database/API Changes:** None (docs, a UI footer line, and a dev-only seeder/capture tooling).
+**Summary:** Per the user's request: made the project's independence explicit (**not affiliated with / endorsed by RustDesk — separate third-party open-source implementation**) across the README, AGENT.md and the admin login page, and produced a visual showcase. Screenshots are captured from a live run of the app seeded with fictional demo data (example.com hosts, RFC-5737 IPs) — the connection-logs shot doubles as a showcase of the new **1.4.9 Auth column** (primary-auth + 2FA badges + controller-attribution indicator). Regenerate with `docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash docker/demo-shots.sh`. Verified: Pint 196 files clean, PHPStan L5 0 errors, **164 PHPUnit passed** (557 assertions); Playwright capture spec passes.
+
 ## [2026-07-11 12:55] - Feat: RustDesk 1.4.9 connection-audit auth details + controller attribution
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

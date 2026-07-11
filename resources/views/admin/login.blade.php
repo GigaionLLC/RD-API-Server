@@ -66,7 +66,10 @@
         </div></div>
 
         <p class="rd-muted" style="text-align:center;margin-top:18px;font-size:12px;">
-            RustDesk self-hosted API &amp; admin console
+            Self-hosted API &amp; admin console for the RustDesk client
+        </p>
+        <p class="rd-muted" style="text-align:center;margin-top:6px;font-size:11px;opacity:.75;">
+            Independent open-source project — not affiliated with or endorsed by RustDesk.
         </p>
     </div>
 </div>

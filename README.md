@@ -5,6 +5,12 @@ remote‑desktop client** — built in **PHP 8.5 / Laravel** with a clean **HTML
 Bootstrap 5** dark dashboard. One command to run, SQLite by default, no external services
 required.
 
+> ⚠️ **Not affiliated with RustDesk.** This is an **independent, third‑party, open‑source
+> project** and is **not** an official RustDesk product, nor endorsed by, sponsored by, or
+> connected to the RustDesk team or Purslane Ltd. "RustDesk" is a trademark of its respective
+> owner; it is used here only to describe compatibility with the RustDesk client. This project
+> is a **separate implementation** of the client's public API, maintained independently.
+
 > 🚧 **Beta — under heavy testing.** This is a young project and many features are still being
 > tested and refined, so expect rough edges and occasional breaking changes. If you need
 > something production‑ready today, we recommend the established, well‑tested RustDesk API
@@ -52,6 +58,21 @@ required.
 (`Authorization: Bearer <key>` or `X-API-Key`): devices, users, strategies, audit, address‑book
 peers. Ships an **OpenAPI 3.1 spec** plus **Postman** and **Bruno** collections. See
 **[docs/api/README.md](docs/api/README.md)**.
+
+## 📸 Screenshots
+
+A quick look at the dark admin console — full set in the
+**[screenshot gallery](docs/screenshots/)**. *(Fictional demo data; not affiliated with RustDesk.)*
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+| Devices | Strategy (Security‑Settings) editor |
+|---|---|
+| [![Devices](docs/screenshots/devices.png)](docs/screenshots/devices.png) | [![Strategy editor](docs/screenshots/strategy-editor.png)](docs/screenshots/strategy-editor.png) |
+
+| Connection logs — with RustDesk 1.4.9 auth details | Webhooks / notifications |
+|---|---|
+| [![Connection logs](docs/screenshots/connection-logs.png)](docs/screenshots/connection-logs.png) | [![Webhooks](docs/screenshots/webhooks.png)](docs/screenshots/webhooks.png) |
 
 ## 🚀 Quick start
 
@@ -115,6 +136,14 @@ relay. Set `RUSTDESK_ID_SERVER`, `RUSTDESK_RELAY_SERVER`, and `RUSTDESK_KEY` (se
 ## 📄 License
 
 MIT. See [LICENSE](LICENSE). © Gigaion LLC.
+
+### Trademark & affiliation
+
+This is an **independent, community/third‑party project** and is **not affiliated with,
+endorsed by, or sponsored by RustDesk or Purslane Ltd.** "RustDesk" and any related marks are
+the property of their respective owners and are referenced here solely to indicate
+compatibility with the open‑source RustDesk client's public API. All code in this repository is
+an original, separate implementation and is distributed under the MIT license above.
 
 ## 🤖 AI‑enhanced project
 
