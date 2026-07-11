@@ -1,6 +1,6 @@
 # RD‑API‑Server
 
-**RD‑API‑Server** ("RD" = RustDesk) is a modern, self‑hosted **API server and admin console for
+**RD‑API‑Server** is a modern, self‑hosted **API server and admin console for
 the [RustDesk](https://rustdesk.com) remote‑desktop client** — built in **PHP 8.5 / Laravel**
 with a clean **HTML + jQuery + Bootstrap 5** dark dashboard. Runs with one `docker compose`
 command, backed by MariaDB.
