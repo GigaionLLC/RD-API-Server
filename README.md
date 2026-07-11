@@ -175,7 +175,13 @@ relay. Set `RUSTDESK_ID_SERVER`, `RUSTDESK_RELAY_SERVER`, and `RUSTDESK_KEY` (se
 
 ## 📄 License
 
-MIT. See [LICENSE](LICENSE). © Gigaion LLC.
+**GNU Affero General Public License v3.0 or later (AGPL‑3.0‑or‑later).** See
+[LICENSE](LICENSE). © 2026 Gigaion LLC.
+
+The AGPL is a strong copyleft license: if you modify this software and make it available to
+others — including **over a network** (e.g. running it as a hosted service) — you must offer
+those users the complete corresponding source code of your modified version under the same
+license. In short: improvements stay open.
 
 ### Trademark & affiliation
 
@@ -183,7 +189,7 @@ This is an **independent, community/third‑party project** and is **not affilia
 endorsed by, or sponsored by RustDesk or Purslane Ltd.** "RustDesk" and any related marks are
 the property of their respective owners and are referenced here solely to indicate
 compatibility with the open‑source RustDesk client's public API. All code in this repository is
-an original, separate implementation and is distributed under the MIT license above.
+an original, separate implementation and is distributed under the AGPL‑3.0‑or‑later license above.
 
 ## 🤖 AI‑enhanced project
 

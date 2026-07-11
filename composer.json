@@ -4,7 +4,7 @@
     "type": "project",
     "description": "Self-hosted API server and admin console for the RustDesk remote-desktop client (PHP/Laravel).",
     "keywords": ["rustdesk", "remote-desktop", "api", "self-hosted", "laravel"],
-    "license": "MIT",
+    "license": "AGPL-3.0-or-later",
     "require": {
         "php": "^8.5",
         "ext-ldap": "*",

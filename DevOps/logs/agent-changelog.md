@@ -3,6 +3,15 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-11 14:05] - License: adopt GNU AGPL-3.0-or-later
+**Agent:** rustdesk-api (Claude Opus 4.8)
+**Files Modified:**
+- `LICENSE`: full verbatim GNU Affero General Public License v3.0 text (fetched from gnu.org).
+- `composer.json`: `"license"` → `AGPL-3.0-or-later` (SPDX; `composer validate` passes).
+- `README.md`: License section now states **AGPL-3.0-or-later** with a plain-language note on the network-use copyleft (hosted/modified versions must offer their source); Trademark section wording updated to reference the AGPL.
+**Database/API Changes:** None.
+**Summary:** Adopted the **AGPL-3.0-or-later** to keep the project strongly copyleft — anyone who modifies it and offers it to others, including as a network service, must release their corresponding source under the same license. Scope was swept for every own-project license reference (`LICENSE`, `composer.json`, README; `package.json` has no license field; the only in-source "MIT" strings are vendored Tailwind attribution and unrelated third-party dep metadata in `package-lock.json`, left as-is).
+
 ## [2026-07-11 13:40] - Default DB → MariaDB (SQLite optional); README production-focus + RD-API-Server rename
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**
