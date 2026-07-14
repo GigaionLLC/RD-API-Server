@@ -3,6 +3,15 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 12:21] - Security: serialize recovery-code consumption
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/TwoFactorService.php`
+- `tests/Feature/RecoveryCodeSecurityTest.php`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Recovery-code verification now reloads and consumes the current database value under a transaction and row lock without dirtying the caller model. Concurrent or stale requests cannot reuse a consumed code, and a later unrelated caller save cannot resurrect one. Twenty related tests / 211 assertions, Pint, targeted PHPStan, and diff checks passed in Docker.
+
 ## [2026-07-14 12:15] - Security: bind pending 2FA to credential version
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

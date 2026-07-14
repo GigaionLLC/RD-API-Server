@@ -148,20 +148,36 @@ class TwoFactorService
             return false;
         }
 
-        /** @var list<string> $codes */
-        $codes = $user->two_factor_recovery_codes ?? [];
-        $remaining = array_values(array_filter(
-            $codes,
-            static fn (string $c): bool => ! hash_equals(strtoupper($c), $code),
-        ));
+        return DB::transaction(function () use ($user, $code): bool {
+            /** @var User|null $locked */
+            $locked = User::query()->lockForUpdate()->find($user->getKey());
+            if ($locked === null) {
+                return false;
+            }
 
-        if (count($remaining) === count($codes)) {
-            return false; // no match
-        }
+            $stored = $locked->getAttribute('two_factor_recovery_codes');
+            $codes = is_array($stored)
+                ? array_values(array_filter($stored, static fn (mixed $candidate): bool => is_string($candidate)))
+                : [];
+            $match = null;
 
-        $user->forceFill(['two_factor_recovery_codes' => $remaining])->save();
+            foreach ($codes as $index => $candidate) {
+                if (hash_equals(strtoupper($candidate), $code)) {
+                    $match = $index;
+                    break;
+                }
+            }
 
-        return true;
+            if ($match === null) {
+                return false;
+            }
+
+            unset($codes[$match]);
+            $remaining = array_values($codes);
+            $locked->forceFill(['two_factor_recovery_codes' => $remaining])->save();
+
+            return true;
+        });
     }
 
     /**
