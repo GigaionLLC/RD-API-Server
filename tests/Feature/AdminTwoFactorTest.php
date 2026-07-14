@@ -28,6 +28,14 @@ class AdminTwoFactorTest extends TestCase
         return app(TwoFactorService::class)->currentCode($secret);
     }
 
+    private function assertPendingChallengeCleared(): void
+    {
+        $this->assertFalse(session()->has('2fa.user'));
+        $this->assertFalse(session()->has('2fa.remember'));
+        $this->assertFalse(session()->has('2fa.password_fingerprint'));
+        $this->assertFalse(session()->has('2fa.expires_at'));
+    }
+
     public function test_admin_can_enroll_in_two_factor(): void
     {
         $admin = $this->admin();
@@ -47,7 +55,7 @@ class AdminTwoFactorTest extends TestCase
         $this->assertTrue((bool) $admin->two_factor_enabled);
         $this->assertSame($secret, $admin->two_factor_secret);
         $this->assertSame(User::LOGIN_VERIFY_TOTP, $admin->login_verify);
-        $this->assertCount(8, $admin->two_factor_recovery_codes);
+        $this->assertCount(8, (array) $admin->two_factor_recovery_codes);
     }
 
     public function test_confirm_rejects_a_bad_code(): void
@@ -75,11 +83,98 @@ class AdminTwoFactorTest extends TestCase
         $this->post('/admin/login', ['username' => 'admin', 'password' => 'secret12345'])
             ->assertRedirect(route('admin.2fa.challenge'));
         $this->assertGuest();
+        $this->assertTrue(session()->has('2fa.password_fingerprint'));
+        $this->assertTrue(session()->has('2fa.expires_at'));
 
         // Supplying the code completes the login.
         $this->post(route('admin.2fa.challenge.verify'), ['code' => $this->code($secret)])
             ->assertRedirect(route('admin.dashboard'));
         $this->assertAuthenticated();
+        $this->assertPendingChallengeCleared();
+    }
+
+    public function test_password_change_invalidates_a_pending_challenge(): void
+    {
+        $secret = app(TwoFactorService::class)->generateSecret();
+        $admin = $this->admin([
+            'two_factor_enabled' => true,
+            'two_factor_secret' => $secret,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+        ]);
+
+        $this->post('/admin/login', ['username' => 'admin', 'password' => 'secret12345'])
+            ->assertRedirect(route('admin.2fa.challenge'));
+
+        $admin->forceFill(['password' => 'replacement-password'])->save();
+
+        $this->post(route('admin.2fa.challenge.verify'), ['code' => $this->code($secret)])
+            ->assertRedirect(route('admin.login'));
+        $this->assertGuest();
+        $this->assertPendingChallengeCleared();
+
+        $this->post('/admin/login', ['username' => 'admin', 'password' => 'replacement-password'])
+            ->assertRedirect(route('admin.2fa.challenge'));
+        $this->post(route('admin.2fa.challenge.verify'), ['code' => $this->code($secret)])
+            ->assertRedirect(route('admin.dashboard'));
+        $this->assertAuthenticatedAs($admin->fresh());
+        $this->assertPendingChallengeCleared();
+    }
+
+    public function test_expired_pending_challenge_is_rejected(): void
+    {
+        $secret = app(TwoFactorService::class)->generateSecret();
+        $this->admin([
+            'two_factor_enabled' => true,
+            'two_factor_secret' => $secret,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+        ]);
+
+        $this->post('/admin/login', ['username' => 'admin', 'password' => 'secret12345'])
+            ->assertRedirect(route('admin.2fa.challenge'));
+        $this->travel(6)->minutes();
+
+        $this->post(route('admin.2fa.challenge.verify'), ['code' => $this->code($secret)])
+            ->assertRedirect(route('admin.login'));
+        $this->assertGuest();
+        $this->assertPendingChallengeCleared();
+    }
+
+    public function test_disabled_account_cannot_finish_a_pending_challenge(): void
+    {
+        $secret = app(TwoFactorService::class)->generateSecret();
+        $admin = $this->admin([
+            'two_factor_enabled' => true,
+            'two_factor_secret' => $secret,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+        ]);
+
+        $this->post('/admin/login', ['username' => 'admin', 'password' => 'secret12345'])
+            ->assertRedirect(route('admin.2fa.challenge'));
+        $admin->forceFill(['status' => User::STATUS_DISABLED])->save();
+
+        $this->post(route('admin.2fa.challenge.verify'), ['code' => $this->code($secret)])
+            ->assertRedirect(route('admin.login'));
+        $this->assertGuest();
+        $this->assertPendingChallengeCleared();
+    }
+
+    public function test_account_without_console_authority_cannot_finish_a_pending_challenge(): void
+    {
+        $secret = app(TwoFactorService::class)->generateSecret();
+        $admin = $this->admin([
+            'two_factor_enabled' => true,
+            'two_factor_secret' => $secret,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+        ]);
+
+        $this->post('/admin/login', ['username' => 'admin', 'password' => 'secret12345'])
+            ->assertRedirect(route('admin.2fa.challenge'));
+        $admin->forceFill(['is_admin' => false])->save();
+
+        $this->post(route('admin.2fa.challenge.verify'), ['code' => $this->code($secret)])
+            ->assertRedirect(route('admin.login'));
+        $this->assertGuest();
+        $this->assertPendingChallengeCleared();
     }
 
     public function test_challenge_rejects_a_bad_code_and_stays_guest(): void
@@ -94,8 +189,10 @@ class AdminTwoFactorTest extends TestCase
         $this->post('/admin/login', ['username' => 'admin', 'password' => 'secret12345']);
 
         $this->post(route('admin.2fa.challenge.verify'), ['code' => '111111'])
+            ->assertRedirect(route('admin.login'))
             ->assertSessionHasErrors('code');
         $this->assertGuest();
+        $this->assertPendingChallengeCleared();
     }
 
     public function test_admin_without_two_factor_signs_in_directly(): void

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
 /**
@@ -27,6 +28,12 @@ class TwoFactorController extends Controller
     private const PENDING_USER = '2fa.user';
 
     private const PENDING_REMEMBER = '2fa.remember';
+
+    private const PENDING_PASSWORD = '2fa.password_fingerprint';
+
+    private const PENDING_EXPIRES_AT = '2fa.expires_at';
+
+    private const CHALLENGE_LIFETIME_SECONDS = 300;
 
     public function __construct(private readonly TwoFactorService $twoFactor) {}
 
@@ -120,7 +127,7 @@ class TwoFactorController extends Controller
 
     public function challenge(Request $request): View|RedirectResponse
     {
-        if (! $request->session()->has(self::PENDING_USER)) {
+        if (! $this->pendingUser($request)) {
             return redirect()->route('admin.login');
         }
 
@@ -129,11 +136,14 @@ class TwoFactorController extends Controller
 
     public function verifyChallenge(Request $request): RedirectResponse
     {
-        $request->validate(['code' => ['required', 'string']]);
+        $validator = Validator::make($request->all(), ['code' => ['required', 'string']]);
+        if ($validator->fails()) {
+            self::clearPendingChallenge($request);
 
-        $userId = $request->session()->get(self::PENDING_USER);
-        $user = is_scalar($userId) ? User::find($userId) : null;
+            return redirect()->route('admin.login')->withErrors($validator);
+        }
 
+        $user = $this->pendingUser($request);
         if (! $user) {
             return redirect()->route('admin.login');
         }
@@ -141,8 +151,10 @@ class TwoFactorController extends Controller
         $throttleKey = '2fa-challenge:'.$user->id.'|'.$request->ip();
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+            self::clearPendingChallenge($request);
 
-            return back()->withErrors(['code' => "Too many attempts. Try again in {$seconds} seconds."]);
+            return redirect()->route('admin.login')
+                ->withErrors(['username' => "Too many two-factor attempts. Try again in {$seconds} seconds."]);
         }
 
         $code = (string) $request->input('code');
@@ -151,14 +163,16 @@ class TwoFactorController extends Controller
 
         if (! $ok) {
             RateLimiter::hit($throttleKey);
+            self::clearPendingChallenge($request);
 
-            return back()->withErrors(['code' => 'Invalid authentication code.']);
+            return redirect()->route('admin.login')
+                ->withErrors(['code' => 'Invalid authentication code. Sign in again to retry.']);
         }
 
         RateLimiter::clear($throttleKey);
 
         $remember = (bool) $request->session()->get(self::PENDING_REMEMBER, false);
-        $request->session()->forget([self::PENDING_USER, self::PENDING_REMEMBER]);
+        self::clearPendingChallenge($request);
 
         Auth::login($user, $remember);
         $request->session()->regenerate();
@@ -179,9 +193,66 @@ class TwoFactorController extends Controller
     public static function startChallenge(Request $request, User $user, bool $remember): RedirectResponse
     {
         Auth::logout();
-        $request->session()->put(self::PENDING_USER, $user->id);
-        $request->session()->put(self::PENDING_REMEMBER, $remember);
+        $request->session()->regenerate();
+        self::clearPendingChallenge($request);
+        $request->session()->put([
+            self::PENDING_USER => $user->getAuthIdentifier(),
+            self::PENDING_REMEMBER => $remember,
+            self::PENDING_PASSWORD => self::passwordFingerprint($user),
+            self::PENDING_EXPIRES_AT => now()->getTimestamp() + self::CHALLENGE_LIFETIME_SECONDS,
+        ]);
 
         return redirect()->route('admin.2fa.challenge');
+    }
+
+    /**
+     * Resolve a still-valid deferred login. The HMAC deliberately binds the challenge to the
+     * password hash accepted during primary authentication without storing that hash in the
+     * session. A password replacement therefore makes the pending challenge unusable.
+     */
+    private function pendingUser(Request $request): ?User
+    {
+        $userId = $request->session()->get(self::PENDING_USER);
+        $fingerprint = $request->session()->get(self::PENDING_PASSWORD);
+        $expiresAt = $request->session()->get(self::PENDING_EXPIRES_AT);
+
+        $user = is_scalar($userId) ? User::find($userId) : null;
+        $valid = $user instanceof User
+            && is_string($fingerprint)
+            && is_numeric($expiresAt)
+            && (int) $expiresAt > now()->getTimestamp()
+            && $user->isActive()
+            && ($user->is_admin || $user->adminRoles()->exists())
+            && $user->two_factor_enabled
+            && is_string($user->two_factor_secret)
+            && $user->two_factor_secret !== ''
+            && hash_equals(self::passwordFingerprint($user), $fingerprint);
+
+        if (! $valid) {
+            self::clearPendingChallenge($request);
+
+            return null;
+        }
+
+        return $user;
+    }
+
+    private static function passwordFingerprint(User $user): string
+    {
+        return hash_hmac(
+            'sha256',
+            $user->getAuthIdentifier().'|'.$user->getAuthPassword(),
+            (string) config('app.key'),
+        );
+    }
+
+    private static function clearPendingChallenge(Request $request): void
+    {
+        $request->session()->forget([
+            self::PENDING_USER,
+            self::PENDING_REMEMBER,
+            self::PENDING_PASSWORD,
+            self::PENDING_EXPIRES_AT,
+        ]);
     }
 }
