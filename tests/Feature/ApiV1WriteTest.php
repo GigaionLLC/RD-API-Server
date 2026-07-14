@@ -161,4 +161,20 @@ class ApiV1WriteTest extends TestCase
             ->assertStatus(403);
         $this->assertDatabaseHas('address_books', ['id' => $book->id]);
     }
+
+    public function test_cannot_add_a_peer_to_another_users_address_book(): void
+    {
+        [, $plain] = $this->makeKey(['address_book.write']);
+        $other = User::create(['username' => 'peer-other', 'password' => 'secret12345', 'status' => User::STATUS_NORMAL]);
+        $book = AddressBook::create(['user_id' => $other->id, 'name' => 'Theirs']);
+
+        $this->withHeader('Authorization', 'Bearer '.$plain)
+            ->postJson("/api/v1/address-books/{$book->id}/peers", ['id' => 'cross-owner'])
+            ->assertStatus(403);
+
+        $this->assertDatabaseMissing('address_book_peers', [
+            'address_book_id' => $book->id,
+            'rustdesk_id' => 'cross-owner',
+        ]);
+    }
 }

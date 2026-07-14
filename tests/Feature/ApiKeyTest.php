@@ -84,6 +84,20 @@ class ApiKeyTest extends TestCase
             ->assertStatus(403);
     }
 
+    public function test_v1_address_book_list_is_owner_only_even_for_a_full_admin_key(): void
+    {
+        [$owner, $plain] = $this->makeKey(['address_book.read']);
+        $ownBook = AddressBook::create(['user_id' => $owner->id, 'name' => 'Mine']);
+        $other = User::create(['username' => 'list-other', 'password' => 'secret12345', 'status' => User::STATUS_NORMAL]);
+        AddressBook::create(['user_id' => $other->id, 'name' => 'Theirs']);
+
+        $this->withHeader('Authorization', 'Bearer '.$plain)
+            ->getJson('/api/v1/address-books')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $ownBook->id);
+    }
+
     public function test_expired_key_is_rejected(): void
     {
         [, $plain] = $this->makeKey(['devices.read'], now()->subDay()->toDateTimeString());
