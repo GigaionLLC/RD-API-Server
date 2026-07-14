@@ -211,6 +211,11 @@ Reported from `src/ui_interface.rs` and `src/core_main.rs`; these back `rustdesk
   address-book filing. Returns an **empty** 200 on success (the client prints "Done!") or a
   plain-text reason it prints verbatim. No other OSS server implements this.
 
+Deployment tokens are continuously authorization-bound: their owner must remain active and
+retain `deploy.edit`. CLI assignment requires a non-empty UUID and an exact match before an
+existing device can be changed. A delegated deployment operator may assign devices only to the
+token owner; the optional cross-user `user_name` override is reserved for a full administrator.
+
 ---
 
 ## 8. Audit ingestion ✅ — `POST /api/audit/conn`, `POST /api/audit/file`

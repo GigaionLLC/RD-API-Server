@@ -35,13 +35,19 @@ class DeploymentService
             return null;
         }
 
-        $deployToken = DeployToken::where('token', trim($token))->first();
+        $deployToken = DeployToken::with('user')->where('token', trim($token))->first();
 
         if (! $deployToken) {
             return null;
         }
 
         if ($deployToken->expires_at !== null && $deployToken->expires_at->isPast()) {
+            return null;
+        }
+
+        // A long-lived token must not outlive the account or permission that authorized it.
+        $owner = $deployToken->user;
+        if (! $owner || ! $owner->isActive() || ! $owner->hasPermission('deploy.edit')) {
             return null;
         }
 
@@ -67,8 +73,9 @@ class DeploymentService
 
         $existing = Device::where('rustdesk_id', $id)->first();
 
-        // Reject if the id is already owned by a different device (different uuid).
-        if ($existing && $existing->uuid !== '' && $uuid !== '' && $existing->uuid !== $uuid) {
+        // Existing identifiers can only be touched by the device that originally established
+        // them. A blank legacy UUID has no identity proof and therefore fails closed.
+        if ($existing && ((string) $existing->uuid === '' || ! hash_equals((string) $existing->uuid, $uuid))) {
             return self::RESULT_ID_TAKEN;
         }
 
@@ -109,9 +116,12 @@ class DeploymentService
         if ($id === '') {
             return 'Device id is required.';
         }
+        if ($uuid === '') {
+            return 'Device uuid is required.';
+        }
 
         $existing = Device::where('rustdesk_id', $id)->first();
-        if ($existing && (string) $existing->uuid !== '' && $uuid !== '' && $existing->uuid !== $uuid) {
+        if ($existing && ((string) $existing->uuid === '' || ! hash_equals((string) $existing->uuid, $uuid))) {
             return 'This id is already taken by another device.';
         }
 
@@ -119,9 +129,15 @@ class DeploymentService
         $ownerId = $token->user_id;
         if (! empty($input['user_name'])) {
             $user = User::where('username', $input['user_name'])->first();
-            if (! $user) {
+            if (! $user || ! $user->isActive()) {
                 return 'Unknown user: '.$input['user_name'];
             }
+
+            $tokenOwner = $token->user;
+            if ($user->id !== $token->user_id && ! ($tokenOwner?->is_admin ?? false)) {
+                return 'Only a full administrator can assign a device to another user.';
+            }
+
             $ownerId = $user->id;
         }
 

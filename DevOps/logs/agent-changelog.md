@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:23] - Security: bind deployment tokens and device assignment
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/DeploymentService.php`
+- `tests/Feature/{ApiResponseTest,DeploymentSecurityTest}.php`
+- `docs/modernization/02-client-api-contract.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Deployment and CLI assignment response formats are unchanged. Existing-device assignment now requires the stored UUID, and tokens stop authorizing when their owner is disabled or loses `deploy.edit`.
+**Summary:** Closed the deploy-token device takeover path by requiring exact device identity, continuously revalidating token-owner status and permissions, and limiting cross-user assignment to full administrators. Added coverage for omitted/mismatched UUIDs, revoked privileges, disabled owners, delegated operators, and the retained full-admin workflow.
+
 ## [2026-07-14 09:21] - Security: suspend disabled address-book shares
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

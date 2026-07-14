@@ -111,6 +111,7 @@ class ApiResponseTest extends TestCase
     {
         $owner = User::create([
             'username' => 'ops', 'password' => 'secret12345', 'status' => User::STATUS_NORMAL,
+            'is_admin' => true,
         ]);
         $token = DeployToken::create(['user_id' => $owner->id, 'token' => 'deploy-xyz', 'name' => 'CLI']);
         $strategy = Strategy::create(['name' => 'Locked', 'enabled' => true, 'options' => [], 'modified_at' => 1]);
