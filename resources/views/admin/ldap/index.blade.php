@@ -10,8 +10,12 @@
         </div>
         <div class="rd-page-header__actions">
             <div class="rd-actions rd-actions--wrap">
-                @if ($enabled)
+                @if ($enabled && $configurationError === null && $transportEncrypted && $tlsVerify)
                     <span class="rd-badge rd-badge--online"><span class="dot"></span> Enabled</span>
+                @elseif ($enabled && $configurationError !== null)
+                    <span class="rd-badge rd-badge--offline"><span class="dot"></span> Configuration blocked</span>
+                @elseif ($enabled)
+                    <span class="rd-badge rd-badge--offline"><span class="dot"></span> Insecure override</span>
                 @else
                     <span class="rd-badge rd-badge--offline"><span class="dot"></span> Disabled</span>
                 @endif
@@ -38,12 +42,32 @@
             </div>
         @endunless
 
+        @if ($enabled && $configurationError !== null)
+            <div class="rd-callout rd-callout--danger" role="alert">
+                <i class="ri-shield-cross-line" aria-hidden="true"></i>
+                <div>
+                    <strong>LDAP authentication is blocked by its transport configuration.</strong>
+                    {{ $configurationError }}
+                </div>
+            </div>
+        @elseif ($enabled && $allowInsecure)
+            <div class="rd-callout rd-callout--warning" role="alert">
+                <i class="ri-alert-line" aria-hidden="true"></i>
+                <div>
+                    <strong>The LDAP insecure compatibility override is armed.</strong>
+                    Effective transport: {{ $transportLabel }}. Remove
+                    <code>LDAP_ALLOW_INSECURE=true</code> after the legacy requirement is resolved.
+                </div>
+            </div>
+        @endif
+
         <div class="rd-callout rd-callout--info">
             <i class="ri-information-line" aria-hidden="true"></i>
             <div>
                 These settings are read-only and configured via environment variables
                 (<code>LDAP_*</code> in <code>config/ldap.php</code>). LDAP is disabled by default;
                 when enabled, client and admin login try LDAP first and fall back to local passwords.
+                Verified StartTLS is the default; <code>ldaps://</code> endpoints use implicit TLS.
             </div>
         </div>
 
@@ -65,8 +89,12 @@
                                 <td class="rd-mono">{{ $host !== '' ? $host : '—' }}</td>
                             </tr>
                             <tr>
-                                <th scope="row">Port</th>
+                                <th scope="row">LDAP_PORT (bare hosts)</th>
                                 <td class="rd-mono">{{ $port }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Effective endpoint</th>
+                                <td class="rd-mono">{{ $effectiveUri !== '' ? $effectiveUri : '(invalid)' }}</td>
                             </tr>
                             <tr>
                                 <th scope="row">Base DN</th>
@@ -97,12 +125,16 @@
                                 <td class="rd-mono">{{ $displayNameAttr !== '' ? $displayNameAttr : '—' }}</td>
                             </tr>
                             <tr>
-                                <th scope="row">StartTLS</th>
-                                <td>{{ $useStartTls ? 'On' : 'Off' }}</td>
+                                <th scope="row">Effective transport</th>
+                                <td>{{ $transportLabel }}</td>
                             </tr>
                             <tr>
                                 <th scope="row">TLS certificate verification</th>
                                 <td>{{ $tlsVerify ? 'On' : 'Off' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Insecure compatibility override</th>
+                                <td>{{ $allowInsecure ? 'On - legacy risk accepted' : 'Off' }}</td>
                             </tr>
                             <tr>
                                 <th scope="row">Admin group</th>

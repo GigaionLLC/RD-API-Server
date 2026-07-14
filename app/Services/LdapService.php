@@ -35,6 +35,8 @@ class LdapService
 
     private const PROVISION_ATTEMPTS = 3;
 
+    private const HOST_MAX_LENGTH = 253;
+
     /**
      * Whether LDAP authentication is configured and enabled.
      */
@@ -65,7 +67,14 @@ class LdapService
             return null;
         }
 
-        $provider = $this->identityProvider();
+        $transport = $this->transportConfiguration();
+        if ($transport['error'] !== null) {
+            Log::error($transport['error']);
+
+            return null;
+        }
+
+        $provider = $this->identityProvider($transport['port']);
         if ($provider === null) {
             Log::error('LDAP identity provider configuration is invalid.');
 
@@ -116,7 +125,7 @@ class LdapService
             }
 
             // 4. Re-bind as the user to verify their password. This is the credential check.
-            if (! @ldap_bind($connection, $userDn, $password)) {
+            if (! $this->bindLdap($connection, $userDn, $password)) {
                 return null;
             }
 
@@ -136,7 +145,7 @@ class LdapService
             return null;
         } finally {
             if ($connection !== null) {
-                @ldap_unbind($connection);
+                $this->unbindLdap($connection);
             }
         }
     }
@@ -282,17 +291,182 @@ class LdapService
     }
 
     /**
+     * Resolve and validate the effective LDAP transport before any connection or bind attempt.
+     *
+     * Bare hosts and ldap:// endpoints use StartTLS when enabled. ldaps:// endpoints are already
+     * encrypted, so StartTLS is never applied a second time. URI endpoints use their embedded port
+     * or the scheme default (389/636); bare hosts use LDAP_PORT. This preserves PHP's prior URI
+     * behavior while removing the deprecated and ambiguous two-argument ldap_connect() call.
+     *
+     * @return array{host:string,port:int,scheme:string,uri:string,start_tls:bool,encrypted:bool,tls_verify:bool,allow_insecure:bool,label:string,error:string|null}
+     */
+    public function transportConfiguration(): array
+    {
+        $configuredHost = trim((string) config('ldap.host', ''));
+        $useStartTls = (bool) config('ldap.use_starttls', true);
+        $tlsVerify = (bool) config('ldap.tls_verify', true);
+        $allowInsecure = (bool) config('ldap.allow_insecure', false);
+
+        if ($configuredHost === '') {
+            return $this->invalidTransportConfiguration(
+                $configuredHost,
+                $tlsVerify,
+                $allowInsecure,
+                'LDAP_HOST must not be empty.',
+            );
+        }
+        if (strlen($configuredHost) > 512
+            || preg_match('/[\x00-\x20\x7F]/', $configuredHost) === 1) {
+            return $this->invalidTransportConfiguration(
+                $configuredHost,
+                $tlsVerify,
+                $allowInsecure,
+                'LDAP_HOST must contain one hostname or IP address without whitespace or control characters.',
+            );
+        }
+
+        $scheme = 'ldap';
+        $host = $configuredHost;
+        $embeddedPort = null;
+        $schemeProvided = false;
+
+        if (str_contains($configuredHost, '://')) {
+            $schemeProvided = true;
+            try {
+                $parts = parse_url($configuredHost);
+            } catch (\ValueError) {
+                $parts = false;
+            }
+
+            if (! is_array($parts)) {
+                return $this->invalidTransportConfiguration(
+                    $configuredHost,
+                    $tlsVerify,
+                    $allowInsecure,
+                    'LDAP_HOST is not a valid LDAP URI.',
+                );
+            }
+
+            $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+            if (! in_array($scheme, ['ldap', 'ldaps'], true)) {
+                return $this->invalidTransportConfiguration(
+                    $configuredHost,
+                    $tlsVerify,
+                    $allowInsecure,
+                    'LDAP_HOST supports only ldap:// or ldaps:// schemes.',
+                );
+            }
+            if (array_key_exists('user', $parts)
+                || array_key_exists('pass', $parts)
+                || array_key_exists('query', $parts)
+                || array_key_exists('fragment', $parts)
+                || ! in_array((string) ($parts['path'] ?? ''), ['', '/'], true)) {
+                return $this->invalidTransportConfiguration(
+                    $configuredHost,
+                    $tlsVerify,
+                    $allowInsecure,
+                    'LDAP_HOST must not contain credentials, a path, query parameters, or a fragment.',
+                );
+            }
+
+            $host = (string) ($parts['host'] ?? '');
+            $embeddedPort = array_key_exists('port', $parts) ? (int) $parts['port'] : null;
+        }
+
+        if (str_starts_with($host, '[') || str_ends_with($host, ']')) {
+            if (! str_starts_with($host, '[') || ! str_ends_with($host, ']')) {
+                return $this->invalidTransportConfiguration(
+                    $configuredHost,
+                    $tlsVerify,
+                    $allowInsecure,
+                    'LDAP_HOST contains an invalid bracketed address.',
+                );
+            }
+            $host = substr($host, 1, -1);
+        }
+
+        if (! $this->validLdapHost($host)) {
+            return $this->invalidTransportConfiguration(
+                $configuredHost,
+                $tlsVerify,
+                $allowInsecure,
+                'LDAP_HOST must contain a valid hostname, IPv4 address, or bracketed IPv6 address.',
+            );
+        }
+
+        $port = $embeddedPort
+            ?? ($schemeProvided
+                ? ($scheme === 'ldaps' ? 636 : 389)
+                : $this->validLdapPort(config('ldap.port', 389)));
+        if ($port === null || $port < 1 || $port > 65535) {
+            return $this->invalidTransportConfiguration(
+                $configuredHost,
+                $tlsVerify,
+                $allowInsecure,
+                'LDAP_PORT (or the URI port) must be an integer from 1 through 65535.',
+            );
+        }
+
+        $uriHost = filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false
+            ? '['.$host.']'
+            : $host;
+        $uri = $scheme.'://'.$uriHost.':'.$port;
+        $startTls = $scheme === 'ldap' && $useStartTls;
+        $encrypted = $scheme === 'ldaps' || $startTls;
+
+        $label = match (true) {
+            $scheme === 'ldaps' && $tlsVerify => 'LDAPS (certificate verified)',
+            $scheme === 'ldaps' => 'LDAPS (certificate verification disabled)',
+            $startTls && $tlsVerify => 'StartTLS (certificate verified)',
+            $startTls => 'StartTLS (certificate verification disabled)',
+            default => 'Plaintext LDAP (explicit insecure override)',
+        };
+
+        $configuration = [
+            'host' => $host,
+            'port' => $port,
+            'scheme' => $scheme,
+            'uri' => $uri,
+            'start_tls' => $startTls,
+            'encrypted' => $encrypted,
+            'tls_verify' => $tlsVerify,
+            'allow_insecure' => $allowInsecure,
+            'label' => $label,
+            'error' => null,
+        ];
+
+        if (! $encrypted && ! $allowInsecure) {
+            $configuration['label'] = 'Plaintext LDAP (blocked)';
+            $configuration['error'] = 'LDAP configuration error: plaintext LDAP is blocked. '
+                .'Enable LDAP_USE_STARTTLS=true or use an ldaps:// endpoint. For isolated legacy '
+                .'environments only, LDAP_ALLOW_INSECURE=true is the explicit risk override.';
+        } elseif (! $tlsVerify && ! $allowInsecure) {
+            $configuration['label'] .= ' (blocked)';
+            $configuration['error'] = 'LDAP configuration error: TLS certificate verification is disabled. '
+                .'Set LDAP_TLS_VERIFY=true. For isolated legacy environments only, '
+                .'LDAP_ALLOW_INSECURE=true is the explicit risk override.';
+        }
+
+        return $configuration;
+    }
+
+    /**
      * Attempt the service-account bind only (used by the admin "Test connection" action).
      * Returns null on success or a human-readable error message on failure.
      */
     public function testConnection(): ?string
     {
-        if (! extension_loaded('ldap')) {
-            return 'The PHP ldap extension is not installed.';
-        }
-
         if (! (bool) config('ldap.enabled', false)) {
             return 'LDAP is disabled.';
+        }
+
+        $transport = $this->transportConfiguration();
+        if ($transport['error'] !== null) {
+            return $transport['error'];
+        }
+
+        if (! extension_loaded('ldap')) {
+            return 'The PHP ldap extension is not installed.';
         }
 
         $connection = null;
@@ -300,11 +474,12 @@ class LdapService
         try {
             $connection = $this->connect();
             if ($connection === null) {
-                return 'Could not connect to the LDAP server.';
+                return 'Could not establish the configured '.$transport['label'].' connection. '
+                    .'Check the LDAP host, port, TLS support, and trusted CA certificates.';
             }
 
             if (! $this->bindServiceAccount($connection)) {
-                return 'Service-account bind failed: '.ldap_error($connection);
+                return 'Service-account bind failed: '.$this->ldapError($connection);
             }
 
             return null;
@@ -312,9 +487,60 @@ class LdapService
             return 'LDAP error: '.$e->getMessage();
         } finally {
             if ($connection !== null) {
-                @ldap_unbind($connection);
+                $this->unbindLdap($connection);
             }
         }
+    }
+
+    /**
+     * @return array{host:string,port:int,scheme:string,uri:string,start_tls:bool,encrypted:bool,tls_verify:bool,allow_insecure:bool,label:string,error:string|null}
+     */
+    private function invalidTransportConfiguration(
+        string $host,
+        bool $tlsVerify,
+        bool $allowInsecure,
+        string $message,
+    ): array {
+        return [
+            'host' => $host,
+            'port' => 0,
+            'scheme' => '',
+            'uri' => '',
+            'start_tls' => false,
+            'encrypted' => false,
+            'tls_verify' => $tlsVerify,
+            'allow_insecure' => $allowInsecure,
+            'label' => 'Invalid LDAP transport configuration',
+            'error' => 'LDAP configuration error: '.$message,
+        ];
+    }
+
+    private function validLdapHost(string $host): bool
+    {
+        if ($host === '' || strlen($host) > self::HOST_MAX_LENGTH) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return true;
+        }
+
+        return filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) !== false;
+    }
+
+    private function validLdapPort(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value >= 1 && $value <= 65535 ? $value : null;
+        }
+
+        if (! is_string($value) || preg_match('/\A[0-9]{1,5}\z/', $value) !== 1) {
+            return null;
+        }
+
+        $port = (int) $value;
+
+        return $port >= 1 && $port <= 65535 ? $port : null;
     }
 
     /**
@@ -322,7 +548,7 @@ class LdapService
      * derive one from the connection host, port, and search base. Configuration changes therefore
      * fail closed into a new namespace instead of silently reusing another directory's subjects.
      */
-    private function identityProvider(): ?string
+    private function identityProvider(int $effectivePort): ?string
     {
         $configured = trim((string) config('ldap.provider_id', ''));
         if ($configured !== '') {
@@ -336,8 +562,8 @@ class LdapService
 
         $host = strtolower(trim((string) config('ldap.host', '')));
         $baseDn = strtolower(trim((string) config('ldap.base_dn', '')));
-        $port = (int) config('ldap.port', 389);
-        if ($host === '' || $baseDn === '' || $port < 1 || $port > 65535) {
+        $port = $this->validLdapPort(config('ldap.port', 389)) ?? $effectivePort;
+        if ($host === '' || $baseDn === '') {
             return null;
         }
 
@@ -363,31 +589,50 @@ class LdapService
     }
 
     /**
-     * Open the connection and (optionally) start TLS. Returns the connection or null on failure.
+     * Open the validated connection and establish its required encryption before any bind.
      */
     private function connect(): ?Connection
     {
-        $host = (string) config('ldap.host', '');
-        $port = (int) config('ldap.port', 389);
-
-        // Respect certificate verification before any TLS negotiation.
-        $verify = (bool) config('ldap.tls_verify', true);
-        @ldap_set_option(null, LDAP_OPT_X_TLS_REQUIRE_CERT, $verify ? LDAP_OPT_X_TLS_DEMAND : LDAP_OPT_X_TLS_NEVER);
-
-        $connection = @ldap_connect($host, $port);
-        if ($connection === false) {
-            Log::error('LDAP connect failed', ['host' => $host, 'port' => $port]);
+        $transport = $this->transportConfiguration();
+        if ($transport['error'] !== null) {
+            Log::error($transport['error']);
 
             return null;
         }
 
-        @ldap_set_option($connection, LDAP_OPT_PROTOCOL_VERSION, 3);
-        @ldap_set_option($connection, LDAP_OPT_REFERRALS, 0);
+        // PHP requires TLS options to be set globally before ldap_connect() for LDAPS. Applying
+        // the same policy before StartTLS also prevents a process-level weak setting from leaking
+        // into this request.
+        $certificatePolicy = $transport['tls_verify']
+            ? LDAP_OPT_X_TLS_DEMAND
+            : LDAP_OPT_X_TLS_NEVER;
+        if (! $this->setLdapOption(null, LDAP_OPT_X_TLS_REQUIRE_CERT, $certificatePolicy)) {
+            Log::error('LDAP could not apply the TLS certificate verification policy.');
 
-        if ((bool) config('ldap.use_starttls', false)) {
-            if (! @ldap_start_tls($connection)) {
-                Log::error('LDAP StartTLS failed: '.ldap_error($connection));
-                @ldap_unbind($connection);
+            return null;
+        }
+
+        $connection = $this->initializeLdapConnection($transport['uri']);
+        if ($connection === false) {
+            Log::error('LDAP endpoint URI is not accepted by the LDAP runtime.', [
+                'uri' => $transport['uri'],
+            ]);
+
+            return null;
+        }
+
+        if (! $this->setLdapOption($connection, LDAP_OPT_PROTOCOL_VERSION, 3)
+            || ! $this->setLdapOption($connection, LDAP_OPT_REFERRALS, 0)) {
+            Log::error('LDAP could not apply required connection options.');
+            $this->unbindLdap($connection);
+
+            return null;
+        }
+
+        if ($transport['start_tls']) {
+            if (! $this->startLdapTls($connection)) {
+                Log::error('LDAP StartTLS failed: '.$this->ldapError($connection));
+                $this->unbindLdap($connection);
 
                 return null;
             }
@@ -406,16 +651,56 @@ class LdapService
 
         // An anonymous bind is allowed when no service account is configured.
         if ($bindDn === '') {
-            return @ldap_bind($connection);
+            return $this->bindLdap($connection);
         }
 
-        if (! @ldap_bind($connection, $bindDn, $bindPassword)) {
-            Log::error('LDAP service-account bind failed: '.ldap_error($connection));
+        if (! $this->bindLdap($connection, $bindDn, $bindPassword)) {
+            Log::error('LDAP service-account bind failed: '.$this->ldapError($connection));
 
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Low-level LDAP operations are isolated behind protected methods so transport policy and
+     * operation ordering can be tested without placing credentials on a real network.
+     */
+    protected function initializeLdapConnection(string $uri): Connection|false
+    {
+        return @ldap_connect($uri);
+    }
+
+    protected function setLdapOption(
+        ?Connection $connection,
+        int $option,
+        array|string|int|bool $value,
+    ): bool {
+        return @ldap_set_option($connection, $option, $value);
+    }
+
+    protected function startLdapTls(Connection $connection): bool
+    {
+        return @ldap_start_tls($connection);
+    }
+
+    protected function bindLdap(
+        Connection $connection,
+        ?string $dn = null,
+        ?string $password = null,
+    ): bool {
+        return @ldap_bind($connection, $dn, $password);
+    }
+
+    protected function unbindLdap(Connection $connection): bool
+    {
+        return @ldap_unbind($connection);
+    }
+
+    protected function ldapError(Connection $connection): string
+    {
+        return ldap_error($connection);
     }
 
     /**

@@ -20,6 +20,8 @@ class LdapController extends Controller
 
     public function index(): View
     {
+        $transport = $this->ldap->transportConfiguration();
+
         return view('admin.ldap.index', [
             'enabled' => (bool) config('ldap.enabled', false),
             'host' => (string) config('ldap.host', ''),
@@ -31,8 +33,12 @@ class LdapController extends Controller
             'usernameAttr' => (string) config('ldap.username_attr', ''),
             'emailAttr' => (string) config('ldap.email_attr', ''),
             'displayNameAttr' => (string) config('ldap.displayname_attr', ''),
-            'useStartTls' => (bool) config('ldap.use_starttls', false),
-            'tlsVerify' => (bool) config('ldap.tls_verify', true),
+            'transportLabel' => $transport['label'],
+            'effectiveUri' => $transport['uri'],
+            'transportEncrypted' => $transport['encrypted'],
+            'tlsVerify' => $transport['tls_verify'],
+            'allowInsecure' => $transport['allow_insecure'],
+            'configurationError' => $transport['error'],
             'adminGroup' => (string) config('ldap.admin_group', ''),
             'allowGroup' => (string) config('ldap.allow_group', ''),
             'sync' => (bool) config('ldap.sync', false),
@@ -45,9 +51,12 @@ class LdapController extends Controller
         $error = $this->ldap->testConnection();
 
         if ($error === null) {
+            $transport = $this->ldap->transportConfiguration();
+            $flashKey = $transport['encrypted'] && $transport['tls_verify'] ? 'status' : 'warning';
+
             return redirect()
                 ->route('admin.ldap.index')
-                ->with('status', 'LDAP connection succeeded: service-account bind OK.');
+                ->with($flashKey, 'LDAP connection succeeded over '.$transport['label'].': service-account bind OK.');
         }
 
         return redirect()

@@ -60,6 +60,26 @@ services:
       RUSTDESK_RECORDING_UPLOAD_MAX_TOTAL_FILES: "${RUSTDESK_RECORDING_UPLOAD_MAX_TOTAL_FILES:-5000}"
       RUSTDESK_RECORDING_UPLOAD_MAX_ACTIVE_PER_SOURCE: "${RUSTDESK_RECORDING_UPLOAD_MAX_ACTIVE_PER_SOURCE:-4}"
 
+      # LDAP / Active Directory (optional; disabled and securely fail-closed by default).
+      LDAP_ENABLED: "${LDAP_ENABLED:-false}"
+      LDAP_HOST: "${LDAP_HOST:-ldap.example.com}"
+      LDAP_PORT: "${LDAP_PORT:-389}"
+      LDAP_BASE_DN: "${LDAP_BASE_DN:-dc=example,dc=com}"
+      LDAP_PROVIDER_ID: "${LDAP_PROVIDER_ID:-}"
+      LDAP_SUBJECT_ATTR: "${LDAP_SUBJECT_ATTR:-entryUUID}"
+      LDAP_BIND_DN: "${LDAP_BIND_DN:-}"
+      LDAP_BIND_PASSWORD: "${LDAP_BIND_PASSWORD:-}"
+      LDAP_USER_FILTER: "${LDAP_USER_FILTER:-(uid=%s)}"
+      LDAP_USERNAME_ATTR: "${LDAP_USERNAME_ATTR:-uid}"
+      LDAP_EMAIL_ATTR: "${LDAP_EMAIL_ATTR:-mail}"
+      LDAP_DISPLAYNAME_ATTR: "${LDAP_DISPLAYNAME_ATTR:-cn}"
+      LDAP_USE_STARTTLS: "${LDAP_USE_STARTTLS:-true}"
+      LDAP_TLS_VERIFY: "${LDAP_TLS_VERIFY:-true}"
+      LDAP_ALLOW_INSECURE: "${LDAP_ALLOW_INSECURE:-false}"
+      LDAP_ADMIN_GROUP: "${LDAP_ADMIN_GROUP:-}"
+      LDAP_ALLOW_GROUP: "${LDAP_ALLOW_GROUP:-}"
+      LDAP_SYNC: "${LDAP_SYNC:-false}"
+
       # SMTP (optional — for 2FA email codes, invitations, alarms).
       MAIL_MAILER: "${MAIL_MAILER:-log}"
       MAIL_HOST: "${MAIL_HOST:-}"
