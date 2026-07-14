@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:25] - Security: restrict generic OIDC egress
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/{OauthService,OidcDestinationGuard,OidcDnsResolver}.php`
+- `config/rustdesk.php`, `.env.example`
+- `tests/Feature/{OidcDestinationSecurityTest,OidcPkceTest,AdminSsoLoginTest}.php`
+- `Wiki/core/15-security.md`, `docs/modernization/08-build-log.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds optional `RUSTDESK_OIDC_ALLOWED_PORTS` configuration (default `443`). Inbound OIDC routes and response shapes are unchanged.
+**Summary:** Added a fail-closed outbound boundary for generic OIDC issuer discovery, authorization, token, and userinfo endpoints: HTTPS/public-network validation, exact issuer assertion, per-hop DNS revalidation and cURL pinning, disabled redirects/proxies/reuse, and credential-safe failure logs. Public cross-host providers and PKCE remain supported, with 47 focused tests / 117 assertions plus clean Pint and PHPStan gates.
+
 ## [2026-07-14 09:23] - Security: bind deployment tokens and device assignment
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

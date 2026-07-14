@@ -2,6 +2,22 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-14 - Generic OIDC outbound boundary (verified)
+
+- Added an OIDC-specific destination guard for issuer discovery and discovered authorization,
+  token, and userinfo endpoints. Generic OIDC now requires HTTPS and public DNS, rejects mixed
+  public/private answers, validates the discovery document's issuer, and supports intentional
+  public custom ports through `RUSTDESK_OIDC_ALLOWED_PORTS`.
+- Discovery, token, and userinfo requests disable redirects and inherited proxies, open fresh
+  connections, and pin the address validated immediately before each request. Token and
+  userinfo endpoints are re-resolved after discovery so DNS rebinding cannot redirect an
+  authorization code, client secret, or bearer token to an internal service.
+- Public cross-host provider topologies remain supported. Existing device-login PKCE and admin
+  SSO behavior are unchanged, and authorization endpoints with an existing query string now
+  receive OAuth parameters correctly.
+- **Verified in Docker:** focused OIDC, PKCE, and admin-SSO coverage passed 47 tests / 117
+  assertions; the full Pint and PHPStan gates passed with no findings.
+
 ## 2026-07-13 - Full admin WebUI modernization (verified)
 
 - Reworked the full admin and authentication surface into one responsive design system using

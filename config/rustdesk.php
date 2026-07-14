@@ -65,4 +65,13 @@ return [
             explode(',', (string) env('RUSTDESK_WEBHOOK_ALLOWED_PORTS', '80,443'))
         ),
     ],
+
+    // Generic OIDC discovery/token/userinfo calls require HTTPS and public DNS. Standard TLS
+    // port 443 is allowed by default; list an additional public port only when an IdP needs it.
+    'oidc' => [
+        'allowed_ports' => array_map(
+            'intval',
+            explode(',', (string) env('RUSTDESK_OIDC_ALLOWED_PORTS', '443'))
+        ),
+    ],
 ];

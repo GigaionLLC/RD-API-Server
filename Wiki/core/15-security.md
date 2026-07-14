@@ -39,3 +39,17 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - `webhooks.view` grants redacted configuration and delivery history only. Create, update,
   toggle, test, resend, and delete operations require `webhooks.edit` on the server and are not
   rendered for view-only delegates.
+
+## Generic OIDC Egress Boundary
+
+- Generic OIDC issuers and every discovered authorization, token, and userinfo endpoint must
+  use HTTPS, resolve entirely to globally routable addresses, and use an allowed port (`443` by
+  default; configure `RUSTDESK_OIDC_ALLOWED_PORTS` for an intentional public custom port).
+- Discovery must assert the configured issuer. A missing or mismatched `issuer`, unsafe URL, or
+  unsafe endpoint aborts the login before an authorization URL is returned.
+- Discovery, token, and userinfo requests resolve immediately before use and pin the validated
+  address into the connection. Redirects, inherited proxies, and connection reuse are disabled;
+  token and userinfo destinations are resolved again after discovery to prevent DNS rebinding.
+- Cross-host endpoints remain supported when each endpoint independently passes the public
+  network checks. The guard does not assume that every standards-compliant provider uses one
+  hostname.

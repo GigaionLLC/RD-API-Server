@@ -6,8 +6,10 @@ use App\Models\OauthProvider;
 use App\Models\User;
 use App\Models\UserThird;
 use App\Services\OauthService;
+use App\Services\OidcDnsResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /**
@@ -31,8 +33,13 @@ class OidcPkceTest extends TestCase
 
     private function fakeOidc(): void
     {
+        $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->andReturn(['8.8.8.8']);
+        });
+
         Http::fake([
             'kc.example.com/realms/test/.well-known/openid-configuration' => Http::response([
+                'issuer' => 'https://kc.example.com/realms/test',
                 'authorization_endpoint' => 'https://kc.example.com/auth',
                 'token_endpoint' => 'https://kc.example.com/token',
                 'userinfo_endpoint' => 'https://kc.example.com/userinfo',

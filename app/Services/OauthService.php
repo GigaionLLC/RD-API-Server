@@ -7,6 +7,7 @@ use App\Models\OauthProvider;
 use App\Models\OauthSession;
 use App\Models\User;
 use App\Models\UserThird;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -42,6 +43,12 @@ class OauthService
     public const DEFAULT_SCOPES = 'openid,profile,email';
 
     public const CACHE_TTL = 300;
+
+    private const OIDC_CONNECT_TIMEOUT_SECONDS = 5;
+
+    private const OIDC_TIMEOUT_SECONDS = 10;
+
+    public function __construct(private readonly OidcDestinationGuard $oidcDestinationGuard) {}
 
     /**
      * The list of supported provider types.
@@ -146,7 +153,9 @@ class OauthService
             $query['code_challenge_method'] = $method;
         }
 
-        return $config['authorization_endpoint'].'?'.http_build_query($query);
+        $separator = str_contains($config['authorization_endpoint'], '?') ? '&' : '?';
+
+        return $config['authorization_endpoint'].$separator.http_build_query($query);
     }
 
     /**
@@ -300,7 +309,7 @@ class OauthService
     {
         $config = $this->discoverOidc($provider->issuer ?? '');
         if (! $config || empty($config['token_endpoint']) || empty($config['userinfo_endpoint'])) {
-            Log::warning('OIDC discovery missing token/userinfo endpoint', ['op' => $provider->op, 'issuer' => $provider->issuer]);
+            Log::warning('OIDC discovery failed validation', ['op' => $provider->op]);
 
             return null;
         }
@@ -318,13 +327,16 @@ class OauthService
                 $form['code_verifier'] = $codeVerifier;
             }
 
-            $tokenResponse = Http::asForm()->acceptJson()->post($config['token_endpoint'], $form);
+            $tokenEndpoint = (string) $config['token_endpoint'];
+            $tokenResponse = $this->oidcRequest($tokenEndpoint)
+                ->asForm()
+                ->acceptJson()
+                ->post($tokenEndpoint, $form);
 
             if (! $tokenResponse->successful()) {
                 Log::warning('OIDC token exchange failed', [
                     'op' => $provider->op,
                     'status' => $tokenResponse->status(),
-                    'body' => Str::limit($tokenResponse->body(), 300),
                 ]);
 
                 return null;
@@ -337,9 +349,11 @@ class OauthService
                 return null;
             }
 
-            $userResponse = Http::withToken($accessToken)
+            $userinfoEndpoint = (string) $config['userinfo_endpoint'];
+            $userResponse = $this->oidcRequest($userinfoEndpoint)
+                ->withToken($accessToken)
                 ->acceptJson()
-                ->get($config['userinfo_endpoint']);
+                ->get($userinfoEndpoint);
 
             if (! $userResponse->successful()) {
                 Log::warning('OIDC userinfo fetch failed', ['op' => $provider->op, 'status' => $userResponse->status()]);
@@ -349,7 +363,10 @@ class OauthService
 
             $info = (array) $userResponse->json();
         } catch (\Throwable $e) {
-            Log::warning('OIDC exchange threw', ['op' => $provider->op, 'error' => $e->getMessage()]);
+            Log::warning('OIDC exchange threw', [
+                'op' => $provider->op,
+                'exception' => $e::class,
+            ]);
 
             return null;
         }
@@ -377,23 +394,50 @@ class OauthService
      */
     private function discoverOidc(string $issuer): ?array
     {
-        $issuer = rtrim(trim($issuer), '/');
-        if ($issuer === '') {
-            return null;
-        }
-
-        $url = $issuer.'/.well-known/openid-configuration';
-
         try {
-            $response = Http::acceptJson()->get($url);
+            $issuer = $this->oidcDestinationGuard->normalizeIssuer($issuer);
+            $url = $issuer.'/.well-known/openid-configuration';
+            $response = $this->oidcRequest($url)->acceptJson()->get($url);
             if (! $response->successful()) {
                 return null;
             }
 
-            return (array) $response->json();
+            $config = $response->json();
+            if (! is_array($config)
+                || ! is_string($config['issuer'] ?? null)
+                || ! $this->oidcDestinationGuard->issuerMatches($issuer, $config['issuer'])) {
+                return null;
+            }
+
+            foreach (['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint'] as $endpoint) {
+                if (! is_string($config[$endpoint] ?? null) || trim($config[$endpoint]) === '') {
+                    return null;
+                }
+
+                // Validate every discovered endpoint now so a malicious document cannot even
+                // start a login flow. Token and userinfo are resolved again immediately before
+                // their requests to close the DNS-rebinding window.
+                $this->oidcDestinationGuard->resolve($config[$endpoint]);
+            }
+
+            return $config;
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Build a secure request for one generic OIDC hop. Resolution happens immediately before
+     * the request and is pinned into cURL; redirects and environment proxies stay disabled.
+     */
+    private function oidcRequest(string $url): PendingRequest
+    {
+        $destination = $this->oidcDestinationGuard->resolve($url);
+
+        return Http::connectTimeout(self::OIDC_CONNECT_TIMEOUT_SECONDS)
+            ->timeout(self::OIDC_TIMEOUT_SECONDS)
+            ->withoutRedirecting()
+            ->withOptions($this->oidcDestinationGuard->requestOptions($destination));
     }
 
     /**
