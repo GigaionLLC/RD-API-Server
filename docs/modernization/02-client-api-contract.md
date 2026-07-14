@@ -57,7 +57,12 @@ connections are active. `sync.rs:86‑274`.
   See `handle_config_options` `sync.rs:287`.
 - Returning `disconnect: [ids]` force‑drops those sessions on the client.
 - Returning `"sysinfo": true` makes the client clear its sysinfo hash and re‑upload.
-- **Today's server returns `{}`** — so none of this works. This is gap #1.
+- Existing devices must present the exact stored non-empty `uuid` for their `id`. A mismatch
+  receives `{}` without inventory mutation, Strategy disclosure, or consumption of queued
+  disconnects. Unknown devices auto-register only when deployment gating is off and both
+  bounded identity fields are present; unapproved devices receive no commands or policy.
+- **Implemented:** the server records liveness, resolves the effective Strategy, pushes changed
+  options/timestamps, and delivers queued disconnect commands after the identity checks above.
 
 ---
 
@@ -95,8 +100,10 @@ matches; `/api/sysinfo_ver` lets it confirm the server still has the same versio
 
 **`/api/sysinfo_ver`** returns an opaque version string used to short‑circuit uploads.
 
-> Today's server stores the core fields but **ignores all preset keys** and always answers
-> `SYSINFO_UPDATED` (`http/controller/api/peer.go:26`). Gaps #4 and #5.
+The server stores core fields and applies recognized preset keys only after the request's
+`id`/`uuid` pair matches an approved device (or securely establishes a new auto-registered
+device while deployment gating is off). A mismatched or unapproved device receives
+`ID_NOT_FOUND` and cannot change inventory, assignments, groups, or address books.
 
 The set of `OPTION_PRESET_*` keys (from `hbb_common` `keys`): preset address‑book
 name/tag/alias/password/note, preset username, preset strategy name, preset device‑group

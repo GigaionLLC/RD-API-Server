@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:34] - Security: bind device telemetry to stored identity
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Api/SystemController.php`
+- `tests/Feature/DeviceTelemetrySecurityTest.php`
+- `docs/modernization/02-client-api-contract.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Heartbeat/sysinfo wire shapes are unchanged. Existing devices now require the exact stored UUID; deployment-gated and unapproved devices receive the existing empty/`ID_NOT_FOUND` responses without mutation or policy delivery.
+**Summary:** Closed unauthenticated device-ID takeover and Strategy/disconnect disclosure paths by making telemetry fail closed on missing, oversized, blank legacy, or mismatched identities; stopped heartbeat from bypassing deployment gating; and withheld all mutation/policy/command behavior from unapproved devices. Thirty-five focused device and contract tests / 132 assertions plus Pint passed.
+
 ## [2026-07-14 09:30] - Security: require explicit trusted proxies
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

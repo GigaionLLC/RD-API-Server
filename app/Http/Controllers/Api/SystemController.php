@@ -35,21 +35,31 @@ class SystemController extends Controller
      */
     public function heartbeat(Request $request): JsonResponse
     {
-        $id = (string) $request->input('id', '');
-        $uuid = (string) $request->input('uuid', '');
-        $rustdeskId = $id !== '' ? $id : $uuid;
+        $rustdeskId = trim((string) $request->input('id', ''));
+        $uuid = trim((string) $request->input('uuid', ''));
 
-        if ($rustdeskId === '') {
+        if (! $this->validIdentityPart($rustdeskId)) {
             return response()->json(['error' => 'missing id']);
         }
 
         $device = Device::where('rustdesk_id', $rustdeskId)->first();
 
-        if (! $device) {
-            if (! config('rustdesk.devices.auto_register')) {
+        if ($device) {
+            if (! $this->identityMatches($device, $uuid) || ! $device->approved) {
                 return response()->json((object) []);
             }
-            $device = new Device(['rustdesk_id' => $rustdeskId, 'uuid' => $uuid]);
+        } else {
+            if (! $this->validIdentityPart($uuid)
+                || config('rustdesk.devices.require_deployment')
+                || ! config('rustdesk.devices.auto_register')) {
+                return response()->json((object) []);
+            }
+
+            $device = new Device([
+                'rustdesk_id' => $rustdeskId,
+                'uuid' => $uuid,
+                'approved' => true,
+            ]);
         }
 
         // Place new / still-ungrouped devices into the default group (auto-provisioned when
@@ -58,7 +68,6 @@ class SystemController extends Controller
 
         $conns = $request->input('conns', []);
         $device->fill([
-            'uuid' => $uuid !== '' ? $uuid : $device->uuid,
             'is_online' => true,
             'conns' => is_array($conns) ? count($conns) : 0,
             'last_online_at' => now(),
@@ -93,26 +102,35 @@ class SystemController extends Controller
      */
     public function sysinfo(Request $request): Response
     {
-        $id = (string) $request->input('id', '');
-        $uuid = (string) $request->input('uuid', '');
-        $rustdeskId = $id !== '' ? $id : $uuid;
+        $rustdeskId = trim((string) $request->input('id', ''));
+        $uuid = trim((string) $request->input('uuid', ''));
 
-        if ($rustdeskId === '') {
+        if (! $this->validIdentityPart($rustdeskId)) {
             return response('ID_NOT_FOUND')->header('Content-Type', 'text/plain');
         }
 
         $device = Device::where('rustdesk_id', $rustdeskId)->first();
 
-        if (! $device) {
-            // Deployment gating: unknown devices are rejected until approved/deployed.
-            if (config('rustdesk.devices.require_deployment') || ! config('rustdesk.devices.auto_register')) {
+        if ($device) {
+            if (! $this->identityMatches($device, $uuid) || ! $device->approved) {
                 return response('ID_NOT_FOUND')->header('Content-Type', 'text/plain');
             }
-            $device = new Device(['rustdesk_id' => $rustdeskId]);
+        } else {
+            // Deployment gating: unknown devices are rejected until approved/deployed.
+            if (! $this->validIdentityPart($uuid)
+                || config('rustdesk.devices.require_deployment')
+                || ! config('rustdesk.devices.auto_register')) {
+                return response('ID_NOT_FOUND')->header('Content-Type', 'text/plain');
+            }
+
+            $device = new Device([
+                'rustdesk_id' => $rustdeskId,
+                'uuid' => $uuid,
+                'approved' => true,
+            ]);
         }
 
         $device->fill([
-            'uuid' => $uuid !== '' ? $uuid : $device->uuid,
             'cpu' => (string) $request->input('cpu', $device->cpu),
             'hostname' => (string) $request->input('hostname', $device->hostname),
             'memory' => (string) $request->input('memory', $device->memory),
@@ -197,5 +215,19 @@ class SystemController extends Controller
                 ], static fn ($v) => $v !== null)
             );
         }
+    }
+
+    private function identityMatches(Device $device, string $uuid): bool
+    {
+        $storedUuid = (string) $device->uuid;
+
+        return $this->validIdentityPart($uuid)
+            && $storedUuid !== ''
+            && hash_equals($storedUuid, $uuid);
+    }
+
+    private function validIdentityPart(string $value): bool
+    {
+        return $value !== '' && strlen($value) <= 255;
     }
 }
