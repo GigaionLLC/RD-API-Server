@@ -166,3 +166,16 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   at the fifth wrong code and atomically consumed on success, preventing replay.
 - Rows created before the challenge-hash migration contain no challenge digest and are therefore
   intentionally unusable after deployment; the user can begin a fresh five-minute login attempt.
+
+## Two-Factor Recovery Boundary
+
+- Authenticator recovery codes are returned only in the successful enrollment response. That
+  response is private/no-store and the plaintext list is never written to the database-backed
+  session, user row, model serialization, or logs.
+- The user row stores only versioned HMAC-SHA-256 digests separated from other uses of `APP_KEY`.
+  Verification accepts the current key and configured `APP_PREVIOUS_KEYS`, consumes one digest
+  under a row lock, and rejects replay from concurrent or stale requests.
+- Legacy plaintext lists are converted by the deployment migration and are also upgraded under
+  lock if encountered during a rolling transition. Rolling back the one-way digest migration
+  invalidates affected recovery lists; the authenticator remains usable and new recovery codes
+  require re-enrollment.

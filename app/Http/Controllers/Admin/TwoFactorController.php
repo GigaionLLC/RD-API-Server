@@ -8,6 +8,7 @@ use App\Services\TwoFactorService;
 use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -50,11 +51,15 @@ class TwoFactorController extends Controller
             ? $this->twoFactor->provisioningUri($setupSecret, (string) $user->username)
             : null;
 
+        // Retire plaintext recovery-code flash data created by older releases. New codes are
+        // rendered once in a no-store response and never persisted in the session.
+        $request->session()->forget('2fa.recovery_codes');
+
         return view('admin.two_factor.show', [
             'enabled' => (bool) $user->two_factor_enabled,
             'setupSecret' => is_string($setupSecret) ? $setupSecret : null,
             'setupUri' => $uri,
-            'recoveryCodes' => $request->session()->get('2fa.recovery_codes'),
+            'recoveryCodes' => null,
         ]);
     }
 
@@ -73,7 +78,7 @@ class TwoFactorController extends Controller
         return redirect()->route('admin.2fa.show');
     }
 
-    public function confirm(Request $request): RedirectResponse
+    public function confirm(Request $request): Response|RedirectResponse
     {
         $request->validate(['code' => ['required', 'string']]);
 
@@ -90,14 +95,25 @@ class TwoFactorController extends Controller
             'two_factor_secret' => $secret,
             'two_factor_enabled' => true,
             'two_factor_confirmed_at' => now(),
-            'two_factor_recovery_codes' => $recovery,
+            'two_factor_recovery_codes' => $this->twoFactor->protectRecoveryCodes($recovery),
             'login_verify' => User::LOGIN_VERIFY_TOTP,
         ])->save();
 
-        $request->session()->forget(self::SETUP_KEY);
+        $request->session()->forget([self::SETUP_KEY, '2fa.recovery_codes']);
 
-        // Surface the recovery codes exactly once.
-        return redirect()->route('admin.2fa.show')->with('2fa.recovery_codes', $recovery);
+        // Surface plaintext recovery codes exactly once without writing them to the database
+        // session or allowing a browser/proxy cache to retain the response.
+        return response()->view('admin.two_factor.show', [
+            'enabled' => true,
+            'setupSecret' => null,
+            'setupUri' => null,
+            'recoveryCodes' => $recovery,
+        ])->withHeaders([
+            'Cache-Control' => 'no-store, private',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'Referrer-Policy' => 'no-referrer',
+        ]);
     }
 
     public function disable(Request $request): RedirectResponse

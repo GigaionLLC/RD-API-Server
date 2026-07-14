@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\VerifyCode;
+use App\Support\RecoveryCodeProtector;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -42,6 +43,8 @@ class TwoFactorService
 
     /** Length of an opaque login-challenge secret returned to the RustDesk client. */
     private const CHALLENGE_LENGTH = 64;
+
+    public function __construct(private readonly RecoveryCodeProtector $recoveryCodes) {}
 
     /**
      * Verify a 6-digit TOTP code against the user's stored Base32 secret.
@@ -138,13 +141,22 @@ class TwoFactorService
     }
 
     /**
+     * @param  list<string>  $codes
+     * @return list<string>
+     */
+    public function protectRecoveryCodes(array $codes): array
+    {
+        return $this->recoveryCodes->protectMany($codes);
+    }
+
+    /**
      * Verify and consume a recovery code for the user. Returns true and removes the code on a
      * match; false otherwise. Persists the trimmed list on success.
      */
     public function verifyRecoveryCode(User $user, string $code): bool
     {
-        $code = strtoupper(trim($code));
-        if ($code === '') {
+        $code = $this->recoveryCodes->normalize($code);
+        if (! $this->recoveryCodes->isValidPlaintext($code)) {
             return false;
         }
 
@@ -162,7 +174,7 @@ class TwoFactorService
             $match = null;
 
             foreach ($codes as $index => $candidate) {
-                if (hash_equals(strtoupper($candidate), $code)) {
+                if ($this->recoveryCodes->matches($candidate, $code)) {
                     $match = $index;
                     break;
                 }
@@ -173,7 +185,13 @@ class TwoFactorService
             }
 
             unset($codes[$match]);
-            $remaining = array_values($codes);
+            $remaining = [];
+            foreach ($codes as $candidate) {
+                $protected = $this->recoveryCodes->protectStored($candidate);
+                if ($protected !== null) {
+                    $remaining[] = $protected;
+                }
+            }
             $locked->forceFill(['two_factor_recovery_codes' => $remaining])->save();
 
             return true;

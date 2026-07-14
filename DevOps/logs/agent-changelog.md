@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 12:28] - Security: protect recovery codes at rest
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Support/RecoveryCodeProtector.php`, `app/Services/TwoFactorService.php`
+- `app/Http/Controllers/Admin/TwoFactorController.php`
+- `database/migrations/2026_07_14_100006_hash_two_factor_recovery_codes.php`
+- `tests/Feature/AdminTwoFactorTest.php`, `tests/Feature/RecoveryCodeSecurityTest.php`
+- `.env.example`, `Wiki/core/15-security.md`, `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Existing plaintext recovery-code JSON values are replaced with versioned keyed digests. Rollback invalidates protected recovery lists because their plaintext is intentionally unrecoverable; TOTP authenticators remain valid.
+**Summary:** Recovery codes now use domain-separated HMAC-SHA-256 digests keyed by the current or previous application keys, legacy rows migrate idempotently under row locks, and malformed entries fail closed. Enrollment renders plaintext exactly once in a private no-store response instead of persisting it in the database session. Twenty-four related tests / 243 assertions, Pint, targeted PHPStan, SQLite/MariaDB migration up/down/reapply, and diff checks passed in Docker.
+
 ## [2026-07-14 12:21] - Security: serialize recovery-code consumption
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

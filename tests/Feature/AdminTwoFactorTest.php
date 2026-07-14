@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\TwoFactorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -46,16 +47,31 @@ class AdminTwoFactorTest extends TestCase
         $this->assertIsString($secret);
 
         // Confirm with a live code → 2FA becomes enabled and recovery codes are issued once.
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->post(route('admin.2fa.confirm'), ['code' => $this->code($secret)])
-            ->assertRedirect(route('admin.2fa.show'))
-            ->assertSessionHas('2fa.recovery_codes');
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeader('Pragma', 'no-cache')
+            ->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertSessionMissing('2fa.recovery_codes');
+
+        preg_match_all('/\b[A-F0-9]{6}-[A-F0-9]{6}\b/', $response->getContent(), $matches);
+        $displayedCodes = array_values(array_unique($matches[0]));
+        $this->assertCount(8, $displayedCodes);
 
         $admin->refresh();
         $this->assertTrue((bool) $admin->two_factor_enabled);
         $this->assertSame($secret, $admin->two_factor_secret);
         $this->assertSame(User::LOGIN_VERIFY_TOTP, $admin->login_verify);
         $this->assertCount(8, (array) $admin->two_factor_recovery_codes);
+        $this->assertArrayNotHasKey('two_factor_recovery_codes', $admin->toArray());
+
+        $rawCodes = (string) DB::table('users')
+            ->where('id', $admin->id)
+            ->value('two_factor_recovery_codes');
+        foreach ($displayedCodes as $code) {
+            $this->assertStringNotContainsString($code, $rawCodes);
+        }
     }
 
     public function test_confirm_rejects_a_bad_code(): void
