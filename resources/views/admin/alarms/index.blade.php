@@ -3,22 +3,32 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Audit / Alarms</div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">Alarms</h3>
-            <form method="GET" action="{{ route('admin.alarms.index') }}" class="rd-row">
-                <select class="rd-select" name="type" style="width:200px;" onchange="this.form.submit()">
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">Activity &amp; Security</p>
+            <h1 class="rd-page-header__title">Alarms</h1>
+            <p class="rd-page-header__description">Review security and operational alerts reported by managed devices.</p>
+        </div>
+    </header>
+
+    <div class="rd-card rd-card--flush">
+        <div class="rd-toolbar">
+            <form method="GET" action="{{ route('admin.alarms.index') }}" class="rd-toolbar__group">
+                <label class="visually-hidden" for="alarm-type">Alarm type</label>
+                <select class="rd-select rd-toolbar__control" id="alarm-type" name="type" onchange="this.form.submit()">
                     <option value="">All types</option>
                     @foreach ($types as $t)
                         <option value="{{ $t }}" @selected($type === $t)>{{ $t }}</option>
                     @endforeach
                 </select>
-                <button class="rd-btn rd-btn--ghost" type="submit"><i class="ri-filter-3-line"></i> Filter</button>
+                <button class="rd-btn rd-btn--ghost" type="submit"><i class="ri-filter-3-line" aria-hidden="true"></i> Filter</button>
+                @if (filled($type))
+                    <a class="rd-btn rd-btn--ghost" href="{{ route('admin.alarms.index') }}">Reset</a>
+                @endif
             </form>
         </div>
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-table-wrap" role="region" aria-label="Alarms" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
@@ -29,39 +39,47 @@
                         <th>Message</th>
                         <th>IP</th>
                         <th>Emailed</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($alarms as $alarm)
                     <tr>
-                        <td class="rd-muted">{{ $alarm->created_at?->format('Y-m-d H:i:s') ?? '—' }}</td>
+                        <td class="rd-muted rd-mono">{{ $alarm->created_at?->format('Y-m-d H:i:s') ?? '—' }}</td>
                         <td class="rd-muted">{{ $alarm->device?->hostname ?: $alarm->device?->alias ?: $alarm->device?->rustdesk_id ?: '—' }}</td>
-                        <td style="color:var(--rd-text-bright);">{{ $alarm->peer_id }}</td>
+                        <td><span class="rd-table__primary rd-mono">{{ $alarm->peer_id }}</span></td>
                         <td><span class="rd-badge rd-badge--muted">{{ $alarm->type }}</span></td>
                         <td class="rd-muted">{{ $alarm->message }}</td>
-                        <td class="rd-muted">{{ $alarm->ip ?: '—' }}</td>
+                        <td class="rd-muted rd-mono">{{ $alarm->ip ?: '—' }}</td>
                         <td>
                             <span class="rd-badge rd-badge--{{ $alarm->emailed ? 'online' : 'muted' }}">
                                 <span class="dot"></span>{{ $alarm->emailed ? 'Yes' : 'No' }}
                             </span>
                         </td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end">
                                 <form method="POST" action="{{ route('admin.alarms.destroy', $alarm) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this alarm?"><i class="ri-delete-bin-line"></i></button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this alarm?" aria-label="Delete alarm" title="Delete alarm"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="rd-muted" style="text-align:center;padding:28px;">No alarms.</td></tr>
+                    <tr>
+                        <td colspan="8">
+                            <div class="rd-empty">
+                                <i class="rd-empty__icon ri-alarm-warning-line" aria-hidden="true"></i>
+                                <p class="rd-empty__title">No alarms</p>
+                                <p class="rd-empty__body">New device alerts will appear here.</p>
+                            </div>
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $alarms])
         </div>
+        @include('admin.partials.pagination', ['paginator' => $alarms])
     </div>
 @endsection

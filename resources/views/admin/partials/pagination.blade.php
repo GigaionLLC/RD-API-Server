@@ -1,28 +1,34 @@
-{{--
-    Dark-theme pagination control. Pass a LengthAwarePaginator as $paginator.
-    Preserves existing query-string filters via appends() done in the controller.
-    Uses only rd-* components + inline layout styles (consistent with dashboard.blade.php).
---}}
 @if ($paginator->hasPages())
-    <div class="rd-row" style="justify-content:space-between;padding:14px 16px;border-top:1px solid var(--rd-border);">
-        <div class="rd-muted" style="font-size:13px;">
-            Showing {{ $paginator->firstItem() ?? 0 }}–{{ $paginator->lastItem() ?? 0 }}
+    <nav class="rd-pagination" aria-label="Pagination">
+        <div class="rd-pagination__meta">
+            Showing {{ $paginator->firstItem() ?? 0 }}&ndash;{{ $paginator->lastItem() ?? 0 }}
             of {{ $paginator->total() }}
         </div>
-        <div class="rd-row">
+
+        <div class="rd-pagination__controls">
             @if ($paginator->onFirstPage())
-                <button class="rd-btn rd-btn--ghost" disabled><i class="ri-arrow-left-s-line"></i> Prev</button>
+                <button class="rd-btn rd-btn--ghost" type="button" disabled>
+                    <i class="ri-arrow-left-s-line" aria-hidden="true"></i> Previous
+                </button>
             @else
-                <a href="{{ $paginator->previousPageUrl() }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-s-line"></i> Prev</a>
+                <a href="{{ $paginator->previousPageUrl() }}" class="rd-btn rd-btn--ghost" rel="prev">
+                    <i class="ri-arrow-left-s-line" aria-hidden="true"></i> Previous
+                </a>
             @endif
 
-            <span class="rd-muted" style="font-size:13px;">Page {{ $paginator->currentPage() }} / {{ $paginator->lastPage() }}</span>
+            <span class="rd-pagination__meta" aria-current="page">
+                Page {{ $paginator->currentPage() }} of {{ $paginator->lastPage() }}
+            </span>
 
             @if ($paginator->hasMorePages())
-                <a href="{{ $paginator->nextPageUrl() }}" class="rd-btn rd-btn--ghost">Next <i class="ri-arrow-right-s-line"></i></a>
+                <a href="{{ $paginator->nextPageUrl() }}" class="rd-btn rd-btn--ghost" rel="next">
+                    Next <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+                </a>
             @else
-                <button class="rd-btn rd-btn--ghost" disabled>Next <i class="ri-arrow-right-s-line"></i></button>
+                <button class="rd-btn rd-btn--ghost" type="button" disabled>
+                    Next <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+                </button>
             @endif
         </div>
-    </div>
+    </nav>
 @endif

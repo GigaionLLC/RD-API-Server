@@ -3,54 +3,57 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Management / Device Groups</div>
 
-    <div class="rd-card" style="margin-bottom:16px;">
-        <div class="rd-card__body" style="display:flex;align-items:center;gap:10px;">
-            <i class="ri-information-line" style="color:var(--rd-primary);font-size:18px;"></i>
-            <span class="rd-muted" style="font-size:13px;">
-                <strong style="color:var(--rd-text-bright);">One</strong> group is the <strong style="color:var(--rd-text-bright);">Default</strong> — new and ungrouped devices are placed here.
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">Fleet</p>
+            <h1 class="rd-page-header__title">Device Groups</h1>
+            <p class="rd-page-header__description">Organize fleet ownership and choose where new or ungrouped devices are placed.</p>
+        </div>
+        <div class="rd-page-header__actions rd-actions--wrap">
+            <a href="{{ route('admin.groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-group-line" aria-hidden="true"></i> User Groups</a>
+            <a href="{{ route('admin.device-groups.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New device group</a>
+        </div>
+    </header>
+
+    <div class="rd-stack rd-stack--lg">
+        <div class="rd-callout rd-callout--info rd-actions rd-align-start">
+            <i class="ri-information-line rd-info" aria-hidden="true"></i>
+            <span>
+                <strong>One</strong> group is the <strong>Default</strong> — new and ungrouped devices are placed here.
                 @if ($defaultGroup)
-                    Currently <strong style="color:var(--rd-text-bright);">{{ $defaultGroup->name }}</strong>.
+                    Currently <strong>{{ $defaultGroup->name }}</strong>.
                 @else
                     None is set yet.
                 @endif
-                Setting another group as default <strong style="color:var(--rd-text-bright);">replaces</strong> it; the previous default reverts to a normal group (its devices stay put).
+                Setting another group as default <strong>replaces</strong> it; the previous default reverts to a normal group (its devices stay put).
             </span>
         </div>
-    </div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">Device Groups</h3>
-            <div class="rd-row">
-                <a href="{{ route('admin.groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-group-line"></i> User Groups</a>
-                <a href="{{ route('admin.device-groups.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line"></i> New device group</a>
-            </div>
-        </div>
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-card rd-card--flush">
+        <div class="rd-table-wrap" role="region" aria-label="Device groups" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
                         <th>Name</th>
                         <th>Devices</th>
                         <th>Note</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($deviceGroups as $group)
                     <tr>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">
-                            {{ $group->name }}
+                        <td>
+                            <span class="rd-table__primary">{{ $group->name }}</span>
                             @if ($group->is_default)
                                 <span class="rd-badge rd-badge--online" title="New and ungrouped devices are placed in this group"><i class="ri-star-fill"></i> Default — new devices land here</span>
                             @endif
                         </td>
                         <td class="rd-muted">{{ $group->devices_count }}</td>
                         <td class="rd-muted">{{ $group->note ?: '—' }}</td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <form method="POST" action="{{ route('admin.device-groups.default', $group) }}" class="m-0">
                                     @csrf
                                     @if ($group->is_default)
@@ -65,17 +68,18 @@
                                 <form method="POST" action="{{ route('admin.device-groups.destroy', $group) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete device group '{{ $group->name }}'?"><i class="ri-delete-bin-line"></i></button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete device group '{{ $group->name }}'?" aria-label="Delete {{ $group->name }} device group" title="Delete device group"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="rd-muted" style="text-align:center;padding:28px;">No device groups yet.</td></tr>
+                    <tr><td colspan="4"><div class="rd-empty"><i class="rd-empty__icon ri-folder-chart-line" aria-hidden="true"></i><p class="rd-empty__title">No device groups yet</p><p class="rd-empty__body">Create a group to organize your fleet.</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $deviceGroups])
+        </div>
+        @include('admin.partials.pagination', ['paginator' => $deviceGroups])
         </div>
     </div>
 @endsection

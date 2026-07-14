@@ -3,14 +3,20 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Management / Pending Devices</div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">Pending Devices</h3>
-            <a href="{{ route('admin.deploy-tokens.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-key-2-line"></i> Deploy Tokens</a>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">Fleet</p>
+            <h1 class="rd-page-header__title">Pending Devices</h1>
+            <p class="rd-page-header__description">Approve or reject devices that registered through the deployment workflow.</p>
         </div>
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-page-header__actions">
+            <a href="{{ route('admin.deploy-tokens.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-key-2-line" aria-hidden="true"></i> Deploy Tokens</a>
+        </div>
+    </header>
+
+    <div class="rd-card rd-card--flush">
+        <div class="rd-table-wrap" role="region" aria-label="Pending devices" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
@@ -18,21 +24,21 @@
                         <th>OS</th>
                         <th>Owner</th>
                         <th>Registered</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($devices as $device)
                     <tr>
                         <td>
-                            <div style="color:var(--rd-text-bright);font-weight:600;">{{ $device->hostname ?: $device->alias ?: $device->rustdesk_id }}</div>
-                            <div class="rd-muted" style="font-size:12px;">{{ $device->rustdesk_id }}</div>
+                            <div class="rd-table__primary">{{ $device->hostname ?: $device->alias ?: $device->rustdesk_id }}</div>
+                            <div class="rd-table__meta rd-mono">{{ $device->rustdesk_id }}</div>
                         </td>
                         <td class="rd-muted">{{ $device->os ?: '—' }}</td>
                         <td class="rd-muted">{{ $device->user->username ?? '—' }}</td>
                         <td class="rd-muted">{{ $device->created_at?->diffForHumans() ?? '—' }}</td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <form method="POST" action="{{ route('admin.devices.approve', $device) }}" class="m-0">
                                     @csrf
                                     @method('PUT')
@@ -47,11 +53,11 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="rd-muted" style="text-align:center;padding:28px;">No devices awaiting approval.</td></tr>
+                    <tr><td colspan="5"><div class="rd-empty"><i class="rd-empty__icon ri-shield-check-line" aria-hidden="true"></i><p class="rd-empty__title">No devices awaiting approval</p><p class="rd-empty__body">New registrations that require review will appear here.</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $devices])
         </div>
+        @include('admin.partials.pagination', ['paginator' => $devices])
     </div>
 @endsection

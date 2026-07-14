@@ -3,14 +3,20 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Access / OAuth Providers</div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">OAuth / OIDC Providers</h3>
-            <a href="{{ route('admin.oauth-providers.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line"></i> New provider</a>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">Integrations</p>
+            <h1 class="rd-page-header__title">OAuth / OIDC Providers</h1>
+            <p class="rd-page-header__description">Manage external identity providers and automatic user registration.</p>
         </div>
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-page-header__actions">
+            <a href="{{ route('admin.oauth-providers.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New provider</a>
+        </div>
+    </header>
+
+    <div class="rd-card rd-card--flush">
+        <div class="rd-table-wrap" role="region" aria-label="OAuth and OIDC providers" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
@@ -19,15 +25,15 @@
                         <th>Client ID</th>
                         <th>Auto-register</th>
                         <th>Status</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($providers as $provider)
                     <tr>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">{{ $provider->op }}</td>
+                        <td><span class="rd-table__primary">{{ $provider->op }}</span></td>
                         <td><span class="rd-badge rd-badge--muted">{{ $provider->type }}</span></td>
-                        <td class="rd-muted">{{ $provider->client_id }}</td>
+                        <td class="rd-muted rd-mono">{{ $provider->client_id }}</td>
                         <td class="rd-muted">{{ $provider->auto_register ? 'Yes' : 'No' }}</td>
                         <td>
                             @if ($provider->enabled)
@@ -36,23 +42,23 @@
                                 <span class="rd-badge rd-badge--offline"><span class="dot"></span> Disabled</span>
                             @endif
                         </td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <a href="{{ route('admin.oauth-providers.edit', $provider) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
                                 <form method="POST" action="{{ route('admin.oauth-providers.destroy', $provider) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete provider '{{ $provider->op }}'?"><i class="ri-delete-bin-line"></i></button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete provider '{{ $provider->op }}'?" aria-label="Delete {{ $provider->op }} provider" title="Delete provider"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="rd-muted" style="text-align:center;padding:28px;">No OAuth providers yet.</td></tr>
+                    <tr><td colspan="6"><div class="rd-empty"><i class="rd-empty__icon ri-shield-keyhole-line" aria-hidden="true"></i><p class="rd-empty__title">No OAuth providers yet</p><p class="rd-empty__body">Add a provider to enable external sign-in.</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $providers])
         </div>
+        @include('admin.partials.pagination', ['paginator' => $providers])
     </div>
 @endsection

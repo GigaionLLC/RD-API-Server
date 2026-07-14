@@ -8,6 +8,17 @@
 > status and remaining roadmap, see **[04-gap-analysis.md](04-gap-analysis.md)** (top section).
 > This file is kept for history only.
 
+## Current admin UI status (2026-07-13)
+
+The historical table below predates the completed full-surface WebUI modernization. The
+current admin console is a server-rendered Blade + jQuery + Bootstrap 5 application with a
+warm-mineral dark/light theme, locally vendored frontend assets, a responsive grouped
+navigation shell, and shared accessible confirmation, toast, combobox, and chart behavior.
+Playwright now covers desktop dark, desktop light, tablet dark, and mobile dark projects, with
+axe scans for login and representative authenticated pages. This visual refresh does not
+change the database, client API, or RustDesk wire contract. Its final full Docker and
+four-project browser gates are still in progress at the time of this documentation sync.
+
 Tracks parity of the PHP rewrite against the legacy Go implementation and the client
 contract. Status: ⬜ not started · 🟦 in progress · ✅ done+verified.
 

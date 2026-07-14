@@ -3,6 +3,32 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-13 22:56] - Full admin console WebUI modernization
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `public/assets/css/theme-dark.css`, `public/assets/js/app.js`, `public/assets/vendor/`, `scripts/copy-admin-vendor.mjs`, `package.json`, `package-lock.json`
+- `resources/views/layouts/admin.blade.php`, all admin/auth Blade views and shared partials under `resources/views/admin/`
+- `playwright.config.ts`, `e2e/{login,gui,accessibility,screenshots}.spec.ts`, `tests/Feature/OauthPresetsTest.php`
+- `DESIGN.md`, `Wiki/core/06-design-system.md`, `docs/modernization/{08-build-log,09-port-status}.md`, `docs/screenshots/` gallery and README
+- `DevOps/archive-plans/web-ui-design-modernization.md`, `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Routes, permissions, schema, RustDesk JSON keys, and wire behavior are unchanged.
+**Summary:** Rebuilt the complete Blade/jQuery/Bootstrap admin and authentication UI around a responsive warm-mineral dark/light design system with local pinned assets and accessible shared interactions; regenerated the gallery and verified 557 PHPUnit assertions, Pint (196 files), PHPStan (0 errors), JavaScript gates, Blade caching, a green 46-pass/6-skip Playwright matrix, and 320px reflow. Changes remain local, uncommitted, and unpushed for final review.
+## [2026-07-13 21:17] - Design plan: replace AI-blue dark palette with warm mineral system
+**Agent:** rustdesk-api (Codex / GPT-5)
+**Files Modified:**
+- `DevOps/plans/web-ui-design-modernization.md` (revised visual direction, provisional accessible dark-palette roles/values, color-distribution rule, and review question)
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Refined the proposed admin-console identity away from the generic blue-black/iris/cyan “AI dashboard” look toward warm carbon and mineral graphite surfaces, bone text, oxidized-copper actions, and restrained sea-glass/moss/ochre/clay semantic colors; an initial contrast calculation informed the provisional token values.
+
+## [2026-07-13 20:52] - Plan: second-generation admin console UI/UX modernization
+**Agent:** rustdesk-api (Codex / GPT-5)
+**Files Modified:**
+- `DevOps/plans/web-ui-design-modernization.md` (new proposed plan grounded in the current Blade views, design contract, screenshots, and UI test baseline)
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Audited the complete admin WebUI and created a review-gated modernization roadmap covering product direction, information architecture, independent visual identity, design tokens/components, shell/navigation, representative pilots, responsive and WCAG 2.2 AA-oriented behavior, local asset delivery, phased page migration, and visual/accessibility regression gates without changing the Laravel/Blade/jQuery stack or RustDesk wire contract.
+
 ## [2026-07-11 14:05] - License: adopt GNU AGPL-3.0-or-later
 **Agent:** rustdesk-api (Claude Opus 4.8)
 **Files Modified:**

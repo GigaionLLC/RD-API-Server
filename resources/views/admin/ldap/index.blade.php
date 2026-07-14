@@ -2,13 +2,14 @@
 @section('title', 'LDAP / Active Directory')
 
 @section('content')
-    @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Access / LDAP</div>
-
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">LDAP / Active Directory</h3>
-            <div class="rd-row">
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <div class="rd-page-header__eyebrow">Integrations</div>
+            <h1 class="rd-page-header__title">LDAP / Active Directory</h1>
+            <p class="rd-page-header__description">Review directory authentication settings and verify the configured connection.</p>
+        </div>
+        <div class="rd-page-header__actions">
+            <div class="rd-actions rd-actions--wrap">
                 @if ($enabled)
                     <span class="rd-badge rd-badge--online"><span class="dot"></span> Enabled</span>
                 @else
@@ -22,85 +23,103 @@
                 </form>
             </div>
         </div>
-        <div class="rd-card__body">
-            @unless ($extensionLoaded)
-                <p class="rd-help" style="color:var(--rd-danger);">
-                    The PHP <code>ldap</code> extension is not loaded — LDAP authentication will not work.
-                </p>
-            @endunless
+    </header>
 
-            <p class="rd-help" style="margin-bottom:18px;">
+    @include('admin.partials.flash')
+
+    <div class="rd-stack rd-stack--lg">
+        @unless ($extensionLoaded)
+            <div class="rd-callout rd-callout--danger" role="alert">
+                <i class="ri-error-warning-line" aria-hidden="true"></i>
+                <div>
+                    <strong>LDAP runtime unavailable.</strong>
+                    The PHP <code>ldap</code> extension is not loaded — LDAP authentication will not work.
+                </div>
+            </div>
+        @endunless
+
+        <div class="rd-callout rd-callout--info">
+            <i class="ri-information-line" aria-hidden="true"></i>
+            <div>
                 These settings are read-only and configured via environment variables
                 (<code>LDAP_*</code> in <code>config/ldap.php</code>). LDAP is disabled by default;
                 when enabled, client and admin login try LDAP first and fall back to local passwords.
-            </p>
+            </div>
+        </div>
 
+        <section class="rd-card rd-card--quiet" aria-labelledby="ldap-config-title">
+            <div class="rd-card__header">
+                <h2 class="rd-card__title" id="ldap-config-title">Configuration snapshot</h2>
+            </div>
+            <div class="rd-card__body">
             <table class="rd-table">
+                <caption class="visually-hidden">Current LDAP and Active Directory configuration</caption>
                 <tbody>
                     <tr>
-                        <td class="rd-muted" style="width:240px;">Status</td>
-                        <td style="color:var(--rd-text-bright);">{{ $enabled ? 'Enabled' : 'Disabled' }}</td>
+                        <th scope="row">Status</th>
+                        <td>{{ $enabled ? 'Enabled' : 'Disabled' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Host</td>
-                        <td>{{ $host !== '' ? $host : '—' }}</td>
+                        <th scope="row">Host</th>
+                        <td class="rd-mono">{{ $host !== '' ? $host : '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Port</td>
-                        <td>{{ $port }}</td>
+                        <th scope="row">Port</th>
+                        <td class="rd-mono">{{ $port }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Base DN</td>
-                        <td>{{ $baseDn !== '' ? $baseDn : '—' }}</td>
+                        <th scope="row">Base DN</th>
+                        <td class="rd-mono">{{ $baseDn !== '' ? $baseDn : '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Bind DN (service account)</td>
-                        <td>{{ $bindDn !== '' ? $bindDn : '(anonymous)' }}</td>
+                        <th scope="row">Bind DN (service account)</th>
+                        <td class="rd-mono">{{ $bindDn !== '' ? $bindDn : '(anonymous)' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Bind password</td>
+                        <th scope="row">Bind password</th>
                         <td>{{ $bindPasswordSet ? '•••••••• (set)' : '(not set)' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">User filter</td>
+                        <th scope="row">User filter</th>
                         <td><code>{{ $userFilter !== '' ? $userFilter : '—' }}</code></td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Username attribute</td>
-                        <td>{{ $usernameAttr !== '' ? $usernameAttr : '—' }}</td>
+                        <th scope="row">Username attribute</th>
+                        <td class="rd-mono">{{ $usernameAttr !== '' ? $usernameAttr : '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Email attribute</td>
-                        <td>{{ $emailAttr !== '' ? $emailAttr : '—' }}</td>
+                        <th scope="row">Email attribute</th>
+                        <td class="rd-mono">{{ $emailAttr !== '' ? $emailAttr : '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Display-name attribute</td>
-                        <td>{{ $displayNameAttr !== '' ? $displayNameAttr : '—' }}</td>
+                        <th scope="row">Display-name attribute</th>
+                        <td class="rd-mono">{{ $displayNameAttr !== '' ? $displayNameAttr : '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">StartTLS</td>
+                        <th scope="row">StartTLS</th>
                         <td>{{ $useStartTls ? 'On' : 'Off' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">TLS certificate verification</td>
+                        <th scope="row">TLS certificate verification</th>
                         <td>{{ $tlsVerify ? 'On' : 'Off' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Admin group</td>
-                        <td>{{ $adminGroup !== '' ? $adminGroup : '(none)' }}</td>
+                        <th scope="row">Admin group</th>
+                        <td class="rd-mono">{{ $adminGroup !== '' ? $adminGroup : '(none)' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Allow group</td>
-                        <td>{{ $allowGroup !== '' ? $allowGroup : '(any)' }}</td>
+                        <th scope="row">Allow group</th>
+                        <td class="rd-mono">{{ $allowGroup !== '' ? $allowGroup : '(any)' }}</td>
                     </tr>
                     <tr>
-                        <td class="rd-muted">Sync on login</td>
+                        <th scope="row">Sync on login</th>
                         <td>{{ $sync ? 'On' : 'Off' }}</td>
                     </tr>
                 </tbody>
             </table>
+            </div>
+        </section>
         </div>
-    </div>
 @endsection
 
 @if (session('error'))

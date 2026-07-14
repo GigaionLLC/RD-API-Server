@@ -3,14 +3,20 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Control / Strategies</div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">Strategies</h3>
-            <a href="{{ route('admin.strategies.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line"></i> New strategy</a>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">Policies &amp; Rollout</p>
+            <h1 class="rd-page-header__title">Strategies</h1>
+            <p class="rd-page-header__description">Define client policy options and assign them across the managed fleet.</p>
         </div>
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-page-header__actions">
+            <a href="{{ route('admin.strategies.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New strategy</a>
+        </div>
+    </header>
+
+    <div class="rd-card rd-card--flush">
+        <div class="rd-table-wrap" role="region" aria-label="Strategies" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
@@ -19,15 +25,17 @@
                         <th>Options</th>
                         <th>Assignments</th>
                         <th>Note</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($strategies as $strategy)
                     <tr>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">
-                            {{ $strategy->name }}
-                            @if ($strategy->is_default)<span class="rd-badge rd-badge--online" style="margin-left:6px;"><i class="ri-star-fill"></i> Default</span>@endif
+                        <td>
+                            <div class="rd-actions rd-actions--wrap">
+                                <span class="rd-table__primary">{{ $strategy->name }}</span>
+                                @if ($strategy->is_default)<span class="rd-badge rd-badge--online"><i class="ri-star-fill" aria-hidden="true"></i> Default</span>@endif
+                            </div>
                         </td>
                         <td>
                             <span class="rd-badge rd-badge--{{ $strategy->enabled ? 'online' : 'offline' }}">
@@ -37,29 +45,29 @@
                         <td class="rd-muted">{{ count($strategy->options ?? []) }}</td>
                         <td class="rd-muted">{{ $strategy->assignments_count }}</td>
                         <td class="rd-muted">{{ $strategy->note ?: '—' }}</td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <form method="POST" action="{{ route('admin.strategies.default', $strategy) }}" class="m-0">
                                     @csrf
-                                    <button type="submit" class="rd-btn rd-btn--ghost" title="{{ $strategy->is_default ? 'Unset as default' : 'Set as default (fallback for unassigned devices)' }}">
-                                        <i class="{{ $strategy->is_default ? 'ri-star-fill' : 'ri-star-line' }}"></i>
+                                    <button type="submit" class="rd-icon-btn" title="{{ $strategy->is_default ? 'Unset as default' : 'Set as default (fallback for unassigned devices)' }}" aria-label="{{ $strategy->is_default ? 'Unset '.$strategy->name.' as default' : 'Set '.$strategy->name.' as default' }}">
+                                        <i class="{{ $strategy->is_default ? 'ri-star-fill' : 'ri-star-line' }}" aria-hidden="true"></i>
                                     </button>
                                 </form>
                                 <a href="{{ route('admin.strategies.edit', $strategy) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
                                 <form method="POST" action="{{ route('admin.strategies.destroy', $strategy) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete strategy '{{ $strategy->name }}'?"><i class="ri-delete-bin-line"></i></button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete strategy '{{ $strategy->name }}'?" aria-label="Delete {{ $strategy->name }} strategy" title="Delete strategy"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="rd-muted" style="text-align:center;padding:28px;">No strategies yet.</td></tr>
+                    <tr><td colspan="6"><div class="rd-empty"><i class="rd-empty__icon ri-list-settings-line" aria-hidden="true"></i><p class="rd-empty__title">No strategies yet</p><p class="rd-empty__body">Create a strategy to define and assign client policy.</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $strategies])
         </div>
+        @include('admin.partials.pagination', ['paginator' => $strategies])
     </div>
 @endsection

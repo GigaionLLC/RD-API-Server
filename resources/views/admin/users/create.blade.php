@@ -2,34 +2,47 @@
 @section('title', 'New User')
 
 @section('content')
-    <div class="rd-breadcrumb">Management / Users / New</div>
-
-    <div class="rd-card" style="max-width:640px;">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">New user</h3>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <div class="rd-page-header__eyebrow">People &amp; Access / Users</div>
+            <h1 class="rd-page-header__title">Create user</h1>
+            <p class="rd-page-header__description">Add an account, assign its access level, and choose its sign-in policy.</p>
+        </div>
+        <div class="rd-page-header__actions">
             <a href="{{ route('admin.users.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
         </div>
-        <div class="rd-card__body">
+    </header>
+
+    <div class="rd-card rd-card--quiet rd-max-w-lg">
+        <div class="rd-card__body rd-stack rd-stack--lg">
             @if ($errors->any())
-                <div class="rd-toast rd-toast--error" style="margin-bottom:16px;">
-                    <i class="ri-error-warning-line"></i><span>{{ $errors->first() }}</span>
+                <div class="rd-callout rd-callout--danger" role="alert">
+                    <i class="ri-error-warning-line" aria-hidden="true"></i>
+                    <div><strong>User not created.</strong> {{ $errors->first() }}</div>
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('admin.users.store') }}">
+            <form method="POST" action="{{ route('admin.users.store') }}" class="rd-stack rd-stack--lg">
                 @csrf
+                <div class="rd-form-grid rd-form-grid--2">
                 <div class="rd-field">
                     <label class="rd-label" for="username">Username</label>
-                    <input class="rd-input" id="username" name="username" value="{{ old('username') }}" required>
+                    <input class="rd-input" id="username" name="username" value="{{ old('username') }}" required
+                           @error('username') aria-invalid="true" aria-describedby="username-error" @enderror>
+                    @error('username')<span class="rd-help rd-help--error" id="username-error">{{ $message }}</span>@enderror
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="password">Password</label>
-                    <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" required>
-                    <span class="rd-help">At least 6 characters.</span>
+                    <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" required aria-describedby="password-help"
+                           @error('password') aria-invalid="true" aria-errormessage="password-error" @enderror>
+                    <span class="rd-help" id="password-help">At least 6 characters.</span>
+                    @error('password')<span class="rd-help rd-help--error" id="password-error">{{ $message }}</span>@enderror
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="email">Email</label>
-                    <input class="rd-input" id="email" name="email" type="email" value="{{ old('email') }}">
+                    <input class="rd-input" id="email" name="email" type="email" value="{{ old('email') }}"
+                           @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
+                    @error('email')<span class="rd-help rd-help--error" id="email-error">{{ $message }}</span>@enderror
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="display_name">Display name</label>
@@ -71,7 +84,8 @@
                     <label class="rd-label" for="note">Note</label>
                     <input class="rd-input" id="note" name="note" value="{{ old('note') }}">
                 </div>
-                <div class="rd-row" style="margin-top:8px;">
+                </div>
+                <div class="rd-actions">
                     <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Create user</button>
                 </div>
             </form>

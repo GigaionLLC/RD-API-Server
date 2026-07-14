@@ -3,13 +3,17 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Management / Address Books</div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">Address Books</h3>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">People &amp; Access</p>
+            <h1 class="rd-page-header__title">Address Books</h1>
+            <p class="rd-page-header__description">Review shared contact collections, their owners, and the peers they contain.</p>
         </div>
-        <div class="rd-card__body" style="padding:0;">
+    </header>
+
+    <div class="rd-card rd-card--flush">
+        <div class="rd-table-wrap" role="region" aria-label="Address books" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
@@ -17,33 +21,41 @@
                         <th>Owner</th>
                         <th>Peers</th>
                         <th>Tags</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($addressBooks as $book)
                     <tr>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">{{ $book->name ?: 'Default' }}</td>
+                        <td><span class="rd-table__primary">{{ $book->name ?: 'Default' }}</span></td>
                         <td class="rd-muted">{{ $book->user->username ?? '—' }}</td>
                         <td class="rd-muted">{{ $book->peers_count }}</td>
                         <td class="rd-muted">{{ $book->tags_count }}</td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <a href="{{ route('admin.address-books.show', $book) }}" class="rd-btn rd-btn--ghost"><i class="ri-eye-line"></i> View</a>
                                 <form method="POST" action="{{ route('admin.address-books.destroy', $book) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this address book and all its peers/tags?"><i class="ri-delete-bin-line"></i></button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this address book and all its peers/tags?" aria-label="Delete {{ $book->name ?: 'Default' }} address book" title="Delete address book"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="rd-muted" style="text-align:center;padding:28px;">No address books yet.</td></tr>
+                    <tr>
+                        <td colspan="5">
+                            <div class="rd-empty">
+                                <i class="rd-empty__icon ri-contacts-book-2-line" aria-hidden="true"></i>
+                                <p class="rd-empty__title">No address books yet</p>
+                                <p class="rd-empty__body">Shared address books will appear here.</p>
+                            </div>
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $addressBooks])
         </div>
+        @include('admin.partials.pagination', ['paginator' => $addressBooks])
     </div>
 @endsection

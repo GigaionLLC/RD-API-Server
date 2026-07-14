@@ -1,39 +1,54 @@
-# Application Design & Frontend Guidelines 🎨
+# Application Design & Frontend Guidelines
 
-Welcome to the frontend styling and layout system guide. 
+The master frontend contract is
+[`Wiki/core/06-design-system.md`](Wiki/core/06-design-system.md). Read it before creating or
+changing an admin or authentication screen. The global implementation is
+`public/assets/css/theme-dark.css` plus `public/assets/js/app.js`.
 
-To ensure absolute visual consistency and match the premium design system of this application, all developers and agents **MUST** read and adhere to the core design system specification.
+## Creative north star
 
-> [!IMPORTANT]
-> **Direct System Specification:**
-> Before creating or modifying any user interface elements, dashboards, or components, review the master design system document:
-> ➡️ **[design-system.md](Wiki/core/06-design-system.md)**
+The console should feel like a focused self-hosted operations tool: warm mineral surfaces,
+restrained copper accents, compact but calm information density, and obvious hierarchy. Dark
+and light modes are first-class, and the interface must remain fully usable from a 390px
+mobile viewport through a wide desktop.
 
----
+The frontend remains **server-rendered Blade + jQuery + Bootstrap 5**. Do not introduce Vue,
+another SPA framework, remote template assets, runtime CDN dependencies, or a second design
+system.
 
-## 🎨 Creative North Star
+## Quick reference
 
-Every application should follow a clean, premium, and unified aesthetic guidelines. Key principles include:
+| Need | Use |
+|---|---|
+| Page background | `--rd-canvas` |
+| Navigation background | `--rd-sidebar-bg` |
+| Cards and panels | `--rd-surface` |
+| Inputs and raised controls | `--rd-surface-raised` |
+| Hover/selection | `--rd-surface-hover` |
+| Main/secondary/muted text | `--rd-text`, `--rd-text-secondary`, `--rd-text-muted` |
+| Headings/emphasis | `--rd-text-bright` |
+| Primary action | `--rd-primary`, `--rd-on-primary` |
+| Semantic state | `--rd-success`, `--rd-warning`, `--rd-danger`, `--rd-info` |
+| Keyboard focus | `--rd-focus` plus the shared `:focus-visible` rule |
+| Standard card radius | `--rd-radius` |
 
-- **Unified Color Palette:** Use HSL or hex tokens mapped to theme variables to manage dark/light modes and custom components.
-- **Architectural Layout:** Leverage consistent spacing scales, structured grid alignments, and component boundaries.
-- **Visual Boundaries:** Define section separations cleanly. Avoid over-using hard borders; instead, utilize backgrounds, elevation shadows, or subtle padding offsets.
+Prefer established `rd-*` primitives: `.rd-page-header`, `.rd-card`, `.rd-toolbar`,
+`.rd-table-wrap` / `.rd-table`, `.rd-field`, `.rd-input`, `.rd-select`, `.rd-btn`,
+`.rd-badge`, `.rd-callout`, `.rd-empty`, and `.rd-pagination`.
 
----
+## Non-negotiable checklist
 
-## ⚙️ Core Design Tokens (Quick Reference Template)
+- Use semantic CSS variables; no literal theme colors in Blade or page scripts.
+- Put reusable styling in `theme-dark.css`; no page-level `<style>` blocks.
+- Use local assets under `public/assets/vendor/`; no CDN or remote font dependency.
+- Keep wide tables inside `.rd-table-wrap` and prevent page-level horizontal overflow.
+- Use the responsive sidebar shell and existing mobile breakpoints.
+- Use `RD.confirm()` / `data-confirm` for destructive actions, never `window.confirm()`.
+- Use `RD.toast()` and the shared searchable combobox behavior rather than page-local copies.
+- Preserve labels, focus states, keyboard operation, ARIA state, and reduced-motion support.
+- Verify both desktop themes plus tablet and mobile projects in Playwright, with axe coverage
+  for representative pages.
 
-These variables are defined in the global stylesheet (e.g., `src/index.css` or theme configuration file):
-
-| Token | CSS Variable | Purpose |
-|---|---|---|
-| **Background / Canvas** | `--color-surface` | Primary application canvas background |
-| **Container Base** | `--color-surface-container` | Main structural containers and panels |
-| **Card / Element Base** | `--color-surface-card` | Cards, buttons, and floating panels |
-| **Primary Accent** | `--color-primary` | Main accent branding color |
-| **Secondary Accent** | `--color-secondary` | Supporting theme accent |
-| **Success** | `--color-success` | Success metrics, indicators, and complete states |
-| **Warning / Error** | `--color-error` | Validation failures, alerts, and critical flags |
-
-*For the full list of variables, badge styling, interactive button specifications, and typography hierarchy, see the complete guide at [design-system.md](Wiki/core/06-design-system.md).*
-
+For complete tokens, markup contracts, interaction APIs, responsive behavior, local asset
+workflow, and verification expectations, use the
+[full design-system guide](Wiki/core/06-design-system.md).

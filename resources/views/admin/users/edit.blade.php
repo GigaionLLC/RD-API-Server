@@ -2,20 +2,29 @@
 @section('title', 'Edit User')
 
 @section('content')
-    <div class="rd-breadcrumb">Management / Users / Edit</div>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <div class="rd-page-header__eyebrow">People &amp; Access / Users</div>
+            <h1 class="rd-page-header__title">{{ $user->username }}</h1>
+            <p class="rd-page-header__description">Manage identity, delegated access, account state, and sign-in policy.</p>
+        </div>
+        <div class="rd-page-header__actions">
+            <a href="{{ route('admin.users.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+        </div>
+    </header>
 
-    <div class="rd-grid rd-grid--2" style="align-items:start;">
-        <div class="rd-card">
+    <div class="rd-form-grid rd-form-grid--2 rd-align-start">
+        <div class="rd-card rd-card--quiet">
             <div class="rd-card__header">
-                <h3 class="rd-card__title">{{ $user->username }}</h3>
-                <a href="{{ route('admin.users.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+                <h2 class="rd-card__title">Account details</h2>
             </div>
             <div class="rd-card__body">
-                <form class="rd-liveform" data-url="{{ route('admin.users.update', $user) }}" data-method="PUT">
+                <form class="rd-liveform rd-stack rd-stack--lg" data-url="{{ route('admin.users.update', $user) }}" data-method="PUT">
+                    <div class="rd-form-grid rd-form-grid--2">
                     <div class="rd-field">
-                        <label class="rd-label">Username</label>
-                        <input class="rd-input" value="{{ $user->username }}" disabled>
-                        <span class="rd-help">Username cannot be changed.</span>
+                        <label class="rd-label" for="username">Username</label>
+                        <input class="rd-input rd-input--mono" id="username" value="{{ $user->username }}" disabled aria-describedby="username-help">
+                        <span class="rd-help" id="username-help">Username cannot be changed.</span>
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="email">Email</label>
@@ -36,23 +45,23 @@
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="is_admin">Role</label>
-                        <select class="rd-select" id="is_admin" name="is_admin">
+                        <select class="rd-select" id="is_admin" name="is_admin" aria-describedby="role-help">
                             <option value="0" @selected(! $user->is_admin)>User</option>
                             <option value="1" @selected($user->is_admin)>Administrator — Full access (global)</option>
                         </select>
-                        <span class="rd-help">Full access (global) overrides any scoped admin roles below.</span>
+                        <span class="rd-help" id="role-help">Full access (global) overrides any scoped admin roles below.</span>
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="admin_roles">Admin roles</label>
-                        <select class="rd-select" id="admin_roles" multiple size="5" data-roles-multiselect data-target="#admin_role_ids" @disabled($adminRoles->isEmpty())>
+                        <select class="rd-select" id="admin_roles" multiple size="5" data-roles-multiselect data-target="#admin_role_ids" aria-describedby="admin-roles-help" @disabled($adminRoles->isEmpty())>
                             @foreach ($adminRoles as $r)
                                 <option value="{{ $r->id }}" @selected(in_array((int) $r->id, $assignedRoleIds, true))>{{ $r->name }}</option>
                             @endforeach
                         </select>
                         <input type="hidden" id="admin_role_ids" name="admin_role_ids" value="{{ implode(',', $assignedRoleIds) }}">
-                        <span class="rd-help">
+                        <span class="rd-help" id="admin-roles-help">
                             @if ($adminRoles->isEmpty())
-                                No admin roles defined yet. Create them under System / Admin Roles.
+                                No admin roles defined yet. Create them under People &amp; Access / Admin Roles.
                             @else
                                 Scoped, delegated console permissions. Ignored when Full access (global) is set.
                             @endif
@@ -67,11 +76,11 @@
                         </select>
                     </div>
                     <div class="rd-field">
-                        <label class="rd-label">Login policy</label>
-                        <label class="rd-row" style="gap:8px;align-items:center;">
+                        <div class="rd-label" id="login-policy-label">Login policy</div>
+                        <label class="rd-check">
                             <input type="hidden" name="force_sso" value="0">
                             <input type="checkbox" id="force_sso" name="force_sso" value="1" @checked($user->force_sso)>
-                            <span class="rd-muted">Require SSO login (block local password; LDAP/OIDC still allowed)</span>
+                            <span>Require SSO login (block local password; LDAP/OIDC still allowed)</span>
                         </label>
                     </div>
                     <div class="rd-field">
@@ -86,25 +95,26 @@
                         <label class="rd-label" for="note">Note</label>
                         <input class="rd-input" id="note" name="note" value="{{ $user->note }}">
                     </div>
-                    <div class="rd-row" style="margin-top:8px;">
+                    </div>
+                    <div class="rd-actions">
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Save</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <div class="rd-card">
+        <div class="rd-card rd-card--quiet">
             <div class="rd-card__header">
-                <h3 class="rd-card__title">Reset password</h3>
+                <h2 class="rd-card__title">Reset password</h2>
             </div>
             <div class="rd-card__body">
-                <form class="rd-liveform" data-url="{{ route('admin.users.password', $user) }}" data-method="PUT">
+                <form class="rd-liveform rd-stack rd-stack--lg" data-url="{{ route('admin.users.password', $user) }}" data-method="PUT">
                     <div class="rd-field">
                         <label class="rd-label" for="password">New password</label>
-                        <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" placeholder="••••••••">
-                        <span class="rd-help">At least 6 characters. The user must use the new password on next login.</span>
+                        <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" placeholder="••••••••" aria-describedby="new-password-help">
+                        <span class="rd-help" id="new-password-help">At least 6 characters. The user must use the new password on next login.</span>
                     </div>
-                    <div class="rd-row" style="margin-top:8px;">
+                    <div class="rd-actions">
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Reset password</button>
                     </div>
                 </form>

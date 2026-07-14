@@ -11,14 +11,20 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">System / Admin Roles</div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">Admin Roles</h3>
-            <a href="{{ route('admin.roles.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line"></i> New role</a>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">People &amp; Access</p>
+            <h1 class="rd-page-header__title">Admin Roles</h1>
+            <p class="rd-page-header__description">Control administrative access with global, individual, and group-scoped roles.</p>
         </div>
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-page-header__actions">
+            <a href="{{ route('admin.roles.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New role</a>
+        </div>
+    </header>
+
+    <div class="rd-card rd-card--flush">
+        <div class="rd-table-wrap" role="region" aria-label="Admin roles" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
@@ -26,13 +32,13 @@
                         <th>Type</th>
                         <th>Permissions</th>
                         <th>Members</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($roles as $role)
                     <tr>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">{{ $role->name }}</td>
+                        <td><span class="rd-table__primary">{{ $role->name }}</span></td>
                         <td><span class="rd-badge rd-badge--muted">{{ $typeLabels[$role->type] ?? 'Unknown' }}</span></td>
                         <td class="rd-muted">
                             @if ($role->type === \App\Models\AdminRole::TYPE_GLOBAL)
@@ -42,23 +48,31 @@
                             @endif
                         </td>
                         <td class="rd-muted">{{ $role->users_count }}</td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <a href="{{ route('admin.roles.edit', $role) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
                                 <form method="POST" action="{{ route('admin.roles.destroy', $role) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete role '{{ $role->name }}'? Members lose these permissions."><i class="ri-delete-bin-line"></i></button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete role '{{ $role->name }}'? Members lose these permissions." aria-label="Delete {{ $role->name }} role" title="Delete role"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="rd-muted" style="text-align:center;padding:28px;">No admin roles yet.</td></tr>
+                    <tr>
+                        <td colspan="5">
+                            <div class="rd-empty">
+                                <i class="rd-empty__icon ri-shield-user-line" aria-hidden="true"></i>
+                                <p class="rd-empty__title">No admin roles yet</p>
+                                <p class="rd-empty__body">Create a role to delegate administrative access.</p>
+                            </div>
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $roles])
         </div>
+        @include('admin.partials.pagination', ['paginator' => $roles])
     </div>
 @endsection

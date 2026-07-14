@@ -4,18 +4,24 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "build:vendor": "node scripts/copy-admin-vendor.mjs",
         "dev": "vite",
         "lint:js": "eslint public/assets/js",
         "test:e2e": "playwright test"
     },
     "devDependencies": {
+        "@axe-core/playwright": "4.12.1",
         "@eslint/js": "^9.0.0",
         "@playwright/test": "^1.48.0",
         "@tailwindcss/vite": "^4.0.0",
+        "apexcharts": "3.54.0",
+        "bootstrap": "5.3.8",
         "concurrently": "^9.0.1",
         "eslint": "^9.0.0",
         "globals": "^15.0.0",
+        "jquery": "3.7.1",
         "laravel-vite-plugin": "^3.1",
+        "remixicon": "4.5.0",
         "tailwindcss": "^4.0.0",
         "vite": "^8.0.0"
     }

@@ -11,58 +11,74 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">Management / Users</div>
 
-    <div class="rd-card">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">Users</h3>
-            <div class="rd-row">
-                <form method="GET" action="{{ route('admin.users.index') }}" class="rd-row">
-                    <input class="rd-input" type="search" name="q" value="{{ $q }}" placeholder="Search users" style="width:220px;">
-                    <button class="rd-btn rd-btn--ghost" type="submit"><i class="ri-search-line"></i></button>
-                </form>
-                <a href="{{ route('admin.users.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line"></i> New user</a>
-            </div>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">People &amp; Access</p>
+            <h1 class="rd-page-header__title">Users</h1>
+            <p class="rd-page-header__description">Manage identities, administrative access, account state, and group membership.</p>
+        </div>
+        <div class="rd-page-header__actions">
+            <a href="{{ route('admin.users.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New user</a>
+        </div>
+    </header>
+
+    <div class="rd-card rd-card--flush">
+        <div class="rd-toolbar">
+            <form method="GET" action="{{ route('admin.users.index') }}" class="rd-toolbar__group">
+                <label class="visually-hidden" for="user-search">Search users</label>
+                <input class="rd-input rd-toolbar__search" id="user-search" type="search" name="q" value="{{ $q }}" placeholder="Search users">
+                <button class="rd-btn rd-btn--ghost" type="submit"><i class="ri-search-line" aria-hidden="true"></i> Search</button>
+                @if (filled($q))
+                    <a class="rd-btn rd-btn--ghost" href="{{ route('admin.users.index') }}">Reset</a>
+                @endif
+            </form>
         </div>
 
         {{-- Bulk-action bar (shown when ≥1 user is selected) --}}
-        <form method="POST" id="bulkForm" action="{{ route('admin.users.bulk') }}" class="rd-bulkbar" style="display:none;">
+        <form method="POST" id="bulkForm" action="{{ route('admin.users.bulk') }}" class="rd-bulkbar rd-actions--wrap">
             @csrf
-            <span id="bulkCount" class="rd-muted" style="font-size:13px;"></span>
-            <select class="rd-select" id="bulkAction" name="action" style="width:170px;">
-                <option value="enable">Enable</option>
-                <option value="disable">Disable</option>
-                <option value="group">Set group</option>
-                <option value="delete">Delete</option>
-            </select>
-            <select class="rd-select" name="value" id="bulkGroup" style="width:200px;display:none;" disabled>
-                <option value="">— No group —</option>
-                @foreach ($groups as $g)<option value="{{ $g->id }}">{{ $g->name }}</option>@endforeach
-            </select>
-            <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-check-line"></i> Apply</button>
-            <button type="button" class="rd-btn rd-btn--ghost" id="bulkClear">Clear</button>
+            <span id="bulkCount" class="rd-bulkbar__count" aria-live="polite"></span>
+            <div class="rd-bulkbar__actions rd-actions rd-actions--wrap">
+                <label class="visually-hidden" for="bulkAction">Bulk action</label>
+                <select class="rd-select rd-toolbar__control" id="bulkAction" name="action">
+                    <option value="enable">Enable</option>
+                    <option value="disable">Disable</option>
+                    <option value="group">Set group</option>
+                    <option value="delete">Delete</option>
+                </select>
+                <label class="visually-hidden" for="bulkGroup">User group</label>
+                <select class="rd-select rd-toolbar__control rd-hidden" name="value" id="bulkGroup" disabled>
+                    <option value="">— No group —</option>
+                    @foreach ($groups as $g)<option value="{{ $g->id }}">{{ $g->name }}</option>@endforeach
+                </select>
+                <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-check-line" aria-hidden="true"></i> Apply</button>
+                <button type="button" class="rd-btn rd-btn--ghost" id="bulkClear">Clear</button>
+            </div>
             <span id="bulkIds"></span>
         </form>
 
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-table-wrap" role="region" aria-label="Users" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
-                        <th style="width:34px;"><input type="checkbox" id="checkAll" title="Select all on this page"></th>
+                        <th><input type="checkbox" id="checkAll" title="Select all on this page" aria-label="Select all users on this page"></th>
                         <th>Username</th>
                         <th>Email</th>
                         <th>Display name</th>
                         <th>Role</th>
                         <th>Status</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th class="rd-table__actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse ($users as $user)
-                    @php($s = $statusLabels[$user->status] ?? ['Unknown', 'muted'])
+                    @php
+                        $s = $statusLabels[$user->status] ?? ['Unknown', 'muted'];
+                    @endphp
                     <tr>
-                        <td><input type="checkbox" class="usr-check" value="{{ $user->id }}"></td>
-                        <td style="color:var(--rd-text-bright);font-weight:600;">{{ $user->username }}</td>
+                        <td><input type="checkbox" class="usr-check" value="{{ $user->id }}" aria-label="Select {{ $user->username }}"></td>
+                        <td><span class="rd-table__primary">{{ $user->username }}</span></td>
                         <td class="rd-muted">{{ $user->email ?: '—' }}</td>
                         <td class="rd-muted">{{ $user->display_name ?: '—' }}</td>
                         <td>
@@ -73,24 +89,24 @@
                             @endif
                         </td>
                         <td><span class="rd-badge rd-badge--{{ $s[1] }}"><span class="dot"></span>{{ $s[0] }}</span></td>
-                        <td style="text-align:right;">
-                            <div class="rd-row" style="justify-content:flex-end;">
+                        <td class="rd-table__actions">
+                            <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <a href="{{ route('admin.users.edit', $user) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
                                 <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete user '{{ $user->username }}'? This cannot be undone."><i class="ri-delete-bin-line"></i></button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete user '{{ $user->username }}'? This cannot be undone." aria-label="Delete {{ $user->username }}" title="Delete user"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="rd-muted" style="text-align:center;padding:28px;">No users found.</td></tr>
+                    <tr><td colspan="7"><div class="rd-empty"><i class="rd-empty__icon ri-user-search-line" aria-hidden="true"></i><p class="rd-empty__title">No users found</p><p class="rd-empty__body">Try another search or create a user.</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>
-            @include('admin.partials.pagination', ['paginator' => $users])
         </div>
+        @include('admin.partials.pagination', ['paginator' => $users])
     </div>
 @endsection
 
@@ -103,7 +119,7 @@
         function refreshBulk() {
             var n = selectedIds().length;
             $('#bulkCount').text(n + ' selected');
-            $('#bulkForm').toggle(n > 0);
+            $('#bulkForm').toggleClass('is-visible', n > 0);
         }
         $('#checkAll').on('change', function () {
             $('.usr-check').prop('checked', this.checked);
@@ -122,18 +138,29 @@
         // The group select only applies to the "Set group" action.
         function syncAction() {
             var isGroup = $('#bulkAction').val() === 'group';
-            $('#bulkGroup').toggle(isGroup).prop('disabled', !isGroup);
+            $('#bulkGroup').toggleClass('rd-hidden', !isGroup).prop('disabled', !isGroup);
         }
         $('#bulkAction').on('change', syncAction);
         syncAction();
 
         $('#bulkForm').on('submit', function (e) {
+            e.preventDefault();
+            var form = this;
             var ids = selectedIds(), action = $('#bulkAction').val();
-            if (!ids.length) { e.preventDefault(); return; }
+            if (!ids.length) { return; }
             var verb = { enable: 'enable', disable: 'disable', delete: 'DELETE', group: 'update' }[action] || 'update';
-            if (!window.confirm(verb + ' ' + ids.length + ' user(s)?')) { e.preventDefault(); return; }
-            var $box = $('#bulkIds').empty();
-            ids.forEach(function (id) { $('<input type="hidden" name="ids[]">').val(id).appendTo($box); });
+            RD.confirm(verb + ' ' + ids.length + ' selected user(s)?', {
+                title: action === 'delete' ? 'Delete selected users' : 'Apply bulk user change',
+                action: action === 'delete' ? 'Delete users' : 'Apply change',
+                danger: action === 'delete'
+            }).done(function (confirmed) {
+                if (!confirmed) { return; }
+                var $box = $('#bulkIds').empty();
+                ids.forEach(function (id) {
+                    $('<input type="hidden" name="ids[]">').val(id).appendTo($box);
+                });
+                window.HTMLFormElement.prototype.submit.call(form);
+            });
         });
     });
 </script>

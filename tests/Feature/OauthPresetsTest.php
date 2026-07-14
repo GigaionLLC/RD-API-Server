@@ -50,7 +50,7 @@ class OauthPresetsTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('Activity (last 14 days)')
+            ->assertSee('Activity over 14 days')
             ->assertSee('New devices');
     }
 }

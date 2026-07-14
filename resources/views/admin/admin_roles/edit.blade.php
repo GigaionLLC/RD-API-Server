@@ -7,25 +7,31 @@
 @endphp
 
 @section('content')
-    <div class="rd-breadcrumb">System / Admin Roles / Edit</div>
-
-    <div class="rd-card" style="max-width:880px;">
-        <div class="rd-card__header">
-            <h3 class="rd-card__title">{{ $role->name }}</h3>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <div class="rd-page-header__eyebrow">People &amp; Access / Admin Roles</div>
+            <h1 class="rd-page-header__title">{{ $role->name }}</h1>
+            <p class="rd-page-header__description">Adjust this role's scope and delegated console permissions.</p>
+        </div>
+        <div class="rd-page-header__actions">
             <a href="{{ route('admin.roles.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
         </div>
-        <div class="rd-card__body">
+    </header>
+
+    <div class="rd-card rd-card--quiet rd-max-w-lg">
+        <div class="rd-card__body rd-stack rd-stack--lg">
             @if ($errors->any())
-                <div class="rd-toast rd-toast--error" style="margin-bottom:16px;">
-                    <i class="ri-error-warning-line"></i><span>{{ $errors->first() }}</span>
+                <div class="rd-callout rd-callout--danger" role="alert">
+                    <i class="ri-error-warning-line" aria-hidden="true"></i>
+                    <div><strong>Role not saved.</strong> {{ $errors->first() }}</div>
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('admin.roles.update', $role) }}">
+            <form method="POST" action="{{ route('admin.roles.update', $role) }}" class="rd-stack rd-stack--lg">
                 @csrf
                 @method('PUT')
                 @include('admin.admin_roles._form')
-                <div class="rd-row" style="margin-top:8px;">
+                <div class="rd-actions">
                     <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Save</button>
                 </div>
             </form>

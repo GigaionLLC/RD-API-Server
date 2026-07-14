@@ -17,71 +17,117 @@
 @endphp
 
 @section('content')
-    <div class="rd-breadcrumb">Overview / Dashboard</div>
-
-    <div class="rd-grid rd-grid--4" style="margin-bottom:20px;">
-        @foreach ($stats as $s)
-            <div class="rd-card"><div class="rd-card__body">
-                <div class="rd-stat">
-                    <div class="rd-stat__icon rd-stat__icon--{{ $s['tone'] }}"><i class="{{ $s['icon'] }}"></i></div>
-                    <div>
-                        <div class="rd-stat__value">
-                            {{ $s['value'] }}
-                            @if (!empty($s['trend']))
-                                @php($t = $s['trend'])
-                                <span style="font-size:12px;font-weight:600;margin-left:6px;color:{{ $t['dir'] === 'down' ? 'var(--rd-danger)' : 'var(--rd-success)' }};" title="vs previous 24h">
-                                    <i class="{{ $t['dir'] === 'down' ? 'ri-arrow-down-line' : 'ri-arrow-up-line' }}"></i>{{ $t['pct'] }}%
-                                </span>
-                            @endif
-                        </div>
-                        <div class="rd-stat__label">{{ $s['label'] }}</div>
-                    </div>
+    <div class="rd-stack rd-stack--lg">
+        <header class="rd-page-header">
+            <div class="rd-page-header__copy">
+                <div class="rd-breadcrumb" aria-label="Breadcrumb">Overview / Dashboard</div>
+                <p class="rd-page-header__eyebrow">Remote operations</p>
+                <h1 class="rd-page-header__title">Fleet overview</h1>
+                <p class="rd-page-header__description">
+                    Monitor availability, recent enrollment, and connection activity from one operational view.
+                </p>
+            </div>
+            @if (auth()->user()?->hasPermission('devices.view'))
+                <div class="rd-page-header__actions">
+                    <a href="{{ route('admin.devices.index') }}" class="rd-btn rd-btn--primary">
+                        <i class="ri-computer-line" aria-hidden="true"></i> Manage devices
+                    </a>
                 </div>
-            </div></div>
-        @endforeach
-    </div>
+            @endif
+        </header>
 
-    <div class="rd-grid rd-grid--2">
-        <div class="rd-card">
-            <div class="rd-card__header">
-                <h3 class="rd-card__title">Activity (last 14 days)</h3>
+        <section aria-labelledby="fleet-summary-title">
+            <h2 class="visually-hidden" id="fleet-summary-title">Fleet summary</h2>
+            <div class="rd-summary">
+                @foreach ($stats as $s)
+                    <article class="rd-summary__item rd-summary__item--{{ $s['tone'] }}">
+                        <span class="rd-summary__icon" aria-hidden="true"><i class="{{ $s['icon'] }}"></i></span>
+                        <div>
+                            <p class="rd-summary__label">{{ $s['label'] }}</p>
+                            <div class="rd-summary__value-row">
+                                <p class="rd-summary__value">{{ $s['value'] }}</p>
+                                @if (!empty($s['trend']))
+                                    @php
+                                        $t = $s['trend'];
+                                    @endphp
+                                    <span class="rd-summary__trend rd-summary__trend--{{ $t['dir'] }}" title="Compared with the previous 24 hours">
+                                        <i class="{{ $t['dir'] === 'down' ? 'ri-arrow-down-line' : 'ri-arrow-up-line' }}" aria-hidden="true"></i>
+                                        {{ $t['pct'] }}%
+                                        <span class="visually-hidden">{{ $t['dir'] === 'down' ? 'decrease' : 'increase' }}</span>
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </article>
+                @endforeach
             </div>
-            <div class="rd-card__body"><div id="connChart"></div></div>
-        </div>
+        </section>
 
-        <div class="rd-card">
-            <div class="rd-card__header">
-                <h3 class="rd-card__title">Recent Devices</h3>
-                <a href="/admin/devices" class="rd-btn rd-btn--ghost">View all</a>
-            </div>
-            <div class="rd-card__body" style="padding:0;">
-                <table class="rd-table">
-                    <thead><tr><th>Device</th><th>OS</th><th>Status</th><th>Last seen</th></tr></thead>
-                    <tbody>
-                    @forelse ($recentDevices as $d)
-                        <tr>
-                            <td>{{ $d['hostname'] ?? $d['id'] }}</td>
-                            <td>{{ $d['os'] ?? '—' }}</td>
-                            <td>
-                                <span class="rd-badge rd-badge--{{ ($d['online'] ?? false) ? 'online' : 'offline' }}">
-                                    <span class="dot"></span>{{ ($d['online'] ?? false) ? 'Online' : 'Offline' }}
-                                </span>
-                            </td>
-                            <td class="rd-muted">{{ $d['last_seen'] ?? '—' }}</td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="4" class="rd-muted" style="text-align:center;padding:28px;">
-                            No devices yet — they appear here after the first heartbeat.
-                        </td></tr>
-                    @endforelse
-                    </tbody>
-                </table>
-            </div>
+        <div class="rd-dashboard-grid">
+            <section class="rd-card rd-dashboard-grid__activity" aria-labelledby="activity-title">
+                <div class="rd-card__header">
+                    <div>
+                        <p class="rd-card__eyebrow">Telemetry</p>
+                        <h2 class="rd-card__title" id="activity-title">Activity over 14 days</h2>
+                    </div>
+                    @if (auth()->user()?->hasPermission('audit.view'))
+                        <a href="{{ route('admin.audit.connections') }}" class="rd-btn rd-btn--ghost">Review logs</a>
+                    @endif
+                </div>
+                <div class="rd-card__body">
+                    <div id="connChart" class="rd-chart" role="img" aria-label="Connections and new devices over the last 14 days"></div>
+                </div>
+            </section>
+
+            <section class="rd-card rd-card--flush" aria-labelledby="recent-devices-title">
+                <div class="rd-card__header">
+                    <div>
+                        <p class="rd-card__eyebrow">Latest heartbeat</p>
+                        <h2 class="rd-card__title" id="recent-devices-title">Recent devices</h2>
+                    </div>
+                    @if (auth()->user()?->hasPermission('devices.view'))
+                        <a href="{{ route('admin.devices.index') }}" class="rd-btn rd-btn--ghost">View all</a>
+                    @endif
+                </div>
+                <div class="rd-table-wrap" role="region" tabindex="0" aria-label="Recent devices table">
+                    <table class="rd-table rd-table--compact">
+                        <thead><tr><th>Device</th><th>OS</th><th>Status</th><th>Last seen</th></tr></thead>
+                        <tbody>
+                        @forelse ($recentDevices as $d)
+                            <tr>
+                                <td>
+                                    <span class="rd-table__primary">{{ $d['hostname'] ?? $d['id'] }}</span>
+                                    <span class="rd-table__meta rd-mono">{{ $d['id'] }}</span>
+                                </td>
+                                <td class="rd-muted">{{ $d['os'] ?? '—' }}</td>
+                                <td>
+                                    <span class="rd-badge rd-badge--{{ ($d['online'] ?? false) ? 'online' : 'offline' }}">
+                                        <span class="dot" aria-hidden="true"></span>{{ ($d['online'] ?? false) ? 'Online' : 'Offline' }}
+                                    </span>
+                                </td>
+                                <td class="rd-muted">{{ $d['last_seen'] ?? '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4">
+                                    <div class="rd-empty">
+                                        <i class="ri-radar-line rd-empty__icon" aria-hidden="true"></i>
+                                        <p class="rd-empty__title">Waiting for the first heartbeat</p>
+                                        <p class="rd-empty__body">Devices will appear here after they contact the API server.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
     </div>
 @endsection
 
 @push('scripts')
+<script src="{{ asset('assets/vendor/apexcharts/apexcharts.min.js') }}"></script>
 <script>
     $(function () {
         var series = @json($chartSeries);
@@ -90,7 +136,7 @@
         RD.areaChart('#connChart', [
             { name: 'Connections', data: series },
             { name: 'New devices', data: devices }
-        ], cats, ['#6571ff', '#22c55e']);
+        ], cats, ['primary', 'info']);
     });
 </script>
 @endpush

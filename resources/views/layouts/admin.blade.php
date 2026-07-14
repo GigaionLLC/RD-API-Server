@@ -1,35 +1,51 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-bs-theme="dark">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Dashboard') · rustdesk-api</title>
+    <meta name="color-scheme" content="dark light">
+    <title>@yield('title', 'Dashboard') &middot; RD-API-Server</title>
 
-    {{-- Third-party: Bootstrap 5, Remix icons, ApexCharts (dev CDNs; vendor for prod) --}}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet">
+    <script>
+        (function () {
+            try {
+                var saved = window.localStorage.getItem('rd_theme');
+                var theme = saved === 'light' || saved === 'dark'
+                    ? saved
+                    : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+                document.documentElement.setAttribute('data-theme', theme);
+                document.documentElement.setAttribute('data-bs-theme', theme);
+            } catch (error) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+        }());
+    </script>
 
-    {{-- Local theme --}}
+    <link href="{{ asset('assets/vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ asset('assets/vendor/remixicon/remixicon.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/css/theme-dark.css') }}" rel="stylesheet">
     @stack('styles')
 </head>
 <body>
+<a class="rd-skip-link" href="#main-content">Skip to main content</a>
+
 <div class="rd-app">
     @include('admin.partials.sidebar')
+    <button class="rd-sidebar__backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
 
     <div class="rd-main">
         @include('admin.partials.navbar')
 
-        <main class="rd-content">
+        <main class="rd-content" id="main-content" tabindex="-1">
             @yield('content')
         </main>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.54.0/dist/apexcharts.min.js"></script>
+<script src="{{ asset('assets/vendor/jquery/jquery.min.js') }}"></script>
+<script src="{{ asset('assets/vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ asset('assets/js/app.js') }}"></script>
 @stack('scripts')
 </body>

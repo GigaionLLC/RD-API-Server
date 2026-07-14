@@ -3,35 +3,41 @@
 
 @section('content')
     @include('admin.partials.flash')
-    <div class="rd-breadcrumb">System / Webhooks / {{ $webhook->name }} / Deliveries</div>
 
-    <div class="rd-card" style="margin-bottom:16px;">
-        <div class="rd-card__body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <strong style="color:var(--rd-text-bright);">{{ $webhook->name }}</strong>
-            <span class="rd-muted" style="font-size:12px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $webhook->url }}</span>
-            <a href="{{ route('admin.webhooks.index') }}" class="rd-btn rd-btn--ghost" style="margin-left:auto;"><i class="ri-arrow-left-line"></i> Back to webhooks</a>
+    <header class="rd-page-header">
+        <div class="rd-page-header__copy">
+            <p class="rd-page-header__eyebrow">Integrations / Webhooks</p>
+            <h1 class="rd-page-header__title">{{ $webhook->name }} Deliveries</h1>
+            <p class="rd-page-header__description rd-mono">{{ $webhook->url }}</p>
         </div>
-    </div>
+        <div class="rd-page-header__actions">
+            <a href="{{ route('admin.webhooks.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back to webhooks</a>
+        </div>
+    </header>
 
-    <div class="rd-card">
+    <div class="rd-card rd-card--flush">
         <div class="rd-card__header"><h3 class="rd-card__title">Recent deliveries</h3></div>
-        <div class="rd-card__body" style="padding:0;">
+        <div class="rd-table-wrap" role="region" aria-label="Recent webhook deliveries" tabindex="0">
             <table class="rd-table">
-                <thead><tr><th>Event</th><th>Status</th><th>Code</th><th>Attempts</th><th>When</th><th>Next retry</th><th>Error</th><th style="text-align:right;">Action</th></tr></thead>
+                <thead><tr><th>Event</th><th>Status</th><th>Code</th><th>Attempts</th><th>When</th><th>Next retry</th><th>Error</th><th class="rd-table__actions">Action</th></tr></thead>
                 <tbody>
                 @forelse ($deliveries as $d)
                     <tr>
-                        <td><code style="font-size:12px;">{{ $d->event }}</code></td>
+                        <td><code class="rd-code">{{ $d->event }}</code></td>
                         <td>
-                            @php($cls = $d->status === \App\Models\WebhookDelivery::STATUS_SUCCESS ? 'rd-badge--online' : ($d->status === \App\Models\WebhookDelivery::STATUS_FAILED ? 'rd-badge--offline' : 'rd-badge--muted'))
+                            @php
+                                $cls = $d->status === \App\Models\WebhookDelivery::STATUS_SUCCESS
+                                    ? 'rd-badge--online'
+                                    : ($d->status === \App\Models\WebhookDelivery::STATUS_FAILED ? 'rd-badge--offline' : 'rd-badge--muted');
+                            @endphp
                             <span class="rd-badge {{ $cls }}">{{ $d->status }}</span>
                         </td>
-                        <td class="rd-muted">{{ $d->status_code ?? '—' }}</td>
+                        <td class="rd-muted rd-mono">{{ $d->status_code ?? '—' }}</td>
                         <td class="rd-muted">{{ $d->attempts }}</td>
                         <td class="rd-muted">{{ $d->created_at?->diffForHumans() }}</td>
                         <td class="rd-muted">{{ $d->next_attempt_at?->diffForHumans() ?? '—' }}</td>
-                        <td class="rd-muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ $d->error }}">{{ $d->error ?? '—' }}</td>
-                        <td style="text-align:right;">
+                        <td><span class="rd-table__meta" title="{{ $d->error }}">{{ $d->error ?? '—' }}</span></td>
+                        <td class="rd-table__actions">
                             @if ($d->status !== \App\Models\WebhookDelivery::STATUS_SUCCESS)
                                 <form method="POST" action="{{ route('admin.webhooks.deliveries.resend', $d) }}" class="m-0">
                                     @csrf
@@ -41,12 +47,11 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="rd-muted" style="text-align:center;padding:24px;">No deliveries recorded yet.</td></tr>
+                    <tr><td colspan="8"><div class="rd-empty"><i class="rd-empty__icon ri-send-plane-line" aria-hidden="true"></i><p class="rd-empty__title">No deliveries recorded yet</p><p class="rd-empty__body">Delivery attempts will appear after this webhook receives an event.</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>
         </div>
+        @include('admin.partials.pagination', ['paginator' => $deliveries])
     </div>
-
-    <div style="margin-top:14px;">@include('admin.partials.pagination', ['paginator' => $deliveries])</div>
 @endsection

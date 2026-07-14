@@ -1,13 +1,13 @@
 import { test, Page } from '@playwright/test';
 
 /**
- * Capture the admin-console screenshots used in the README + docs gallery.
+ * Capture the admin-console gallery and responsive flagship previews.
  *
  * Run against a server seeded with DemoShowcaseSeeder (see docs/screenshots/README.md).
- * Images are written to docs/screenshots/. This is a capture utility, not an assertion test —
- * run it explicitly, it is excluded from the CI gate by grep in the npm script.
+ * The desktop-dark project keeps the canonical gallery filenames. Other projects capture
+ * responsive/theme previews with their project name as a suffix.
  *
- *   E2E_BASE_URL=http://127.0.0.1:8088 npx playwright test screenshots.spec.ts
+ *   CAPTURE_SCREENSHOTS=1 E2E_BASE_URL=http://127.0.0.1:8088 npx playwright test screenshots.spec.ts --project=desktop-dark
  */
 
 const USER = process.env.E2E_ADMIN_USER || 'admin';
@@ -18,24 +18,46 @@ async function signIn(page: Page) {
     await page.goto('/admin/login', { waitUntil: 'domcontentloaded' });
     await page.fill('#username', USER);
     await page.fill('#password', PASS);
-    await Promise.all([page.waitForURL(/\/admin$/), page.click('button[type=submit]')]);
+    await Promise.all([
+        page.waitForURL(/\/admin$/, { waitUntil: 'commit' }),
+        page.click('button[type=submit]'),
+    ]);
 }
 
-// Wait for the page 'load' event (bounded) + a fixed beat for fonts/icons/ApexCharts to paint.
-// Deliberately NOT 'networkidle' — with CDN assets it can stall ~30s/page and blow the budget.
 async function settle(page: Page) {
-    await page.waitForLoadState('load').catch(() => {});
-    await page.waitForTimeout(1200);
+    await page.waitForLoadState('load');
+    await page.locator('html[data-rd-ready="true"]').waitFor({ state: 'attached', timeout: 30_000 });
+    await page.evaluate(async () => {
+        if (document.fonts) { await document.fonts.ready; }
+    });
+    await page.waitForFunction(() => {
+        const chart = document.querySelector('#connChart');
+        return !chart || chart.querySelector('.apexcharts-canvas') || !(window as Window & { ApexCharts?: unknown }).ApexCharts;
+    }).catch(() => {});
+    await page.waitForTimeout(300);
 }
 
 async function shot(page: Page, url: string, name: string) {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 }).catch(() => {});
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await settle(page);
     await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
 }
 
-test('capture admin console screenshots', async ({ page }) => {
-    test.setTimeout(240_000);
+async function strategyEditorShot(page: Page, name: string) {
+    await page.goto('/admin/strategies', { waitUntil: 'domcontentloaded' });
+    const edit = page.locator('a[href*="/edit"]').first();
+    if (await edit.count()) {
+        await edit.click();
+        await page.waitForLoadState('domcontentloaded');
+        await settle(page);
+        await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+    }
+}
+
+test('capture admin console screenshots', async ({ page }, testInfo) => {
+    test.skip(process.env.CAPTURE_SCREENSHOTS !== '1', 'Set CAPTURE_SCREENSHOTS=1 to write the screenshot gallery.');
+    test.skip(testInfo.project.name !== 'desktop-dark', 'The canonical gallery is captured at the desktop-dark viewport.');
+    test.setTimeout(600_000);
     await signIn(page);
 
     await shot(page, '/admin', 'dashboard');
@@ -50,14 +72,5 @@ test('capture admin console screenshots', async ({ page }) => {
     await shot(page, '/admin/users', 'users');
     await shot(page, '/admin/client-config', 'client-config');
     await shot(page, '/admin/settings', 'settings');
-
-    // The signature Strategy (Security-Settings) editor — open the first strategy's editor.
-    await page.goto('/admin/strategies', { waitUntil: 'domcontentloaded' });
-    const edit = page.locator('a[href*="/edit"]').first();
-    if (await edit.count()) {
-        await edit.click();
-        await page.waitForLoadState('domcontentloaded');
-        await settle(page);
-        await page.screenshot({ path: `${OUT}/strategy-editor.png`, fullPage: true });
-    }
+    await strategyEditorShot(page, 'strategy-editor');
 });
