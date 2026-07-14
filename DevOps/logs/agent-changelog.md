@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 10:00] - Security: bind email login challenges
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Api/LoginController.php`, `app/Services/TwoFactorService.php`
+- `app/Models/VerifyCode.php`
+- `database/migrations/2026_07_14_100003_harden_email_login_challenges.php`
+- `tests/Feature/EmailLoginChallengeSecurityTest.php`
+- `Wiki/core/15-security.md`, `docs/modernization/{02-client-api-contract,16-response-contract}.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds hashed challenge, attempt-budget, and consumption fields to `verify_codes`; retires legacy plaintext codes. The stock intermediate response is now `type:email_check` with an opaque secret and user payload.
+**Summary:** Bound email verification to the exact user, RustDesk ID, UUID, and a 64-character per-attempt secret; stored only hashes; enforced five-minute expiry, five row-local guesses under lock, single-use consumption, replay rejection, and safe upgrade/rollback cleanup. Sixteen focused and related tests / 116 assertions, Pint, and targeted PHPStan passed.
+
 ## [2026-07-14 09:54] - Security: remove the production admin-password default
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

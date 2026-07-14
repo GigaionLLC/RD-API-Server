@@ -56,8 +56,8 @@ class LoginController extends Controller
      * POST /api/login
      * First call: account + password. Negotiates 2FA per the contract:
      *   - login_verify == 'totp'  → return {type, tfa_type:'totp', secret:<uuid>}
-     *   - login_verify == 'email' → mail a code, store a VerifyCode, return tfa_type:'email_check'
-     * Second call (type == 'email_code'): verify verificationCode/tfaCode then issue the token.
+     *   - login_verify == 'email' → mail a code and return a bound email_check challenge
+     * Second call (type == 'email_code'): verify verificationCode + echoed secret, then issue.
      */
     public function login(Request $request): JsonResponse
     {
@@ -108,12 +108,21 @@ class LoginController extends Controller
             return response()->json(['error' => 'This account must sign in via SSO']);
         }
 
+        $rustdeskId = (string) $request->input('id', '');
         $uuid = (string) $request->input('uuid', '');
 
         // --- Second-factor submission ---------------------------------------------------
         if ($type === 'email_code') {
             $code = (string) ($request->input('verificationCode') ?? $request->input('code') ?? '');
-            if (! $this->twoFactor->verifyEmailCode($user, $uuid, $code)) {
+            $secret = (string) $request->input('secret', '');
+            if ($user->login_verify !== User::LOGIN_VERIFY_EMAIL
+                || ! $this->twoFactor->verifyEmailCode(
+                    $user,
+                    $rustdeskId,
+                    $uuid,
+                    $secret,
+                    $code,
+                )) {
                 return response()->json(['error' => 'Wrong or expired verification code']);
             }
 
@@ -149,21 +158,30 @@ class LoginController extends Controller
         }
 
         if ($user->login_verify === User::LOGIN_VERIFY_EMAIL) {
-            $code = $this->twoFactor->issueEmailCode($user, $uuid, (string) $request->input('id', ''));
-
-            if ($user->email) {
-                Mail::raw(
-                    "Your RustDesk verification code is: {$code}\n\nIt expires in 5 minutes.",
-                    function ($message) use ($user): void {
-                        $message->to($user->email)->subject('RustDesk verification code');
-                    }
-                );
+            if ($rustdeskId === '' || $uuid === ''
+                || mb_strlen($rustdeskId) > 255 || mb_strlen($uuid) > 255) {
+                return response()->json(['error' => 'Device identity is required for email verification']);
+            }
+            if (empty($user->email)) {
+                return response()->json(['error' => 'No email address is configured for this account']);
             }
 
+            $challenge = $this->twoFactor->issueEmailCode($user, $uuid, $rustdeskId);
+
+            Mail::raw(
+                "Your RustDesk verification code is: {$challenge['code']}\n\nIt expires in 5 minutes.",
+                function ($message) use ($user): void {
+                    $message->to($user->email)->subject('RustDesk verification code');
+                }
+            );
+
             return response()->json([
-                'type' => 'access_token',
+                // The stock Flutter client switches on type=email_check and needs user.name
+                // to populate the username on its second request.
+                'type' => 'email_check',
                 'tfa_type' => 'email_check',
-                'secret' => (string) Str::uuid(),
+                'secret' => $challenge['secret'],
+                'user' => $this->userPayload($user),
             ]);
         }
 

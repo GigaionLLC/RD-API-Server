@@ -12,9 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * A verification code (email or TOTP) issued to a user.
  */
 #[Fillable([
-    'user_id', 'type', 'uuid', 'code', 'rustdesk_id', 'status', 'expires_at',
+    'user_id', 'type', 'uuid', 'challenge_hash', 'code', 'failed_attempts',
+    'max_attempts', 'rustdesk_id', 'status', 'expires_at', 'consumed_at',
 ])]
-#[Hidden(['code'])]
+#[Hidden(['challenge_hash', 'code'])]
 class VerifyCode extends Model
 {
     use HasFactory;
@@ -22,6 +23,10 @@ class VerifyCode extends Model
     public const TYPE_EMAIL = 1;
 
     public const TYPE_TOTP = 2;
+
+    public const STATUS_INACTIVE = 0;
+
+    public const STATUS_ACTIVE = 1;
 
     /**
      * @return array<string, string>
@@ -31,7 +36,10 @@ class VerifyCode extends Model
         return [
             'type' => 'integer',
             'status' => 'integer',
+            'failed_attempts' => 'integer',
+            'max_attempts' => 'integer',
             'expires_at' => 'datetime',
+            'consumed_at' => 'datetime',
         ];
     }
 

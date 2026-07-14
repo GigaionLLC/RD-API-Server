@@ -97,3 +97,20 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Every admin CSV export passes through the shared export concern. Cells whose first meaningful
   character is `=`, `+`, `-`, or `@` are prefixed with an apostrophe, including attempts hidden
   behind leading controls, spaces, or a UTF-8 BOM, so spreadsheet software treats them as text.
+
+## Email Login Challenge Boundary
+
+- After the password succeeds, email verification issues a fresh 64-character random challenge
+  and a six-digit code for one exact user, RustDesk id, and device UUID. The challenge expires
+  after five minutes; issuing another challenge for that same user/device invalidates the prior one.
+- The API returns the challenge secret to the client but persists only its SHA-256 digest. The
+  six-digit email code is stored with the configured password hasher, never as plaintext. Both
+  values are hidden from model serialization.
+- The stock client's `type:"email_code"` request must echo the challenge `secret` together with
+  the same username, `id`, and `uuid`. Missing or rebound fields receive the same generic
+  wrong/expired-code response and cannot issue a token.
+- Each challenge has its own five-failure budget in the database. Verification locks the row,
+  so rotating source IPs or racing requests cannot bypass this budget. The challenge is disabled
+  at the fifth wrong code and atomically consumed on success, preventing replay.
+- Rows created before the challenge-hash migration contain no challenge digest and are therefore
+  intentionally unusable after deployment; the user can begin a fresh five-minute login attempt.

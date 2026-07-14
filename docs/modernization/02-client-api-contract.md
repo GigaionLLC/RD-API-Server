@@ -158,8 +158,9 @@ the client response shape.
 }
 ```
 
-> The current server returns a compatible subset but never populates `tfa_type`, `secret`,
-> or `info.*`. Those are the 2FA / email‑verification / device‑whitelist hooks (gap #2).
+> The server populates `tfa_type`, a per-attempt `secret`, and `user.info.*` for the implemented
+> email/TOTP negotiation paths. An email challenge is not a completed AuthBody and therefore has
+> no `access_token`; its exact intermediate shape is specified below.
 
 ---
 
@@ -167,10 +168,19 @@ the client response shape.
 
 - **TOTP:** SHA1, 6 digits, 30s step. Client stores an encrypted `TOTPInfo {name, secret,
   digits, created_at}`. Server signals TOTP by returning `tfa_type:"totp"` + `secret`.
-- **Email verification:** server returns `tfa_type:"email_check"`; client then re‑calls
-  `/api/login` with a `verificationCode`.
-- Login request for the 2nd factor adds: `type:"email_code"`, `verificationCode`,
-  `tfaCode` (for TOTP), `secret`. 🔎
+- **Email verification:** after validating the password, the server returns
+  `{type:"email_check", tfa_type:"email_check", secret, user}`. The stock Flutter client switches
+  on `type`, uses `user.name` as the second request's username, and echoes the opaque `secret`.
+- The stock email second step is
+  `{type:"email_code", username, id, uuid, verificationCode, secret, deviceInfo}`. All of
+  `username`, `id`, `uuid`, and `secret` must match the issued challenge; password is intentionally
+  omitted because the first factor has already succeeded.
+- Each email challenge is bound to one user + RustDesk id + UUID, expires after five minutes, and
+  is consumed on success. Only SHA-256 of the 64-character random challenge and a password hash of
+  the six-digit code are persisted. Five wrong codes disable that challenge under a row lock, so
+  its attempt budget remains effective even when source IPs rotate. A new challenge for the same
+  user/device supersedes the previous one.
+- Login request vocabulary also includes `tfaCode` for TOTP. 🔎
 - Pro detail (for parity): TOTP enrollment yields 6 single‑use backup codes; 2FA secret
   default expiry 180 days; enabling TOTP supersedes email verification.
 
@@ -314,11 +324,11 @@ client's Cargo build feature, **not** the `/api/devices/cli` endpoint.)
 | Endpoint | Method | Auth | Implemented here? |
 |----------|--------|------|-------------------|
 | `/api/login-options` | GET | no | ✅ |
-| `/api/login` | POST | no | ✅ (no 2FA) |
+| `/api/login` | POST | no | ✅ (password + email/TOTP negotiation) |
 | `/api/oidc/auth` | POST | no | ✅ |
 | `/api/oidc/auth-query` | GET | no | ✅ |
 | `/api/logout` | POST | yes | ✅ |
-| `/api/currentUser` · `/api/user/info` | POST/GET | yes | ✅ (no 2FA/info fields) |
+| `/api/currentUser` · `/api/user/info` | POST/GET | yes | ✅ |
 | `/api/heartbeat` | POST | no | ⚠️ stub (no strategy/disconnect) |
 | `/api/sysinfo` | POST | no | ⚠️ no presets / no gating |
 | `/api/sysinfo_ver` | POST | no | ✅ |

@@ -4,6 +4,10 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\VerifyCode;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 /**
  * Self-contained two-factor authentication helpers for the client login flow
@@ -25,6 +29,12 @@ class TwoFactorService
 
     /** Email verification code lifetime in minutes. */
     private const EMAIL_TTL_MINUTES = 5;
+
+    /** Failed guesses permitted for one issued email challenge. */
+    private const EMAIL_MAX_ATTEMPTS = 5;
+
+    /** Length of the opaque challenge secret returned to the RustDesk client. */
+    private const EMAIL_CHALLENGE_LENGTH = 64;
 
     /**
      * Verify a 6-digit TOTP code against the user's stored Base32 secret.
@@ -204,67 +214,119 @@ class TwoFactorService
     }
 
     /**
-     * Generate, persist (VerifyCode), and return a numeric email verification code.
-     * The caller is responsible for mailing it; we only store the record.
+     * Generate an email code plus an opaque per-login challenge for the stock client to echo.
+     * Only hashes are persisted; the caller receives the plaintext values long enough to return
+     * the challenge and mail the code.
+     *
+     * @return array{code: string, secret: string}
      */
-    public function issueEmailCode(User $user, string $uuid, ?string $rustdeskId = null): string
+    public function issueEmailCode(User $user, string $uuid, string $rustdeskId): array
     {
+        if ($uuid === '' || $rustdeskId === ''
+            || mb_strlen($uuid) > 255 || mb_strlen($rustdeskId) > 255) {
+            throw new InvalidArgumentException('A bounded RustDesk id and UUID are required.');
+        }
+
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $secret = Str::random(self::EMAIL_CHALLENGE_LENGTH);
+        $codeHash = Hash::make($code);
 
-        // Invalidate any previous outstanding email codes for this user + device.
-        VerifyCode::where('user_id', $user->id)
-            ->where('type', VerifyCode::TYPE_EMAIL)
-            ->where('uuid', $uuid)
-            ->update(['status' => 0]);
+        DB::transaction(function () use ($user, $uuid, $rustdeskId, $codeHash, $secret): void {
+            // Invalidate any previous outstanding email codes for this user + device.
+            VerifyCode::where('user_id', $user->id)
+                ->where('type', VerifyCode::TYPE_EMAIL)
+                ->where('uuid', $uuid)
+                ->where('rustdesk_id', $rustdeskId)
+                ->where('status', VerifyCode::STATUS_ACTIVE)
+                ->update(['status' => VerifyCode::STATUS_INACTIVE]);
 
-        VerifyCode::create([
-            'user_id' => $user->id,
-            'type' => VerifyCode::TYPE_EMAIL,
-            'uuid' => $uuid !== '' ? $uuid : (string) $user->id,
-            'code' => $code,
-            'rustdesk_id' => $rustdeskId,
-            'status' => 1,
-            'expires_at' => now()->addMinutes(self::EMAIL_TTL_MINUTES),
-        ]);
+            VerifyCode::create([
+                'user_id' => $user->id,
+                'type' => VerifyCode::TYPE_EMAIL,
+                'uuid' => $uuid,
+                'challenge_hash' => hash('sha256', $secret),
+                'code' => $codeHash,
+                'failed_attempts' => 0,
+                'max_attempts' => self::EMAIL_MAX_ATTEMPTS,
+                'rustdesk_id' => $rustdeskId,
+                'status' => VerifyCode::STATUS_ACTIVE,
+                'expires_at' => now()->addMinutes(self::EMAIL_TTL_MINUTES),
+            ]);
+        });
 
-        return $code;
+        return ['code' => $code, 'secret' => $secret];
     }
 
     /**
-     * Verify a previously issued email code, consuming it on success.
+     * Verify a bound email challenge under a row lock. Failed guesses are counted on the
+     * challenge itself, independent of request IP/account throttles; success consumes it.
      */
-    public function verifyEmailCode(User $user, string $uuid, string $code): bool
-    {
+    public function verifyEmailCode(
+        User $user,
+        string $rustdeskId,
+        string $uuid,
+        string $secret,
+        string $code,
+    ): bool {
+        if ($rustdeskId === '' || $uuid === ''
+            || mb_strlen($rustdeskId) > 255 || mb_strlen($uuid) > 255
+            || preg_match('/\A[A-Za-z0-9]{'.self::EMAIL_CHALLENGE_LENGTH.'}\z/', $secret) !== 1) {
+            return false;
+        }
+
         $code = trim($code);
+        $challengeHash = hash('sha256', $secret);
 
-        if ($code === '') {
-            return false;
-        }
+        return DB::transaction(function () use ($user, $rustdeskId, $uuid, $challengeHash, $code): bool {
+            $record = VerifyCode::query()
+                ->where('user_id', $user->id)
+                ->where('type', VerifyCode::TYPE_EMAIL)
+                ->where('uuid', $uuid)
+                ->where('rustdesk_id', $rustdeskId)
+                ->where('challenge_hash', $challengeHash)
+                ->where('status', VerifyCode::STATUS_ACTIVE)
+                ->lockForUpdate()
+                ->first();
 
-        $record = VerifyCode::where('user_id', $user->id)
-            ->where('type', VerifyCode::TYPE_EMAIL)
-            ->where('uuid', $uuid !== '' ? $uuid : (string) $user->id)
-            ->where('status', 1)
-            ->orderByDesc('id')
-            ->first();
+            if ($record === null) {
+                return false;
+            }
 
-        if (! $record) {
-            return false;
-        }
+            if ($record->expires_at === null || $record->expires_at->isPast()) {
+                $record->forceFill(['status' => VerifyCode::STATUS_INACTIVE])->save();
 
-        if ($record->expires_at !== null && $record->expires_at->isPast()) {
-            $record->forceFill(['status' => 0])->save();
+                return false;
+            }
 
-            return false;
-        }
+            $maxAttempts = max(1, (int) $record->max_attempts);
+            if ((int) $record->failed_attempts >= $maxAttempts) {
+                $record->forceFill(['status' => VerifyCode::STATUS_INACTIVE])->save();
 
-        if (! hash_equals((string) $record->code, $code)) {
-            return false;
-        }
+                return false;
+            }
 
-        // Single-use: consume the code.
-        $record->forceFill(['status' => 0])->save();
+            $valid = preg_match('/\A\d{6}\z/', $code) === 1
+                && $record->code !== null
+                && Hash::check($code, (string) $record->code);
 
-        return true;
+            if (! $valid) {
+                $failedAttempts = (int) $record->failed_attempts + 1;
+                $record->forceFill([
+                    'failed_attempts' => $failedAttempts,
+                    'status' => $failedAttempts >= $maxAttempts
+                        ? VerifyCode::STATUS_INACTIVE
+                        : VerifyCode::STATUS_ACTIVE,
+                ])->save();
+
+                return false;
+            }
+
+            $record->forceFill([
+                'status' => VerifyCode::STATUS_INACTIVE,
+                'consumed_at' => now(),
+            ])->save();
+
+            return true;
+        });
     }
 }
