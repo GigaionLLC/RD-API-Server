@@ -269,10 +269,13 @@ storing the exact decimal value. The host's post-auth connection event intention
 The legacy controlling-side note POST (`{id,session_id,note}`) does **not** contain a UUID and
 therefore cannot satisfy this device binding; it now acknowledges without mutating a session.
 The application also supports the account-bearer-authenticated `GET /api/audit/conn/active`
-followed by `PUT /api/audit` with the server-issued guid. A client still using the exact legacy
-POST will not persist a note unless upstream adds an attributable credential. A compatibility
-caller may add the exact device UUID, in which case the update is additionally scoped to
-`peer_id + session_id`.
+followed by `PUT /api/audit` with the server-issued guid. Both operations independently require
+the authenticated account to have owner, delegated group, or administrator access to the target
+device; a known guid alone is not write authority. Denied lookups return the normal empty string
+and denied updates retain the normal `{}` no-op. A client still using the exact legacy POST will
+not persist a note unless upstream adds an attributable credential. A compatibility caller may
+add the exact device UUID, in which case the update is additionally scoped to `peer_id +
+session_id`.
 
 ### 8.1 RustDesk 1.4.9 auth‑detail additions (PR #15456, #15407, #15469) ✅
 

@@ -88,7 +88,10 @@ class ApiResponseTest extends TestCase
     public function test_audit_active_guid_then_note_roundtrip(): void
     {
         $token = $this->clientToken();
-        Device::create(['rustdesk_id' => 'host1', 'uuid' => 'host-uuid']);
+        $owner = User::where('username', 'cli')->firstOrFail();
+        Device::create([
+            'rustdesk_id' => 'host1', 'uuid' => 'host-uuid', 'user_id' => $owner->id,
+        ]);
 
         // Controlled host opens a connection (unauthenticated audit ingest).
         $this->postJson('/api/audit/conn', [

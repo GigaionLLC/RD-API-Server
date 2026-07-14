@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 10:02] - Security: authorize audit session notes
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Api/AuditController.php`
+- `tests/Feature/AuditNoteAuthorizationTest.php`, `tests/Feature/ApiResponseTest.php`
+- `Wiki/core/15-security.md`, `docs/modernization/{02-client-api-contract,16-response-contract}.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Denied GUID lookups remain HTTP 200 JSON `""`; denied or invalid note updates remain HTTP 200 `{}` no-ops.
+**Summary:** Closed cross-account GUID disclosure and note modification by independently scoping both the lookup and update to devices accessible through ownership, delegated group grants, or full administration. Added bounds for peer, session, guid, and note inputs. Sixteen focused tests / 74 assertions, Pint, and targeted PHPStan passed.
+
 ## [2026-07-14 10:00] - Security: bind email login challenges
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

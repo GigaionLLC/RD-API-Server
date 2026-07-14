@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuditConn;
 use App\Models\AuditFile;
+use App\Models\Device;
+use App\Models\User;
+use App\Services\AccessService;
 use App\Services\AlarmService;
 use App\Services\AuditIngestionGuard;
 use App\Services\WebhookService;
@@ -25,7 +28,10 @@ use Throwable;
  */
 class AuditController extends Controller
 {
-    public function __construct(private AuditIngestionGuard $ingestion) {}
+    public function __construct(
+        private AuditIngestionGuard $ingestion,
+        private AccessService $access,
+    ) {}
 
     /**
      * The RustDesk client's connection alarm types (AlarmAuditType in the client).
@@ -279,13 +285,26 @@ class AuditController extends Controller
      */
     public function active(Request $request): JsonResponse
     {
-        $peerId = (string) $request->query('id', '');
-        $sessionId = (string) $request->query('session_id', '');
+        $peerId = $request->query('id');
+        $sessionId = $request->query('session_id');
+
+        if (! is_string($peerId) || $peerId === '' || mb_strlen($peerId) > 255
+            || ! is_string($sessionId) || $sessionId === '' || mb_strlen($sessionId) > 255) {
+            return response()->json('');
+        }
+
+        /** @var User|null $user */
+        $user = $request->user();
+        if ($user === null) {
+            return response()->json('');
+        }
 
         $guid = '';
-        if ($peerId !== '' && $sessionId !== '') {
+        $accessiblePeerIds = $this->accessiblePeerIds($user);
+        if ($accessiblePeerIds !== []) {
             $guid = (string) (AuditConn::query()
                 ->where('peer_id', $peerId)
+                ->whereIn('peer_id', $accessiblePeerIds)
                 ->where('session_id', $sessionId)
                 ->where('action', AuditConn::ACTION_NEW)
                 ->whereNotNull('guid')
@@ -302,14 +321,44 @@ class AuditController extends Controller
      */
     public function note(Request $request): JsonResponse
     {
-        $guid = (string) $request->input('guid', '');
-        $note = (string) $request->input('note', '');
+        $guid = $request->input('guid');
+        $note = $request->input('note');
 
-        if ($guid !== '') {
-            AuditConn::where('guid', $guid)->update(['note' => $note]);
+        if (! is_string($guid) || ! Str::isUuid($guid)
+            || ! is_string($note) || mb_strlen($note) > 4000) {
+            return $this->acknowledge();
+        }
+
+        /** @var User|null $user */
+        $user = $request->user();
+        if ($user === null) {
+            return $this->acknowledge();
+        }
+
+        $accessiblePeerIds = $this->accessiblePeerIds($user);
+        if ($accessiblePeerIds !== []) {
+            AuditConn::query()
+                ->where('guid', $guid)
+                ->whereIn('peer_id', $accessiblePeerIds)
+                ->update(['note' => $note]);
         }
 
         return $this->acknowledge();
+    }
+
+    /**
+     * RustDesk peer ids the authenticated account may operate on.
+     *
+     * @return list<string>
+     */
+    private function accessiblePeerIds(User $user): array
+    {
+        return Device::query()
+            ->whereIn('id', $this->access->accessibleDeviceIds($user))
+            ->pluck('rustdesk_id')
+            ->map(static fn ($peerId): string => (string) $peerId)
+            ->values()
+            ->all();
     }
 
     /**

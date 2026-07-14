@@ -84,10 +84,12 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   may tune these with the `RUSTDESK_AUDIT_*` environment variables in `.env.example`.
 - The older `POST /api/audit/conn` note body contains no UUID and cannot be safely attributed, so
   that exact legacy shape now acknowledges without changing a row. The application also provides
-  the bearer-authenticated `GET /api/audit/conn/active` plus `PUT /api/audit` guid flow. Clients
-  still using the exact legacy POST will not persist a note unless upstream adds an attributable
-  credential; a compatibility caller that adds the matching device UUID is additionally scoped by
-  both peer id and session id.
+  the bearer-authenticated `GET /api/audit/conn/active` plus `PUT /api/audit` guid flow. Both
+  operations independently require owner, delegated group, or administrator access to the target
+  device, so knowing a guid cannot grant cross-account write access. Clients still using the exact
+  legacy POST will not persist a note unless upstream adds an attributable credential; a
+  compatibility caller that adds the matching device UUID is additionally scoped by both peer id
+  and session id.
 
 ## Generated Output Boundaries
 
