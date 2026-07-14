@@ -131,6 +131,9 @@ class DeviceTelemetrySecurityTest extends TestCase
 
     public function test_auto_registration_requires_both_bounded_identity_fields(): void
     {
+        config()->set('rustdesk.devices.require_deployment', false);
+        config()->set('rustdesk.devices.auto_register', true);
+
         foreach ([
             ['id' => 'missing-uuid', 'uuid' => ''],
             ['id' => '', 'uuid' => 'orphan-uuid'],

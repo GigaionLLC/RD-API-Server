@@ -19,6 +19,15 @@ class DefaultDeviceGroupTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // These tests intentionally exercise the legacy open-enrollment path.
+        config()->set('rustdesk.devices.require_deployment', false);
+        config()->set('rustdesk.devices.auto_register', true);
+    }
+
     public function test_new_device_joins_the_default_group_on_heartbeat(): void
     {
         $group = DeviceGroup::create(['name' => 'Default', 'is_default' => true]);

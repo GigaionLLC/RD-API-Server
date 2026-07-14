@@ -45,6 +45,9 @@ class DefaultStrategyAndBulkAllTest extends TestCase
 
     public function test_heartbeat_pushes_the_default_strategy_to_a_new_device(): void
     {
+        config()->set('rustdesk.devices.require_deployment', false);
+        config()->set('rustdesk.devices.auto_register', true);
+
         Strategy::create(['name' => 'Baseline', 'enabled' => true, 'is_default' => true, 'options' => ['enable-audio' => 'N'], 'modified_at' => 7]);
 
         $res = $this->postJson('/api/heartbeat', ['id' => 'new-dev', 'uuid' => 'uuid-1', 'modified_at' => 0]);

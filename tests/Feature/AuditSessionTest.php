@@ -47,6 +47,7 @@ class AuditSessionTest extends TestCase
 
     public function test_heartbeat_delivers_queued_disconnect(): void
     {
+        Device::create(['rustdesk_id' => 'dev-2', 'uuid' => 'u2', 'approved' => true]);
         Cache::put('rd:disconnect:dev-2', [7], now()->addMinutes(5));
 
         $this->postJson('/api/heartbeat', [

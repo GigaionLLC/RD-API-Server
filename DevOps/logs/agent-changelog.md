@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 10:30] - Security: fail closed on unknown device enrollment
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Api/SystemController.php`, `app/Services/DeviceAutoRegistrationGuard.php`
+- `config/rustdesk.php`, `.env.example`
+- `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `tests/Feature/DeviceAutoRegistrationSecurityTest.php` and related telemetry/default-strategy regression tests
+- `QUICKSTART.md`, `Wiki/core/15-security.md`, `docs/modernization/02-client-api-contract.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Unknown devices now fail closed by default (`require_deployment=true`, `auto_register=false`) and retain the stock `{}` / `ID_NOT_FOUND` rejection shapes. Existing approved-device shapes are unchanged.
+**Summary:** Prevented unauthenticated first-claim registration, strategy-secret disclosure, unbounded device/webhook growth, and disconnect consumption by unknown callers. Explicit legacy enrollment remains available with 30/source/minute, 100 global/minute, and 5,000 total-device defaults. Seventy-one related tests / 382 assertions, Pint, targeted PHPStan, all Compose validations, and diff checks passed.
+
 ## [2026-07-14 10:19] - Security: protect OAuth identity trust roots
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

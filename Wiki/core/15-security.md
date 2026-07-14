@@ -89,6 +89,20 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   code without the password-proven challenge is insufficient; the supported one-request path
   still requires the local/LDAP password and TOTP together.
 
+## Device Enrollment Boundary
+
+- Unknown devices fail closed by default: `RUSTDESK_REQUIRE_DEPLOYMENT=true` and
+  `RUSTDESK_AUTO_REGISTER=false`. They receive the stock empty/`ID_NOT_FOUND` responses without
+  creating rows, firing webhooks, consuming disconnects, or receiving strategy secrets.
+- Existing approved devices continue to require their exact stored non-empty UUID. Deployment
+  tokens and explicit operator approval are the authenticated enrollment paths.
+- Legacy first-seen enrollment is available only when both switches are deliberately reversed.
+  That compatibility mode inherently trusts the first caller for a RustDesk ID; it is bounded by
+  per-source and global one-minute registration ceilings plus a total-device quota. Defaults are
+  30 per source, 100 globally, and 5,000 total devices.
+- The framework request IP is authoritative for enrollment limits, so reverse proxies must obey
+  the explicit trusted-proxy boundary above.
+
 ## Audit Ingestion Boundary
 
 - The RustDesk audit feeds are fire-and-forget and do not carry an account bearer. Current

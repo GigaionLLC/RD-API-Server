@@ -59,8 +59,8 @@ connections are active. `sync.rs:86‑274`.
 - Returning `"sysinfo": true` makes the client clear its sysinfo hash and re‑upload.
 - Existing devices must present the exact stored non-empty `uuid` for their `id`. A mismatch
   receives `{}` without inventory mutation, Strategy disclosure, or consumption of queued
-  disconnects. Unknown devices auto-register only when deployment gating is off and both
-  bounded identity fields are present; unapproved devices receive no commands or policy.
+  disconnects. Unknown devices fail closed by default and receive no commands or policy.
+  Token deployment/approval is the normal enrollment path.
 - **Implemented:** the server records liveness, resolves the effective Strategy, pushes changed
   options/timestamps, and delivers queued disconnect commands after the identity checks above.
 
@@ -101,9 +101,12 @@ matches; `/api/sysinfo_ver` lets it confirm the server still has the same versio
 **`/api/sysinfo_ver`** returns an opaque version string used to short‑circuit uploads.
 
 The server stores core fields and applies recognized preset keys only after the request's
-`id`/`uuid` pair matches an approved device (or securely establishes a new auto-registered
-device while deployment gating is off). A mismatched or unapproved device receives
-`ID_NOT_FOUND` and cannot change inventory, assignments, groups, or address books.
+`id`/`uuid` pair matches an approved device. A mismatched, unknown, or unapproved device receives
+`ID_NOT_FOUND` and cannot change inventory, assignments, groups, or address books. Legacy
+first-seen registration requires the explicit combination
+`RUSTDESK_REQUIRE_DEPLOYMENT=false` + `RUSTDESK_AUTO_REGISTER=true`; it retains first-caller trust
+but is bounded by per-IP and global one-minute limits plus a total-device quota (defaults 30,
+100, and 5,000). Rejected attempts create no device/group/address-book/webhook side effects.
 
 The set of `OPTION_PRESET_*` keys (from `hbb_common` `keys`): preset address‑book
 name/tag/alias/password/note, preset username, preset strategy name, preset device‑group

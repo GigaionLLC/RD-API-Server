@@ -36,6 +36,9 @@ class SmokeTest extends TestCase
 
     public function test_heartbeat_accepts_a_device(): void
     {
+        config()->set('rustdesk.devices.require_deployment', false);
+        config()->set('rustdesk.devices.auto_register', true);
+
         $this->postJson('/api/heartbeat', [
             'id' => 'test-1', 'uuid' => 'uuid-1', 'modified_at' => 0,
         ])->assertOk();
@@ -45,7 +48,10 @@ class SmokeTest extends TestCase
 
     public function test_sysinfo_unknown_device_without_deployment(): void
     {
-        // With auto-register on (default), a new device is accepted.
+        config()->set('rustdesk.devices.require_deployment', false);
+        config()->set('rustdesk.devices.auto_register', true);
+
+        // Legacy open enrollment remains available only through explicit opt-in.
         $this->postJson('/api/sysinfo', [
             'id' => 'sys-1', 'uuid' => 'u-sys-1', 'os' => 'Linux', 'hostname' => 'box',
         ])->assertOk()->assertSee('SYSINFO_UPDATED');

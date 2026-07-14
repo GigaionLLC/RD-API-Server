@@ -76,12 +76,20 @@ RUSTDESK_AB_MAX_PEERS=0
 # When set, scrapers must send `Authorization: Bearer <token>`.
 RUSTDESK_METRICS_TOKEN=
 
-# Reject unknown devices at /api/sysinfo until deployed/approved.
-RUSTDESK_REQUIRE_DEPLOYMENT=false
+# Reject unknown devices until they enroll with a deployment token or are approved.
+RUSTDESK_REQUIRE_DEPLOYMENT=true
+RUSTDESK_AUTO_REGISTER=false
 
 # Delete audit logs + alarms older than N days (0 = keep forever). Pruned daily by the scheduler.
 RUSTDESK_AUDIT_RETENTION_DAYS=0
 ```
+
+These are the secure defaults. Existing approved devices continue reporting normally, while an
+unknown stock client receives `{}` from heartbeat and `ID_NOT_FOUND` from sysinfo until it is
+deployed or approved. Legacy first-seen enrollment can be restored only by setting
+`RUSTDESK_REQUIRE_DEPLOYMENT=false` and `RUSTDESK_AUTO_REGISTER=true` together. That mode trusts
+the first caller for an ID, so use it only on a trusted network; per-IP/global registration rates
+and a total-device quota remain enabled and are configurable through `.env.example`.
 
 Session-recording uploads are deliberately off by default because the stock RustDesk uploader
 does not send an account token. To accept stock clients, enable the route and allow only the

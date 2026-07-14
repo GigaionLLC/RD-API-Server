@@ -31,9 +31,14 @@ return [
     // Device onboarding.
     'devices' => [
         // When true, unknown devices get ID_NOT_FOUND from /api/sysinfo until deployed/approved.
-        'require_deployment' => (bool) env('RUSTDESK_REQUIRE_DEPLOYMENT', false),
-        // When true, the first heartbeat auto-creates the device record.
-        'auto_register' => (bool) env('RUSTDESK_AUTO_REGISTER', true),
+        'require_deployment' => (bool) env('RUSTDESK_REQUIRE_DEPLOYMENT', true),
+        // Legacy unauthenticated registration is an explicit opt-in and remains bounded below.
+        'auto_register' => (bool) env('RUSTDESK_AUTO_REGISTER', false),
+        'auto_registration' => [
+            'per_ip_per_minute' => (int) env('RUSTDESK_AUTO_REGISTER_PER_IP_PER_MINUTE', 30),
+            'global_per_minute' => (int) env('RUSTDESK_AUTO_REGISTER_GLOBAL_PER_MINUTE', 100),
+            'max_devices' => (int) env('RUSTDESK_AUTO_REGISTER_MAX_DEVICES', 5000),
+        ],
         // When true, new/ungrouped devices auto-join a default device group (promoting the
         // oldest group, or creating a "Default" one) so they never sit in "None".
         'auto_default_group' => (bool) env('RUSTDESK_AUTO_DEFAULT_GROUP', true),

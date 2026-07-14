@@ -8,6 +8,7 @@ use App\Models\AddressBookPeer;
 use App\Models\Device;
 use App\Models\DeviceGroup;
 use App\Models\Strategy;
+use App\Services\DeviceAutoRegistrationGuard;
 use App\Services\StrategyService;
 use App\Services\WebhookService;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,7 @@ class SystemController extends Controller
     public function __construct(
         private readonly StrategyService $strategies,
         private readonly WebhookService $webhooks,
+        private readonly DeviceAutoRegistrationGuard $autoRegistration,
     ) {}
 
     /**
@@ -43,23 +45,23 @@ class SystemController extends Controller
         }
 
         $device = Device::where('rustdesk_id', $rustdeskId)->first();
+        $wasAutoRegistered = false;
 
         if ($device) {
             if (! $this->identityMatches($device, $uuid) || ! $device->approved) {
                 return response()->json((object) []);
             }
         } else {
-            if (! $this->validIdentityPart($uuid)
-                || config('rustdesk.devices.require_deployment')
-                || ! config('rustdesk.devices.auto_register')) {
+            if (! $this->validIdentityPart($uuid)) {
                 return response()->json((object) []);
             }
 
-            $device = new Device([
-                'rustdesk_id' => $rustdeskId,
-                'uuid' => $uuid,
-                'approved' => true,
-            ]);
+            $device = $this->autoRegistration->register($request, $rustdeskId, $uuid);
+            if ($device === null) {
+                return response()->json((object) []);
+            }
+
+            $wasAutoRegistered = $device->wasRecentlyCreated;
         }
 
         // Place new / still-ungrouped devices into the default group (auto-provisioned when
@@ -75,7 +77,7 @@ class SystemController extends Controller
         ])->save();
 
         // Notify webhooks the first time we see a device (auto-registered on this heartbeat).
-        if ($device->wasRecentlyCreated) {
+        if ($wasAutoRegistered) {
             $this->webhooks->dispatch('device.new', [
                 'peer_id' => $rustdeskId,
                 'uuid' => $uuid,
@@ -116,18 +118,14 @@ class SystemController extends Controller
                 return response('ID_NOT_FOUND')->header('Content-Type', 'text/plain');
             }
         } else {
-            // Deployment gating: unknown devices are rejected until approved/deployed.
-            if (! $this->validIdentityPart($uuid)
-                || config('rustdesk.devices.require_deployment')
-                || ! config('rustdesk.devices.auto_register')) {
+            if (! $this->validIdentityPart($uuid)) {
                 return response('ID_NOT_FOUND')->header('Content-Type', 'text/plain');
             }
 
-            $device = new Device([
-                'rustdesk_id' => $rustdeskId,
-                'uuid' => $uuid,
-                'approved' => true,
-            ]);
+            $device = $this->autoRegistration->register($request, $rustdeskId, $uuid);
+            if ($device === null) {
+                return response('ID_NOT_FOUND')->header('Content-Type', 'text/plain');
+            }
         }
 
         $device->fill([
