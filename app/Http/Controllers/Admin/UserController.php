@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\UserThird;
 use App\Services\AccountCredentialService;
 use App\Services\AdminScopeService;
+use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -150,7 +151,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', 'unique:users,username'],
             'email' => ['nullable', 'email', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:6'],
+            'password' => AccountPasswordPolicy::rules(),
             'is_admin' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'boolean'],
             'status' => ['required', 'integer', Rule::in([User::STATUS_NORMAL, User::STATUS_DISABLED, User::STATUS_UNVERIFIED])],
             'force_sso' => ['nullable', 'boolean'],
@@ -275,7 +276,7 @@ class UserController extends Controller
         $this->authorizePrivilegedAccountManagement($request, $user);
 
         $data = $request->validate([
-            'password' => ['required', 'string', 'min:6'],
+            'password' => AccountPasswordPolicy::rules(),
         ]);
 
         $selfReset = (int) $request->user()->id === (int) $user->id;

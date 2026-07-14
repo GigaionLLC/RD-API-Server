@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\TwoFactorService;
+use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -101,7 +102,9 @@ class TwoFactorController extends Controller
 
     public function disable(Request $request): RedirectResponse
     {
-        $request->validate(['password' => ['required', 'string']]);
+        $request->validate([
+            'password' => ['required', 'string', 'max:'.AccountPasswordPolicy::MAX_LENGTH],
+        ]);
 
         /** @var User $user */
         $user = $request->user();

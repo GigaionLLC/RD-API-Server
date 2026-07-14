@@ -9,6 +9,7 @@ use App\Models\LdapIdentity;
 use App\Models\User;
 use App\Models\UserThird;
 use App\Models\VerifyCode;
+use App\Support\AccountPasswordPolicy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -31,6 +32,8 @@ final class AccountCredentialService
      */
     public function replacePassword(User $user, string $password, array $previousEmails = []): User
     {
+        AccountPasswordPolicy::assertValid($password);
+
         $updated = DB::transaction(function () use ($user, $password, $previousEmails): User {
             /** @var User $locked */
             $locked = User::query()->lockForUpdate()->findOrFail($user->getKey());

@@ -104,17 +104,17 @@ class ApiV1WriteTest extends TestCase
 
         $this->withHeader('Authorization', 'Bearer '.$plain)
             ->postJson('/api/v1/users', [
-                'username' => 'techy', 'password' => 'changeme123', 'email' => 'techy@example.com',
+                'username' => 'techy', 'password' => 'changeme1234', 'email' => 'techy@example.com',
             ])
             ->assertStatus(201)
             ->assertJsonPath('data.username', 'techy');
 
         $user = User::where('username', 'techy')->firstOrFail();
-        $this->assertTrue(Hash::check('changeme123', $user->password));
+        $this->assertTrue(Hash::check('changeme1234', $user->password));
 
         // Duplicate username is rejected.
         $this->withHeader('Authorization', 'Bearer '.$plain)
-            ->postJson('/api/v1/users', ['username' => 'techy', 'password' => 'another123'])
+            ->postJson('/api/v1/users', ['username' => 'techy', 'password' => 'another12345'])
             ->assertStatus(422);
     }
 

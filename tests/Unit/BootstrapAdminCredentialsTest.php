@@ -36,6 +36,7 @@ class BootstrapAdminCredentialsTest extends TestCase
             'blank' => ['   '],
             'too short' => ['short-pass'],
             'known default' => ['admin123456'],
+            'current development default' => [BootstrapAdminCredentials::DEVELOPMENT_PASSWORD],
             'documented placeholder' => ['CHANGE_ME_admin_password'],
             'former quickstart placeholder' => ['choose-a-strong-password'],
             'generic placeholder' => ['replace-me-with-a-unique-password'],
@@ -58,8 +59,33 @@ class BootstrapAdminCredentialsTest extends TestCase
         );
 
         $this->assertSame(
-            'local',
-            BootstrapAdminCredentials::resolvePassword('local', 'admin', false),
+            'local-password',
+            BootstrapAdminCredentials::resolvePassword('local-password', 'admin', false),
+        );
+    }
+
+    public function test_bootstrap_passwords_enforce_the_shared_length_boundary(): void
+    {
+        foreach ([false, true] as $production) {
+            try {
+                BootstrapAdminCredentials::resolvePassword(str_repeat('x', 11), 'admin', $production);
+                $this->fail('An eleven-character bootstrap password was accepted.');
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('between 12 and 255 characters', $exception->getMessage());
+            }
+
+            try {
+                BootstrapAdminCredentials::resolvePassword(str_repeat('x', 256), 'admin', $production);
+                $this->fail('A 256-character bootstrap password was accepted.');
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('between 12 and 255 characters', $exception->getMessage());
+            }
+        }
+
+        $maximum = str_repeat('x', 255);
+        $this->assertSame(
+            $maximum,
+            BootstrapAdminCredentials::resolvePassword($maximum, 'admin', false),
         );
     }
 

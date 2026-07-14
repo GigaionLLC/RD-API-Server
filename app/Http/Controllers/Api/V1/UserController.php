@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AccountCredentialService;
 use App\Services\AdminScopeService;
+use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +47,7 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'username' => ['required', 'string', 'max:255', 'unique:users,username'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => AccountPasswordPolicy::rules(),
             'email' => ['nullable', 'email', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
             'group_id' => ['nullable', 'integer', 'exists:groups,id'],
@@ -93,7 +94,7 @@ class UserController extends Controller
 
         $data = $request->validate([
             'username' => ['sometimes', 'string', 'max:255', Rule::unique('users', 'username')->ignore($user->id)],
-            'password' => ['sometimes', 'string', 'min:8'],
+            'password' => AccountPasswordPolicy::rules(required: false),
             'email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'display_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'group_id' => ['sometimes', 'nullable', 'integer', 'exists:groups,id'],

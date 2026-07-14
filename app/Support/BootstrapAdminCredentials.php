@@ -13,22 +13,20 @@ use RuntimeException;
  */
 final class BootstrapAdminCredentials
 {
-    public const DEVELOPMENT_PASSWORD = 'admin123456';
+    public const DEVELOPMENT_PASSWORD = 'admin12345678';
 
-    public const MINIMUM_PASSWORD_LENGTH = 12;
+    public const MINIMUM_PASSWORD_LENGTH = AccountPasswordPolicy::MIN_LENGTH;
 
     /**
      * @throws RuntimeException when a production bootstrap password is unsafe
      */
     public static function resolvePassword(?string $configuredPassword, string $username, bool $production): string
     {
-        if (! $production) {
-            return self::isMissing($configuredPassword)
-                ? self::DEVELOPMENT_PASSWORD
-                : (string) $configuredPassword;
-        }
-
         if (self::isMissing($configuredPassword)) {
+            if (! $production) {
+                return self::DEVELOPMENT_PASSWORD;
+            }
+
             throw new RuntimeException(
                 'Production bootstrap refused: ADMIN_PASS is required before the initial administrator can be created.'
             );
@@ -36,11 +34,17 @@ final class BootstrapAdminCredentials
 
         $password = (string) $configuredPassword;
 
-        if (mb_strlen($password) < self::MINIMUM_PASSWORD_LENGTH) {
+        if (! AccountPasswordPolicy::hasValidLength($password)) {
             throw new RuntimeException(sprintf(
-                'Production bootstrap refused: ADMIN_PASS must contain at least %d characters.',
-                self::MINIMUM_PASSWORD_LENGTH
+                '%s bootstrap refused: ADMIN_PASS must contain between %d and %d characters.',
+                $production ? 'Production' : 'Local/test',
+                AccountPasswordPolicy::MIN_LENGTH,
+                AccountPasswordPolicy::MAX_LENGTH,
             ));
+        }
+
+        if (! $production) {
+            return $password;
         }
 
         if (self::isKnownOrPlaceholder($password) || self::isDerivedFromUsername($password, $username)) {

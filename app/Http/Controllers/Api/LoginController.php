@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AuthToken;
 use App\Models\User;
 use App\Services\LdapService;
+use App\Services\LocalPasswordHashService;
 use App\Services\OauthService;
 use App\Services\TwoFactorService;
+use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -24,6 +26,7 @@ class LoginController extends Controller
         private readonly TwoFactorService $twoFactor,
         private readonly OauthService $oauth,
         private readonly LdapService $ldap,
+        private readonly LocalPasswordHashService $passwordHashes,
     ) {}
 
     /**
@@ -62,11 +65,19 @@ class LoginController extends Controller
     public function login(Request $request): JsonResponse
     {
         $username = trim((string) $request->input('username', ''));
-        $password = (string) $request->input('password', '');
+        $passwordInput = $request->input('password', '');
+        $password = is_string($passwordInput) ? $passwordInput : '';
         $type = (string) $request->input('type', '');
 
         if ($username === '') {
             return response()->json(['error' => 'Username is required']);
+        }
+
+        // The stock email_code request intentionally omits the password. Bound only the
+        // credentials first step and retain the client's HTTP 200 error contract.
+        if ($type !== 'email_code'
+            && (! is_string($passwordInput) || mb_strlen($password) > AccountPasswordPolicy::MAX_LENGTH)) {
+            return response()->json(['error' => 'Invalid username or password']);
         }
 
         // LDAP first-factor: on a credentials submission (not the email_code second step),
@@ -154,8 +165,14 @@ class LoginController extends Controller
 
         // First-factor: verify the password. LDAP-verified logins skip the local hash check
         // (LDAP users authenticate against the directory, not the local password).
-        if (! $ldapAuthenticated && ($password === '' || ! Hash::check($password, $user->password))) {
-            return response()->json(['error' => 'Invalid username or password']);
+        if (! $ldapAuthenticated) {
+            if ($password === '' || ! Hash::check($password, $user->password)) {
+                return response()->json(['error' => 'Invalid username or password']);
+            }
+
+            if (! $this->passwordHashes->upgradeIfNeeded($user, $password)) {
+                return response()->json(['error' => 'Invalid username or password']);
+            }
         }
 
         // TOTP submitted alongside credentials (client may send tfaCode immediately).

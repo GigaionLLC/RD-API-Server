@@ -36,6 +36,10 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       APP_URL: "${APP_URL:-http://localhost:21114}"
+      HASH_VERIFY: "${HASH_VERIFY:-false}"
+      ARGON_MEMORY: "${ARGON_MEMORY:-65536}"
+      ARGON_THREADS: "${ARGON_THREADS:-1}"
+      ARGON_TIME: "${ARGON_TIME:-4}"
       # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
 

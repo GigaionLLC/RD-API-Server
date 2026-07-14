@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\LdapService;
+use App\Services\LocalPasswordHashService;
 use App\Services\OauthService;
+use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +25,7 @@ class AuthController extends Controller
     public function __construct(
         private readonly LdapService $ldap,
         private readonly OauthService $oauth,
+        private readonly LocalPasswordHashService $passwordHashes,
     ) {}
 
     public function showLogin(): View|RedirectResponse
@@ -117,7 +120,7 @@ class AuthController extends Controller
     {
         $credentials = $request->validate([
             'username' => ['required', 'string'],
-            'password' => ['required', 'string'],
+            'password' => ['required', 'string', 'max:'.AccountPasswordPolicy::MAX_LENGTH],
         ]);
 
         // Brute-force protection: 5 failed attempts per account+IP per minute, then locked out.
@@ -159,12 +162,25 @@ class AuthController extends Controller
             }
         }
 
-        if (! $authenticated && ! Auth::attempt($credentials, $request->boolean('remember'))) {
-            RateLimiter::hit($throttleKey);
+        if (! $authenticated) {
+            if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+                RateLimiter::hit($throttleKey);
 
-            return back()
-                ->withInput($request->only('username'))
-                ->withErrors(['username' => 'Invalid username or password.']);
+                return back()
+                    ->withInput($request->only('username'))
+                    ->withErrors(['username' => 'Invalid username or password.']);
+            }
+
+            /** @var User $localUser */
+            $localUser = Auth::user();
+            if (! $this->passwordHashes->upgradeIfNeeded($localUser, $credentials['password'])) {
+                Auth::logout();
+                RateLimiter::hit($throttleKey);
+
+                return back()
+                    ->withInput($request->only('username'))
+                    ->withErrors(['username' => 'Invalid username or password.']);
+            }
         }
 
         // Credentials accepted — clear the failure counter for this account+IP.

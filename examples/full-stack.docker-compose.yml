@@ -64,6 +64,10 @@ services:
       - APP_ENV=production
       - APP_DEBUG=false
       - APP_URL=https://api.your-domain.com
+      - "HASH_VERIFY=${HASH_VERIFY:-false}"
+      - "ARGON_MEMORY=${ARGON_MEMORY:-65536}"
+      - "ARGON_THREADS=${ARGON_THREADS:-1}"
+      - "ARGON_TIME=${ARGON_TIME:-4}"
       # Exact IP or CIDR of the TLS proxy from step 2; never use a wildcard:
       - TRUSTED_PROXIES=CHANGE_ME_proxy_ip_or_cidr
       # First-run admin (seeded once). There is deliberately no production password default:

@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 
 const USER = process.env.E2E_ADMIN_USER || 'admin';
-const PASS = process.env.E2E_ADMIN_PASS || 'admin123456';
+const PASS = process.env.E2E_ADMIN_PASS || 'admin12345678';
 
 async function signIn(page: Page) {
     await page.goto('/admin/login', { waitUntil: 'domcontentloaded' });

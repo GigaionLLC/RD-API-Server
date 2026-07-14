@@ -23,7 +23,7 @@ class ConsoleAuditTest extends TestCase
 
         // A write request through the admin group: create a user.
         $this->actingAs($admin)->post('/admin/users', [
-            'username' => 'newbie', 'password' => 'secret12345',
+            'username' => 'newbie', 'password' => 'secret123456',
             'status' => User::STATUS_NORMAL, 'login_verify' => User::LOGIN_VERIFY_OFF,
         ])->assertRedirect();
 

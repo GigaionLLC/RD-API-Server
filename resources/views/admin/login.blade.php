@@ -78,7 +78,7 @@
                 <div class="rd-field">
                     <label class="rd-label" for="password">Password</label>
                     <input class="rd-input" id="password" name="password" type="password"
-                           autocomplete="current-password" required
+                           autocomplete="current-password" maxlength="{{ \App\Support\AccountPasswordPolicy::MAX_LENGTH }}" required
                            @error('password') aria-invalid="true" aria-describedby="password-error" @enderror>
                     @error('password')<span class="rd-help rd-help--error" id="password-error">{{ $message }}</span>@enderror
                 </div>

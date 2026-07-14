@@ -116,8 +116,8 @@
                 <form class="rd-liveform rd-stack rd-stack--lg" data-url="{{ route('admin.users.password', $user) }}" data-method="PUT">
                     <div class="rd-field">
                         <label class="rd-label" for="password">New password</label>
-                        <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" placeholder="••••••••" aria-describedby="new-password-help">
-                        <span class="rd-help" id="new-password-help">At least 6 characters. This signs the user out everywhere and revokes their client, API, and deployment credentials. Linked LDAP and SSO accounts cannot be reset here; change access at their identity provider.</span>
+                        <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" minlength="{{ \App\Support\AccountPasswordPolicy::MIN_LENGTH }}" maxlength="{{ \App\Support\AccountPasswordPolicy::MAX_LENGTH }}" placeholder="••••••••••••" aria-describedby="new-password-help" required>
+                        <span class="rd-help" id="new-password-help">{{ \App\Support\AccountPasswordPolicy::MIN_LENGTH }} to {{ \App\Support\AccountPasswordPolicy::MAX_LENGTH }} characters. This signs the user out everywhere and revokes their client, API, and deployment credentials. Linked LDAP and SSO accounts cannot be reset here; change access at their identity provider.</span>
                     </div>
                     <div class="rd-actions">
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Reset password</button>

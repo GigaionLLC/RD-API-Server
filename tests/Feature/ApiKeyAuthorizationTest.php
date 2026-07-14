@@ -185,7 +185,7 @@ class ApiKeyAuthorizationTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$plain)
             ->postJson('/api/v1/users', [
                 'username' => 'api-root',
-                'password' => 'secret12345',
+                'password' => 'secret123456',
                 'is_admin' => true,
             ])
             ->assertUnprocessable()
@@ -235,7 +235,7 @@ class ApiKeyAuthorizationTest extends TestCase
 
         $this->actingAs($delegate)->post(route('admin.users.store'), [
             'username' => 'managed-user',
-            'password' => 'secret12345',
+            'password' => 'secret123456',
             'status' => User::STATUS_NORMAL,
             'login_verify' => User::LOGIN_VERIFY_OFF,
             'group_id' => $group->id,
@@ -267,7 +267,7 @@ class ApiKeyAuthorizationTest extends TestCase
 
         $this->actingAs($delegate)->post(route('admin.users.store'), [
             'username' => 'promoted-at-create',
-            'password' => 'secret12345',
+            'password' => 'secret123456',
             'is_admin' => true,
             'status' => User::STATUS_NORMAL,
             'login_verify' => User::LOGIN_VERIFY_OFF,
@@ -362,7 +362,7 @@ class ApiKeyAuthorizationTest extends TestCase
 
         $this->actingAs($admin)->post(route('admin.users.store'), [
             'username' => 'new-full-admin',
-            'password' => 'secret12345',
+            'password' => 'secret123456',
             'is_admin' => true,
             'status' => User::STATUS_NORMAL,
             'login_verify' => User::LOGIN_VERIFY_OFF,

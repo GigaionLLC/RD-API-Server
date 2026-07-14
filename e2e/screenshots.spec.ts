@@ -11,7 +11,7 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 const USER = process.env.E2E_ADMIN_USER || 'admin';
-const PASS = process.env.E2E_ADMIN_PASS || 'admin123456';
+const PASS = process.env.E2E_ADMIN_PASS || 'admin12345678';
 const OUT = 'docs/screenshots';
 
 async function signIn(page: Page) {

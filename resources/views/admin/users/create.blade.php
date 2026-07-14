@@ -33,9 +33,9 @@
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="password">Password</label>
-                    <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" required aria-describedby="password-help"
+                    <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" minlength="{{ \App\Support\AccountPasswordPolicy::MIN_LENGTH }}" maxlength="{{ \App\Support\AccountPasswordPolicy::MAX_LENGTH }}" required aria-describedby="password-help"
                            @error('password') aria-invalid="true" aria-errormessage="password-error" @enderror>
-                    <span class="rd-help" id="password-help">At least 6 characters.</span>
+                    <span class="rd-help" id="password-help">{{ \App\Support\AccountPasswordPolicy::MIN_LENGTH }} to {{ \App\Support\AccountPasswordPolicy::MAX_LENGTH }} characters.</span>
                     @error('password')<span class="rd-help rd-help--error" id="password-error">{{ $message }}</span>@enderror
                 </div>
                 <div class="rd-field">
