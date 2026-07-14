@@ -3,11 +3,16 @@
 #
 # Build:  docker build -f docker/Dockerfile.runtime -t rustdesk-api:latest .
 
-# ---- Stage 1: install PHP dependencies ----
-FROM php:8.5-cli-bookworm AS build
+# External build inputs are exact release tags plus multi-architecture digests. Update them
+# using the verification procedure in docker/README.md.
+FROM composer:2.10.2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760 AS composer
+FROM mlocati/php-extension-installer:2.11.12@sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138 AS php_extension_installer
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+# ---- Stage 1: install PHP dependencies ----
+FROM php:8.5.8-cli-bookworm@sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a5b0bf0105725f8987b54bee AS build
+
+COPY --from=composer /usr/bin/composer /usr/bin/composer
+COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions pdo_mysql pdo_sqlite mbstring intl gmp bcmath zip gd opcache sockets ldap
 
 WORKDIR /app
@@ -15,9 +20,9 @@ COPY . /app
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
 # ---- Stage 2: runtime ----
-FROM php:8.5-apache-bookworm AS runtime
+FROM php:8.5.8-apache-bookworm@sha256:76f447018df51801eb0587bdced331709c2d7ac4e0bb8b9cb00bd4f93dd85d1c AS runtime
 
-COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions pdo_mysql pdo_sqlite mbstring intl gmp bcmath zip gd opcache ldap \
     && a2enmod rewrite
 

@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:08] - Build security: pin Docker and toolchain inputs
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docker/Dockerfile.{toolchain,runtime}`, `docker/compose.toolchain.yml`
+- `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `docker/README.md`, `README.md`, `docs/modernization/07-rewrite-plan-php.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Pinned every third-party Docker build and Compose input to an exact release plus multi-architecture digest, replaced the privileged NodeSource download-and-shell step with Node 24.18.0 from its verified official image, matched Playwright 1.61.0 to the lockfile, documented safe pin updates, and kept the first-party `latest` release channel overrideable for operators who require a tag-and-digest deployment lock.
+
 ## [2026-07-14 09:07] - Frontend supply chain: reproducible assets and notices
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

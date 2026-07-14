@@ -23,7 +23,9 @@
 
 services:
   rustdesk-api:
-    image: ghcr.io/gigaionllc/rustdesk-api-server:latest
+    # `latest` is this project's release channel. Set RUSTDESK_API_IMAGE to a tag+digest
+    # when a deployment must stay on one verified build (see docker/README.md).
+    image: "${RUSTDESK_API_IMAGE:-ghcr.io/gigaionllc/rustdesk-api-server:latest}"
     container_name: rustdesk-api
     restart: unless-stopped
     ports:
@@ -67,7 +69,7 @@ services:
         condition: service_healthy
 
   db:
-    image: mariadb:11
+    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
     container_name: rustdesk-db
     restart: unless-stopped
     environment:

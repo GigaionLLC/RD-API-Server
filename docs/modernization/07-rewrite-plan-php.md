@@ -54,7 +54,7 @@ form‑row with inline save), and a small `app.js` (jQuery) for AJAX save + toas
 ## 3. Build / test environment (Docker)
 
 - `docker/Dockerfile.toolchain` — PHP 8.5 + ext (pdo_mysql, pdo_sqlite, intl, gmp, bcmath,
-  zip, gd, sockets, opcache) + Composer + Node 20 + Playwright(chromium) + mysql/sqlite
+  zip, gd, sockets, opcache) + Composer + Node 24 LTS + Playwright (Chromium) + mysql/sqlite
   clients. Used for composer/artisan/phpunit/pint/phpstan/eslint and E2E.
 - `docker/compose.toolchain.yml` — `app` (toolchain) + `db` (MariaDB 11) + `mail` (Mailpit, SMTP
   on 1025 / UI on 8025 to verify the mail subsystem). Kept separate from the legacy Go

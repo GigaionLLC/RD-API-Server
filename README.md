@@ -96,7 +96,7 @@ server's URL and log in.
 ```yaml
 services:
   rustdesk-api:
-    image: ghcr.io/gigaionllc/rustdesk-api-server:latest
+    image: "${RUSTDESK_API_IMAGE:-ghcr.io/gigaionllc/rustdesk-api-server:latest}"
     restart: unless-stopped
     ports: ["21114:80"]
     environment:
@@ -117,7 +117,7 @@ services:
     depends_on:
       db: { condition: service_healthy }
   db:
-    image: mariadb:11
+    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: rustdesk_api
@@ -161,6 +161,7 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 
 - **[QUICKSTART.md](QUICKSTART.md)** — deployment & configuration
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — build, test, lint, contribute
+- **[docker/README.md](docker/README.md)** — pinned container inputs and their update process
 - **[AGENT.md](AGENT.md)** — the project's source‑of‑truth guide (architecture, conventions,
   task lookup); `CLAUDE.md` points here
 - **[Wiki/](Wiki/)** — architecture knowledge base (design system, core docs)

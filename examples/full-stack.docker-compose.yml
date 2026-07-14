@@ -15,7 +15,7 @@
 services:
 
   hbbs:
-    image: rustdesk/rustdesk-server:latest
+    image: rustdesk/rustdesk-server:1.1.15@sha256:10818ec05b179039c6660f4d8e74b303f0db2858bbad2b18e24992ea22d54cd6
     container_name: rustdesk-hbbs
     command: hbbs -r relay.your-domain.com:21117 -k _
     ports:
@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
 
   hbbr:
-    image: rustdesk/rustdesk-server:latest
+    image: rustdesk/rustdesk-server:1.1.15@sha256:10818ec05b179039c6660f4d8e74b303f0db2858bbad2b18e24992ea22d54cd6
     container_name: rustdesk-hbbr
     command: hbbr -k _
     ports:
@@ -42,7 +42,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: mariadb:11
+    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
     container_name: rustdesk-db
     environment:
       MARIADB_RANDOM_ROOT_PASSWORD: "yes"
@@ -55,7 +55,8 @@ services:
     restart: unless-stopped
 
   api:
-    image: ghcr.io/gigaionllc/rustdesk-api-server:latest
+    # Keep the default release channel, or set RUSTDESK_API_IMAGE to a verified tag+digest.
+    image: "${RUSTDESK_API_IMAGE:-ghcr.io/gigaionllc/rustdesk-api-server:latest}"
     container_name: rustdesk-api
     environment:
       - TZ=UTC

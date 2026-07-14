@@ -5,10 +5,17 @@
 # Usage:
 #   docker build -f docker/Dockerfile.toolchain -t rustdesk-api-php-toolchain .
 #   docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain <cmd>
-FROM php:8.5-cli-bookworm
+#
+# Every external build image is pinned to an exact release and multi-architecture digest.
+# Keep these pins and the Playwright version in sync via docker/README.md.
+FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS node
+FROM composer:2.10.2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760 AS composer
+FROM mlocati/php-extension-installer:2.11.12@sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138 AS php_extension_installer
+FROM php:8.5.8-cli-bookworm@sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a5b0bf0105725f8987b54bee AS toolchain
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    COMPOSER_ALLOW_SUPERUSER=1
+    COMPOSER_ALLOW_SUPERUSER=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Runtime/tooling system packages (DB clients, git, unzip).
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,21 +26,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # PHP extensions via mlocati/php-extension-installer — reliably resolves the required
 # system libs and configure flags across PHP versions (avoids the manual gd/intl build
 # breakage seen with docker-php-ext-install on PHP 8.5).
-COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions \
         pdo_mysql pdo_sqlite mbstring intl gmp bcmath zip gd opcache sockets ldap
 
-# Composer (pinned major)
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Composer from the verified release image above.
+COPY --from=composer /usr/bin/composer /usr/bin/composer
 
-# Node LTS for asset tooling + Playwright
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Node LTS from its official image. Copying the runtime directly removes the remote
+# NodeSource setup script and its repository bootstrap from this privileged build.
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/ /usr/local/lib/node_modules/
+RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && ln -sf ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
-# Playwright + chromium (+ OS deps) for full-stack E2E
-RUN npm install -g playwright@latest \
-    && npx playwright install --with-deps chromium
+# Match package-lock.json exactly so the project CLI and preinstalled browser revision agree.
+RUN npm install --global --ignore-scripts --no-audit --no-fund playwright@1.61.0 \
+    && playwright install --with-deps chromium \
+    && npm cache clean --force
 
 WORKDIR /app
 CMD ["bash"]
