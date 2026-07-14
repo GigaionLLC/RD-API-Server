@@ -90,7 +90,7 @@
 @push('scripts')
 <script>
     $(function () {
-        var settings = @json($settingsMap, JSON_UNESCAPED_SLASHES);
+        var settings = {{ \Illuminate\Support\Js::from($settingsMap) }};
 
         function settingRow(key, value) {
             var $row = $(

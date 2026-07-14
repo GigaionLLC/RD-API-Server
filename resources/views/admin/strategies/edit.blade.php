@@ -271,7 +271,7 @@
 @push('scripts')
 <script>
     $(function () {
-        var customOptions = @json((object) $customOptions, JSON_UNESCAPED_SLASHES);
+        var customOptions = {{ \Illuminate\Support\Js::from((object) $customOptions) }};
 
         function optionRow(key, value) {
             var $row = $(

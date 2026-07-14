@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 08:09] - Security: prevent stored XSS in admin script data
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `resources/views/admin/settings/index.blade.php`
+- `resources/views/admin/strategies/edit.blade.php`
+- `tests/Feature/AdminInlineScriptSerializationTest.php`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Replaced unsafe custom `@json` flags with Laravel `Js::from()` in both stored-value script contexts and added hostile `</script>` regression coverage so settings or strategy values cannot terminate the enclosing script.
+
 ## [2026-07-13 22:56] - Full admin console WebUI modernization
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
