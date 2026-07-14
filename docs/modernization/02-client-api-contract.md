@@ -136,8 +136,8 @@ the client response shape.
 {
   "access_token": "...",
   "type": "access_token",
-  "tfa_type": "",            // "" | "email_check" | "totp"  ← 2FA negotiation
-  "secret": "",              // 2FA secret/material when tfa_type is set
+  "tfa_type": "",            // "" on success; challenge responses use email_check/tfa_check
+  "secret": "",              // opaque login-challenge secret when a second step is required
   "user": {
     "name": "...",
     "display_name": "...",
@@ -159,15 +159,17 @@ the client response shape.
 ```
 
 > The server populates `tfa_type`, a per-attempt `secret`, and `user.info.*` for the implemented
-> email/TOTP negotiation paths. An email challenge is not a completed AuthBody and therefore has
-> no `access_token`; its exact intermediate shape is specified below.
+> email/TOTP negotiation paths. A challenge is not a completed AuthBody and therefore has no
+> `access_token`; its exact intermediate shape is specified below.
 
 ---
 
 ## 4. Two‑factor authentication ✅ — `src/auth_2fa.rs` + login flow
 
-- **TOTP:** SHA1, 6 digits, 30s step. Client stores an encrypted `TOTPInfo {name, secret,
-  digits, created_at}`. Server signals TOTP by returning `tfa_type:"totp"` + `secret`.
+- **TOTP:** SHA1, 6 digits, 30s step. After validating the password, the server returns
+  `{type:"email_check", tfa_type:"tfa_check", secret, user}`. The stock Flutter client then
+  re-posts `type:"email_code"` with equal `verificationCode` and `tfaCode` values plus the
+  opaque `secret`; it does not repeat the password.
 - **Email verification:** after validating the password, the server returns
   `{type:"email_check", tfa_type:"email_check", secret, user}`. The stock Flutter client switches
   on `type`, uses `user.name` as the second request's username, and echoes the opaque `secret`.
@@ -180,7 +182,10 @@ the client response shape.
   the six-digit code are persisted. Five wrong codes disable that challenge under a row lock, so
   its attempt budget remains effective even when source IPs rotate. A new challenge for the same
   user/device supersedes the previous one.
-- Login request vocabulary also includes `tfaCode` for TOTP. 🔎
+- TOTP uses the same user/id/UUID binding, five-minute lifetime, row lock, five-guess budget,
+  supersession, and single-use consumption. Only the opaque challenge hash is stored; a valid
+  live TOTP without a challenge cannot skip the password first step. Custom clients that submit
+  the password and `tfaCode` together remain supported.
 - Pro detail (for parity): TOTP enrollment yields 6 single‑use backup codes; 2FA secret
   default expiry 180 days; enabling TOTP supersedes email verification.
 

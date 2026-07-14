@@ -67,6 +67,18 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   metadata. Any new IP-based security control must use the framework request IP and retain this
   trusted-proxy boundary.
 
+## Login Challenge Boundary
+
+- Email and stock-client TOTP login both require a password-proven, opaque challenge before a
+  passwordless second request can issue an access token. The challenge is bound to the exact
+  user, RustDesk id, and UUID; only its SHA-256 digest is persisted.
+- Challenges expire after five minutes, are superseded by a new attempt for the same device,
+  and are consumed once under a database row lock. Replay, cross-user, cross-device, and
+  cross-UUID submissions fail.
+- Each row has its own five-guess budget, so rotating source IPs cannot reset it. A live TOTP
+  code without the password-proven challenge is insufficient; the supported one-request path
+  still requires the local/LDAP password and TOTP together.
+
 ## Audit Ingestion Boundary
 
 - The RustDesk audit feeds are fire-and-forget and do not carry an account bearer. Current

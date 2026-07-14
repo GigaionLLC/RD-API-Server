@@ -55,9 +55,9 @@ class LoginController extends Controller
     /**
      * POST /api/login
      * First call: account + password. Negotiates 2FA per the contract:
-     *   - login_verify == 'totp'  → return {type, tfa_type:'totp', secret:<uuid>}
+     *   - login_verify == 'totp'  → return a bound email_check/tfa_check challenge
      *   - login_verify == 'email' → mail a code and return a bound email_check challenge
-     * Second call (type == 'email_code'): verify verificationCode + echoed secret, then issue.
+     * Second call (type == 'email_code'): verify the bound email/TOTP challenge, then issue.
      */
     public function login(Request $request): JsonResponse
     {
@@ -113,16 +113,35 @@ class LoginController extends Controller
 
         // --- Second-factor submission ---------------------------------------------------
         if ($type === 'email_code') {
-            $code = (string) ($request->input('verificationCode') ?? $request->input('code') ?? '');
+            $verificationCode = (string) ($request->input('verificationCode') ?? $request->input('code') ?? '');
             $secret = (string) $request->input('secret', '');
-            if ($user->login_verify !== User::LOGIN_VERIFY_EMAIL
-                || ! $this->twoFactor->verifyEmailCode(
+
+            $verified = false;
+            if ($user->login_verify === User::LOGIN_VERIFY_EMAIL) {
+                $verified = $this->twoFactor->verifyEmailCode(
                     $user,
                     $rustdeskId,
                     $uuid,
                     $secret,
-                    $code,
-                )) {
+                    $verificationCode,
+                );
+            } elseif ($user->login_verify === User::LOGIN_VERIFY_TOTP) {
+                // Stock Flutter sends both fields with the same code. Requiring that exact
+                // shape avoids ambiguous parameter handling before consuming the challenge.
+                $tfaCode = (string) $request->input('tfaCode', '');
+                $verified = $verificationCode !== ''
+                    && $tfaCode !== ''
+                    && hash_equals($verificationCode, $tfaCode)
+                    && $this->twoFactor->verifyTotpChallenge(
+                        $user,
+                        $rustdeskId,
+                        $uuid,
+                        $secret,
+                        $tfaCode,
+                    );
+            }
+
+            if (! $verified) {
                 return response()->json(['error' => 'Wrong or expired verification code']);
             }
 
@@ -140,6 +159,8 @@ class LoginController extends Controller
 
         // --- 2FA negotiation -------------------------------------------------------------
         if ($user->login_verify === User::LOGIN_VERIFY_TOTP) {
+            // Preserve the one-request custom-client path when password and TOTP arrive
+            // together. The stock Flutter client instead uses the bound second step below.
             if ($tfaCode !== '') {
                 if (! $this->twoFactor->verifyTotp($user, $tfaCode)) {
                     return response()->json(['error' => 'Wrong 2FA code']);
@@ -148,12 +169,20 @@ class LoginController extends Controller
                 return response()->json($this->authBody($user, $request));
             }
 
-            // Signal the client to prompt for a TOTP code. `secret` carries a per-attempt
-            // identifier the client echoes back (the actual TOTP secret stays server-side).
+            if ($rustdeskId === '' || $uuid === ''
+                || mb_strlen($rustdeskId) > 255 || mb_strlen($uuid) > 255) {
+                return response()->json(['error' => 'Device identity is required for two-factor verification']);
+            }
+
+            $challengeSecret = $this->twoFactor->issueTotpChallenge($user, $uuid, $rustdeskId);
+
+            // Flutter enters the verification dialog only for type=email_check and selects
+            // its TOTP variant via tfa_type=tfa_check. It echoes the opaque challenge secret.
             return response()->json([
-                'type' => 'access_token',
-                'tfa_type' => 'totp',
-                'secret' => (string) Str::uuid(),
+                'type' => 'email_check',
+                'tfa_type' => 'tfa_check',
+                'secret' => $challengeSecret,
+                'user' => $this->userPayload($user),
             ]);
         }
 

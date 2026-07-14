@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\VerifyCode;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,8 +34,14 @@ class TwoFactorService
     /** Failed guesses permitted for one issued email challenge. */
     private const EMAIL_MAX_ATTEMPTS = 5;
 
-    /** Length of the opaque challenge secret returned to the RustDesk client. */
-    private const EMAIL_CHALLENGE_LENGTH = 64;
+    /** TOTP challenge lifetime in minutes. */
+    private const TOTP_CHALLENGE_TTL_MINUTES = 5;
+
+    /** Failed guesses permitted for one issued TOTP challenge. */
+    private const TOTP_MAX_ATTEMPTS = 5;
+
+    /** Length of an opaque login-challenge secret returned to the RustDesk client. */
+    private const CHALLENGE_LENGTH = 64;
 
     /**
      * Verify a 6-digit TOTP code against the user's stored Base32 secret.
@@ -214,6 +221,117 @@ class TwoFactorService
     }
 
     /**
+     * Issue an opaque, device-bound challenge after the caller has verified the first factor.
+     * The TOTP itself is never persisted; the row proves that this login attempt already passed
+     * its password or LDAP check before the stock client submits a code without a password.
+     */
+    public function issueTotpChallenge(User $user, string $uuid, string $rustdeskId): string
+    {
+        if ($uuid === '' || $rustdeskId === ''
+            || mb_strlen($uuid) > 255 || mb_strlen($rustdeskId) > 255) {
+            throw new InvalidArgumentException('A bounded RustDesk id and UUID are required.');
+        }
+
+        $secret = Str::random(self::CHALLENGE_LENGTH);
+
+        DB::transaction(function () use ($user, $uuid, $rustdeskId, $secret): void {
+            VerifyCode::where('user_id', $user->id)
+                ->where('type', VerifyCode::TYPE_TOTP)
+                ->where('uuid', $uuid)
+                ->where('rustdesk_id', $rustdeskId)
+                ->where('status', VerifyCode::STATUS_ACTIVE)
+                ->update(['status' => VerifyCode::STATUS_INACTIVE]);
+
+            VerifyCode::create([
+                'user_id' => $user->id,
+                'type' => VerifyCode::TYPE_TOTP,
+                'uuid' => $uuid,
+                'challenge_hash' => hash('sha256', $secret),
+                'code' => null,
+                'failed_attempts' => 0,
+                'max_attempts' => self::TOTP_MAX_ATTEMPTS,
+                'rustdesk_id' => $rustdeskId,
+                'status' => VerifyCode::STATUS_ACTIVE,
+                'expires_at' => now()->addMinutes(self::TOTP_CHALLENGE_TTL_MINUTES),
+            ]);
+        });
+
+        return $secret;
+    }
+
+    /**
+     * Verify and consume a bound TOTP challenge under a row lock.
+     */
+    public function verifyTotpChallenge(
+        User $user,
+        string $rustdeskId,
+        string $uuid,
+        string $secret,
+        string $code,
+    ): bool {
+        if ($rustdeskId === '' || $uuid === ''
+            || mb_strlen($rustdeskId) > 255 || mb_strlen($uuid) > 255
+            || preg_match('/\A[A-Za-z0-9]{'.self::CHALLENGE_LENGTH.'}\z/', $secret) !== 1) {
+            return false;
+        }
+
+        $code = trim($code);
+        $challengeHash = hash('sha256', $secret);
+
+        return DB::transaction(function () use ($user, $rustdeskId, $uuid, $challengeHash, $code): bool {
+            $record = VerifyCode::query()
+                ->where('user_id', $user->id)
+                ->where('type', VerifyCode::TYPE_TOTP)
+                ->where('uuid', $uuid)
+                ->where('rustdesk_id', $rustdeskId)
+                ->where('challenge_hash', $challengeHash)
+                ->where('status', VerifyCode::STATUS_ACTIVE)
+                ->lockForUpdate()
+                ->first();
+
+            if ($record === null) {
+                return false;
+            }
+
+            $expiresAt = $record->getAttribute('expires_at');
+            if (! $expiresAt instanceof CarbonInterface || $expiresAt->isPast()) {
+                $record->forceFill(['status' => VerifyCode::STATUS_INACTIVE])->save();
+
+                return false;
+            }
+
+            $maxAttempts = max(1, (int) $record->max_attempts);
+            if ((int) $record->failed_attempts >= $maxAttempts) {
+                $record->forceFill(['status' => VerifyCode::STATUS_INACTIVE])->save();
+
+                return false;
+            }
+
+            $valid = preg_match('/\A\d{6}\z/', $code) === 1
+                && $this->verifyTotp($user, $code);
+
+            if (! $valid) {
+                $failedAttempts = (int) $record->failed_attempts + 1;
+                $record->forceFill([
+                    'failed_attempts' => $failedAttempts,
+                    'status' => $failedAttempts >= $maxAttempts
+                        ? VerifyCode::STATUS_INACTIVE
+                        : VerifyCode::STATUS_ACTIVE,
+                ])->save();
+
+                return false;
+            }
+
+            $record->forceFill([
+                'status' => VerifyCode::STATUS_INACTIVE,
+                'consumed_at' => now(),
+            ])->save();
+
+            return true;
+        });
+    }
+
+    /**
      * Generate an email code plus an opaque per-login challenge for the stock client to echo.
      * Only hashes are persisted; the caller receives the plaintext values long enough to return
      * the challenge and mail the code.
@@ -228,7 +346,7 @@ class TwoFactorService
         }
 
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $secret = Str::random(self::EMAIL_CHALLENGE_LENGTH);
+        $secret = Str::random(self::CHALLENGE_LENGTH);
         $codeHash = Hash::make($code);
 
         DB::transaction(function () use ($user, $uuid, $rustdeskId, $codeHash, $secret): void {
@@ -270,7 +388,7 @@ class TwoFactorService
     ): bool {
         if ($rustdeskId === '' || $uuid === ''
             || mb_strlen($rustdeskId) > 255 || mb_strlen($uuid) > 255
-            || preg_match('/\A[A-Za-z0-9]{'.self::EMAIL_CHALLENGE_LENGTH.'}\z/', $secret) !== 1) {
+            || preg_match('/\A[A-Za-z0-9]{'.self::CHALLENGE_LENGTH.'}\z/', $secret) !== 1) {
             return false;
         }
 

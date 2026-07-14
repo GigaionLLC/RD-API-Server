@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 10:12] - Security: bind stock-client TOTP challenges
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Api/LoginController.php`, `app/Services/TwoFactorService.php`
+- `tests/Feature/TotpLoginChallengeSecurityTest.php`
+- `Wiki/core/15-security.md`
+- `docs/modernization/{02-client-api-contract,11-client-feature-opportunities,16-response-contract}.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Reuses the hashed `verify_codes` challenge fields. The stock TOTP first response is now `type:email_check`, `tfa_type:tfa_check` with an opaque secret and user payload; the passwordless second request requires the exact bound challenge and matching `verificationCode`/`tfaCode`.
+**Summary:** Restored the current Flutter TOTP handshake while preserving password-plus-TOTP custom clients. Bound the second step to the user, RustDesk ID, UUID, first-factor proof, five-minute lifetime, five row-local guesses, supersession, row-locked consumption, and replay rejection. Forty-six related authentication tests / 310 assertions, Pint, targeted PHPStan, and diff checks passed.
+
 ## [2026-07-14 10:08] - Security: harden recording uploads
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

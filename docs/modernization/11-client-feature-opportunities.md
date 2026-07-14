@@ -189,8 +189,11 @@ defined client-side:
 - `hbbs.dart:133-178` — `LoginRequest` carries `verificationCode`, `tfaCode`, `secret`, `type`.
 - `account.rs:99-108` — `AuthBody { access_token, type, tfa_type, secret, user }`.
 
-Flow: `/api/login` returns `tfa_type:"tfa_check"` + `secret` → client prompts for TOTP → re-POSTs with
-`type:"tfa_code"`, `tfaCode`, `secret` → server verifies → returns `access_token`. The server stores the
+Stock Flutter flow: `/api/login` returns `{type:"email_check", tfa_type:"tfa_check", secret, user}` →
+the client prompts for TOTP → re-POSTs `type:"email_code"` with matching `verificationCode` and
+`tfaCode`, the opaque `secret`, username, id, and UUID, but no password → the server consumes the
+password-proven challenge and returns `access_token`. The challenge is stored only as a hash, bound to
+the user/device, expires in five minutes, and has a row-local five-guess budget. The server stores the
 per-user TOTP secret (and, for parity with Pro, 6 single-use backup codes + a configurable secret expiry,
 e.g. 180 days).
 
@@ -205,7 +208,7 @@ implements, but it reveals two reusable building blocks the admin server can off
   shape. (Stored as `{ token (encrypted), chat_id }`.)
 
 **Server implements:** per-user TOTP enrollment + verify, optional Telegram/email code delivery, backup
-codes, and the `tfa_type`/`secret`/`tfaCode` round-trip in `/api/login`.
+codes, and the stock `type`/`tfa_type`/`secret`/`verificationCode`/`tfaCode` round-trip in `/api/login`.
 
 ---
 
