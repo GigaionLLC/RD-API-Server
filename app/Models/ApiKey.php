@@ -43,6 +43,25 @@ class ApiKey extends Model
     ];
 
     /**
+     * Console permission required to issue and continue using each API scope. Scoped keys
+     * are delegated authority, so they must never outlive or exceed their owner's current
+     * console permissions.
+     *
+     * @var array<string, string>
+     */
+    public const SCOPE_PERMISSIONS = [
+        'devices.read' => 'devices.view',
+        'devices.write' => 'devices.edit',
+        'users.read' => 'users.view',
+        'users.write' => 'users.edit',
+        'strategies.read' => 'strategies.view',
+        'strategies.write' => 'strategies.edit',
+        'address_book.read' => 'address_books.view',
+        'address_book.write' => 'address_books.edit',
+        'audit.read' => 'audit.view',
+    ];
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -70,6 +89,24 @@ class ApiKey extends Model
         $scopes = $this->scopes ?? [];
 
         return in_array('*', $scopes, true) || in_array($scope, $scopes, true);
+    }
+
+    /**
+     * Scope choices the given owner is currently allowed to delegate to a key.
+     *
+     * @return array<string, string>
+     */
+    public static function scopesAllowedFor(User $user): array
+    {
+        if ($user->is_admin) {
+            return self::SCOPES;
+        }
+
+        return array_filter(
+            self::SCOPES,
+            static fn (string $label, string $scope): bool => $user->hasPermission(self::SCOPE_PERMISSIONS[$scope]),
+            ARRAY_FILTER_USE_BOTH,
+        );
     }
 
     public function isExpired(): bool

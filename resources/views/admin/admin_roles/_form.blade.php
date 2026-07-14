@@ -7,6 +7,7 @@
     <div class="rd-field">
         <label class="rd-label" for="name">Name</label>
         <input class="rd-input" id="name" name="name" value="{{ old('name', $role->name) }}" required
+               @disabled(! $canEdit)
                @error('name') aria-invalid="true" aria-describedby="name-error" @enderror>
         @error('name')<span class="rd-help rd-help--error" id="name-error">{{ $message }}</span>@enderror
     </div>
@@ -14,6 +15,7 @@
     <div class="rd-field">
         <label class="rd-label" for="type">Type</label>
         <select class="rd-select" id="type" name="type" data-role-type aria-describedby="type-help"
+                @disabled(! $canEdit)
                 @error('type') aria-invalid="true" aria-errormessage="type-error" @enderror>
             <option value="{{ \App\Models\AdminRole::TYPE_GLOBAL }}" @selected(old('type', $role->type) === \App\Models\AdminRole::TYPE_GLOBAL)>Global (full access)</option>
             <option value="{{ \App\Models\AdminRole::TYPE_INDIVIDUAL }}" @selected(old('type', $role->type) === \App\Models\AdminRole::TYPE_INDIVIDUAL)>Individual (own devices &amp; logs)</option>
@@ -27,6 +29,7 @@
 <div class="rd-field" data-role-scope @unless(old('type', $role->type) === \App\Models\AdminRole::TYPE_GROUP) hidden @endunless>
     <label class="rd-label" for="scope">Scoped user groups</label>
     <select class="rd-select" id="scope" name="scope[]" multiple size="6" aria-describedby="scope-help"
+            @disabled(! $canEdit)
             @error('scope') aria-invalid="true" aria-errormessage="scope-error" @enderror>
         @foreach ($groups as $g)
             <option value="{{ $g->id }}" @selected(in_array((int) $g->id, $selectedScope, true))>{{ $g->name }}</option>
@@ -46,7 +49,7 @@
                     <h3 class="rd-card__title" id="permission-area-{{ $loop->index }}">{{ $area }}</h3>
                     @foreach ($perms as $perm)
                         <label class="rd-check">
-                            <input type="checkbox" name="perms[]" value="{{ $perm }}" @checked(in_array($perm, $selectedPerms, true))>
+                            <input type="checkbox" name="perms[]" value="{{ $perm }}" @checked(in_array($perm, $selectedPerms, true)) @disabled(! $canEdit)>
                             <span>{{ \Illuminate\Support\Str::headline(\Illuminate\Support\Str::afterLast($perm, '.')) }}</span>
                         </label>
                     @endforeach

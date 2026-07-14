@@ -43,6 +43,18 @@ class ApiKeyAuth
             return response()->json(['error' => "This API key lacks the required scope: {$scope}"], 403);
         }
 
+        // A delegated key is never a durable bypass around console authorization. Its owner
+        // must still be allowed to manage API keys and the resource represented by this
+        // scope. Full administrators retain unrestricted backward-compatible access.
+        $requiredPermission = $scope === null ? null : (ApiKey::SCOPE_PERMISSIONS[$scope] ?? null);
+        if (! $user->is_admin && (
+            ! $user->hasPermission('api_keys.edit')
+            || $requiredPermission === null
+            || ! $user->hasPermission($requiredPermission)
+        )) {
+            return response()->json(['error' => 'The API key owner is no longer authorized for this operation'], 403);
+        }
+
         $key->forceFill(['last_used_at' => now(), 'last_used_ip' => $request->ip()])->saveQuietly();
 
         $request->setUserResolver(fn () => $user);

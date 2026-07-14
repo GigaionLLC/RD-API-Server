@@ -6,10 +6,10 @@
         <div class="rd-page-header__copy">
             <div class="rd-page-header__eyebrow">People &amp; Access / Users</div>
             <h1 class="rd-page-header__title">Create user</h1>
-            <p class="rd-page-header__description">Add an account, assign its access level, and choose its sign-in policy.</p>
+            <p class="rd-page-header__description">Add an account, assign its group, and choose its sign-in policy.</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.users.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.users.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -57,6 +57,7 @@
                         @endforeach
                     </select>
                 </div>
+                @if ($canManageAdminAccess)
                 <div class="rd-field">
                     <label class="rd-label" for="is_admin">Role</label>
                     <select class="rd-select" id="is_admin" name="is_admin">
@@ -64,6 +65,7 @@
                         <option value="1" @selected(old('is_admin'))>Administrator</option>
                     </select>
                 </div>
+                @endif
                 <div class="rd-field">
                     <label class="rd-label" for="status">Status</label>
                     <select class="rd-select" id="status" name="status">
@@ -86,7 +88,7 @@
                 </div>
                 </div>
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Create user</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Create user</button>
                 </div>
             </form>
         </div>

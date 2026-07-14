@@ -181,10 +181,10 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::delete('/admin/webhooks/{webhook}', [WebhookController::class, 'destroy'])->middleware('permission:webhooks.edit')->name('admin.webhooks.destroy');
 
     // Scoped API keys for the admin REST API (/api/v1).
-    Route::get('/admin/api-keys', [ApiKeyController::class, 'index'])->name('admin.api-keys.index');
-    Route::post('/admin/api-keys', [ApiKeyController::class, 'store'])->name('admin.api-keys.store');
-    Route::post('/admin/api-keys/{apiKey}/rotate', [ApiKeyController::class, 'rotate'])->name('admin.api-keys.rotate');
-    Route::delete('/admin/api-keys/{apiKey}', [ApiKeyController::class, 'destroy'])->name('admin.api-keys.destroy');
+    Route::get('/admin/api-keys', [ApiKeyController::class, 'index'])->middleware('permission:api_keys.view')->name('admin.api-keys.index');
+    Route::post('/admin/api-keys', [ApiKeyController::class, 'store'])->middleware('permission:api_keys.edit')->name('admin.api-keys.store');
+    Route::post('/admin/api-keys/{apiKey}/rotate', [ApiKeyController::class, 'rotate'])->middleware('permission:api_keys.edit')->name('admin.api-keys.rotate');
+    Route::delete('/admin/api-keys/{apiKey}', [ApiKeyController::class, 'destroy'])->middleware('permission:api_keys.edit')->name('admin.api-keys.destroy');
     Route::get('/admin/devices/pending', [DeployTokenController::class, 'pending'])->middleware('permission:deploy.view')->name('admin.devices.pending');
     Route::put('/admin/devices/{device}/approve', [DeployTokenController::class, 'approve'])->middleware('permission:deploy.edit')->name('admin.devices.approve');
     Route::delete('/admin/devices/{device}/reject', [DeployTokenController::class, 'reject'])->middleware('permission:deploy.edit')->name('admin.devices.reject');

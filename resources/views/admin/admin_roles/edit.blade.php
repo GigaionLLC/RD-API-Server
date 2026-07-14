@@ -11,10 +11,10 @@
         <div class="rd-page-header__copy">
             <div class="rd-page-header__eyebrow">People &amp; Access / Admin Roles</div>
             <h1 class="rd-page-header__title">{{ $role->name }}</h1>
-            <p class="rd-page-header__description">Adjust this role's scope and delegated console permissions.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? "Adjust this role's scope and delegated console permissions." : 'Review this role. Only a full administrator may change administrative authority.' }}</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.roles.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.roles.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -31,9 +31,11 @@
                 @csrf
                 @method('PUT')
                 @include('admin.admin_roles._form')
+                @if ($canEdit)
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Save</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Save</button>
                 </div>
+                @endif
             </form>
         </div>
     </div>

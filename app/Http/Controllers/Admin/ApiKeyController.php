@@ -15,19 +15,29 @@ use Illuminate\View\View;
  */
 class ApiKeyController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $keys = ApiKey::with('user:id,username')->orderByDesc('id')->get();
+        $user = $request->user();
+        $keys = ApiKey::query()
+            ->with('user:id,username')
+            ->when(! $user->is_admin, fn ($query) => $query->where('user_id', $user->id))
+            ->orderByDesc('id')
+            ->get();
 
-        return view('admin.api_keys.index', ['keys' => $keys, 'scopeList' => ApiKey::SCOPES]);
+        return view('admin.api_keys.index', [
+            'keys' => $keys,
+            'scopeList' => ApiKey::scopesAllowedFor($user),
+            'canEdit' => $user->hasPermission('api_keys.edit'),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $allowedScopes = array_keys(ApiKey::scopesAllowedFor($request->user()));
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'scopes' => ['required', 'array', 'min:1'],
-            'scopes.*' => [Rule::in(array_keys(ApiKey::SCOPES))],
+            'scopes.*' => [Rule::in($allowedScopes)],
             'allowed_ips' => ['nullable', 'string', 'max:1000'],
             'expires_at' => ['nullable', 'date', 'after:now'],
         ]);
@@ -53,8 +63,10 @@ class ApiKeyController extends Controller
      * Rotate a key's secret in place (same name/scopes/IP rules). The old secret stops working
      * immediately; the new one is shown once.
      */
-    public function rotate(ApiKey $apiKey): RedirectResponse
+    public function rotate(Request $request, ApiKey $apiKey): RedirectResponse
     {
+        $this->authorizeKeyManagement($request, $apiKey);
+
         [$plain, $prefix, $hash] = ApiKey::generateSecret();
 
         $apiKey->forceFill([
@@ -79,10 +91,25 @@ class ApiKeyController extends Controller
         return $ips === [] ? null : implode(',', $ips);
     }
 
-    public function destroy(ApiKey $apiKey): RedirectResponse
+    public function destroy(Request $request, ApiKey $apiKey): RedirectResponse
     {
+        $this->authorizeKeyManagement($request, $apiKey);
+
         $apiKey->delete();
 
         return back()->with('status', 'API key revoked.');
+    }
+
+    /**
+     * Full administrators may manage every key. Delegated API-key managers may only rotate
+     * or revoke keys they own, preventing route-model binding from becoming an IDOR.
+     */
+    private function authorizeKeyManagement(Request $request, ApiKey $apiKey): void
+    {
+        $user = $request->user();
+
+        if (! $user->is_admin && (int) $apiKey->user_id !== (int) $user->id) {
+            abort(403, 'You may only manage API keys that you own.');
+        }
     }
 }

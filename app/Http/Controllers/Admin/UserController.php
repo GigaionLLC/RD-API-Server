@@ -44,6 +44,7 @@ class UserController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $users = User::query()
+            ->withExists('adminRoles')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where('username', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
@@ -55,7 +56,10 @@ class UserController extends Controller
 
         $groups = Group::orderBy('name')->get(['id', 'name']);
 
-        return view('admin.users.index', compact('users', 'q', 'groups'));
+        $canEdit = $request->user()->hasPermission('users.edit');
+        $canManageAdminAccess = (bool) $request->user()->is_admin;
+
+        return view('admin.users.index', compact('users', 'q', 'groups', 'canEdit', 'canManageAdminAccess'));
     }
 
     /**
@@ -72,6 +76,13 @@ class UserController extends Controller
         ]);
 
         $ids = array_map('intval', $data['ids']);
+        if (! $request->user()->is_admin && User::query()
+            ->whereIn('id', $ids)
+            ->where(fn ($query) => $query->where('is_admin', true)->orWhereHas('adminRoles'))
+            ->exists()) {
+            abort(403, 'Only a full administrator may bulk-update privileged accounts.');
+        }
+
         $self = (int) $request->user()->id;
         $protect = static fn (array $list): array => array_values(array_filter($list, fn (int $id): bool => $id !== $self));
 
@@ -101,22 +112,24 @@ class UserController extends Controller
         return back()->with('status', $msg);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $user = new User(['status' => User::STATUS_NORMAL, 'login_verify' => User::LOGIN_VERIFY_OFF]);
         $groups = Group::orderBy('name')->get(['id', 'name']);
+        $canManageAdminAccess = (bool) $request->user()->is_admin;
 
-        return view('admin.users.create', compact('user', 'groups'));
+        return view('admin.users.create', compact('user', 'groups', 'canManageAdminAccess'));
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $canManageAdminAccess = (bool) $request->user()->is_admin;
         $data = $request->validate([
             'username' => ['required', 'string', 'max:255', 'unique:users,username'],
             'email' => ['nullable', 'email', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:6'],
-            'is_admin' => ['nullable', 'boolean'],
+            'is_admin' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'boolean'],
             'status' => ['required', 'integer', Rule::in([User::STATUS_NORMAL, User::STATUS_DISABLED, User::STATUS_UNVERIFIED])],
             'force_sso' => ['nullable', 'boolean'],
             'login_verify' => ['required', Rule::in([User::LOGIN_VERIFY_OFF, User::LOGIN_VERIFY_EMAIL, User::LOGIN_VERIFY_TOTP])],
@@ -124,7 +137,7 @@ class UserController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $data['is_admin'] = (bool) ($data['is_admin'] ?? false);
+        $data['is_admin'] = $canManageAdminAccess && (bool) ($data['is_admin'] ?? false);
         $data['force_sso'] = (bool) ($data['force_sso'] ?? false);
 
         User::create($data);
@@ -134,40 +147,61 @@ class UserController extends Controller
             ->with('status', 'User created.');
     }
 
-    public function edit(User $user): View
+    public function edit(Request $request, User $user): View
     {
-        $groups = Group::orderBy('name')->get(['id', 'name']);
-        $adminRoles = AdminRole::orderBy('name')->get(['id', 'name']);
-        $assignedRoleIds = $user->adminRoles()->pluck('admin_roles.id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
+        $this->authorizePrivilegedAccountManagement($request, $user);
 
-        return view('admin.users.edit', compact('user', 'groups', 'adminRoles', 'assignedRoleIds'));
+        $groups = Group::orderBy('name')->get(['id', 'name']);
+        $canEdit = $request->user()->hasPermission('users.edit');
+        $canManageAdminAccess = (bool) $request->user()->is_admin;
+        $adminRoles = $canManageAdminAccess
+            ? AdminRole::orderBy('name')->get(['id', 'name'])
+            : collect();
+        $assignedRoleIds = $canManageAdminAccess
+            ? $user->adminRoles()->pluck('admin_roles.id')->map(static fn ($id): int => (int) $id)->all()
+            : [];
+
+        return view('admin.users.edit', compact(
+            'user',
+            'groups',
+            'adminRoles',
+            'assignedRoleIds',
+            'canEdit',
+            'canManageAdminAccess',
+        ));
     }
 
     public function update(Request $request, User $user): JsonResponse
     {
+        $this->authorizePrivilegedAccountManagement($request, $user);
+        $canManageAdminAccess = (bool) $request->user()->is_admin;
+
         $data = $request->validate([
             'email' => ['nullable', 'email', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
-            'is_admin' => ['nullable', 'boolean'],
+            'is_admin' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'boolean'],
             'status' => ['required', 'integer', Rule::in([User::STATUS_NORMAL, User::STATUS_DISABLED, User::STATUS_UNVERIFIED])],
             'force_sso' => ['nullable', 'boolean'],
             'login_verify' => ['required', Rule::in([User::LOGIN_VERIFY_OFF, User::LOGIN_VERIFY_EMAIL, User::LOGIN_VERIFY_TOTP])],
             'group_id' => ['nullable', 'integer', 'exists:groups,id'],
             'note' => ['nullable', 'string', 'max:255'],
-            'admin_role_ids' => ['nullable', 'string'],
+            'admin_role_ids' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'string'],
         ]);
 
-        $data['is_admin'] = (bool) ($data['is_admin'] ?? false);
         $data['force_sso'] = (bool) ($data['force_sso'] ?? false);
         $data['group_id'] = $data['group_id'] ?? null;
-
-        $roleIds = $this->parseRoleIds($request->input('admin_role_ids'));
         unset($data['admin_role_ids']);
 
+        if ($canManageAdminAccess) {
+            $data['is_admin'] = (bool) ($data['is_admin'] ?? false);
+        } else {
+            unset($data['is_admin']);
+        }
+
         $user->fill($data)->save();
-        $user->adminRoles()->sync($roleIds);
+        if ($canManageAdminAccess) {
+            $user->adminRoles()->sync($this->parseRoleIds($request->input('admin_role_ids')));
+        }
 
         return response()->json([]);
     }
@@ -195,6 +229,8 @@ class UserController extends Controller
 
     public function resetPassword(Request $request, User $user): JsonResponse
     {
+        $this->authorizePrivilegedAccountManagement($request, $user);
+
         $data = $request->validate([
             'password' => ['required', 'string', 'min:6'],
         ]);
@@ -206,6 +242,8 @@ class UserController extends Controller
 
     public function destroy(Request $request, User $user): RedirectResponse
     {
+        $this->authorizePrivilegedAccountManagement($request, $user);
+
         if ($user->id === $request->user()->id) {
             return redirect()
                 ->route('admin.users.index')
@@ -217,5 +255,18 @@ class UserController extends Controller
         return redirect()
             ->route('admin.users.index')
             ->with('status', 'User deleted.');
+    }
+
+    /**
+     * There is no delegated-role hierarchy that can safely compare two administrators.
+     * Until one exists, only a full administrator may modify another account that has
+     * full or delegated console authority. Delegated user managers may still manage every
+     * ordinary account.
+     */
+    private function authorizePrivilegedAccountManagement(Request $request, User $user): void
+    {
+        if (! $request->user()->is_admin && ($user->is_admin || $user->adminRoles()->exists())) {
+            abort(403, 'Only a full administrator may manage privileged accounts.');
+        }
     }
 }

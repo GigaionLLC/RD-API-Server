@@ -6,6 +6,7 @@
     $canDevices = $u?->hasPermission('devices.view');
     $canDeviceGroups = $u?->hasPermission('device_groups.view');
     $canDeploy = $u?->hasPermission('deploy.view');
+    $canApiKeys = $u?->hasPermission('api_keys.view');
     $canUsers = $u?->hasPermission('users.view');
     $canGroups = $u?->hasPermission('groups.view');
     $canAddressBooks = $u?->hasPermission('address_books.view');
@@ -218,14 +219,14 @@
             </section>
         @endif
 
-        @if ($canDeploy || $canOauth || $canLdap || $canWebhooks)
+        @if ($canApiKeys || $canDeploy || $canOauth || $canLdap || $canWebhooks)
             <section class="rd-nav__group">
                 <button class="rd-nav__group-toggle" type="button" aria-expanded="true"
                         aria-controls="nav-integrations-items">
                     <span>Integrations</span><i class="ri-arrow-down-s-line" aria-hidden="true"></i>
                 </button>
                 <div class="rd-nav__group-items" id="nav-integrations-items">
-                    @if ($canDeploy)
+                    @if ($canApiKeys)
                         <a href="/admin/api-keys"
                            class="rd-nav__item {{ str_starts_with($nav, 'admin/api-keys') ? 'active' : '' }}"
                            @if (str_starts_with($nav, 'admin/api-keys')) aria-current="page" @endif>

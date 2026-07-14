@@ -57,7 +57,11 @@ class AdminRole extends Model
         'OAuth' => ['oauth.view', 'oauth.edit'],
         'LDAP' => ['ldap.view'],
         'Settings' => ['settings.view', 'settings.edit'],
-        'Admin Roles' => ['roles.view', 'roles.edit'],
+        'API Keys' => ['api_keys.view', 'api_keys.edit'],
+        // Role mutation is intentionally full-admin-only until the application has a
+        // formal role hierarchy. Delegated administrators may inspect roles but cannot
+        // rewrite a role assigned to themselves into a more privileged one.
+        'Admin Roles' => ['roles.view'],
     ];
 
     /**

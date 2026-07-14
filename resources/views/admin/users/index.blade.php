@@ -18,9 +18,11 @@
             <h1 class="rd-page-header__title">Users</h1>
             <p class="rd-page-header__description">Manage identities, administrative access, account state, and group membership.</p>
         </div>
+        @if ($canEdit)
         <div class="rd-page-header__actions">
             <a href="{{ route('admin.users.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New user</a>
         </div>
+        @endif
     </header>
 
     <div class="rd-card rd-card--flush">
@@ -36,6 +38,7 @@
         </div>
 
         {{-- Bulk-action bar (shown when ≥1 user is selected) --}}
+        @if ($canEdit)
         <form method="POST" id="bulkForm" action="{{ route('admin.users.bulk') }}" class="rd-bulkbar rd-actions--wrap">
             @csrf
             <span id="bulkCount" class="rd-bulkbar__count" aria-live="polite"></span>
@@ -57,12 +60,13 @@
             </div>
             <span id="bulkIds"></span>
         </form>
+        @endif
 
         <div class="rd-table-wrap" role="region" aria-label="Users" tabindex="0">
             <table class="rd-table">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" id="checkAll" title="Select all on this page" aria-label="Select all users on this page"></th>
+                        <th>@if ($canEdit)<input type="checkbox" id="checkAll" title="Select all on this page" aria-label="Select all manageable users on this page">@endif</th>
                         <th>Username</th>
                         <th>Email</th>
                         <th>Display name</th>
@@ -75,15 +79,26 @@
                 @forelse ($users as $user)
                     @php
                         $s = $statusLabels[$user->status] ?? ['Unknown', 'muted'];
+                        $isPrivileged = $user->is_admin || $user->admin_roles_exists;
+                        $canManageTarget = $canEdit && ($canManageAdminAccess || ! $isPrivileged);
+                        $canViewTarget = $canManageAdminAccess || ! $isPrivileged;
                     @endphp
                     <tr>
-                        <td><input type="checkbox" class="usr-check" value="{{ $user->id }}" aria-label="Select {{ $user->username }}"></td>
+                        <td>
+                            @if ($canManageTarget)
+                                <input type="checkbox" class="usr-check" value="{{ $user->id }}" aria-label="Select {{ $user->username }}">
+                            @else
+                                <span class="rd-muted" aria-hidden="true">&mdash;</span>
+                            @endif
+                        </td>
                         <td><span class="rd-table__primary">{{ $user->username }}</span></td>
                         <td class="rd-muted">{{ $user->email ?: '—' }}</td>
                         <td class="rd-muted">{{ $user->display_name ?: '—' }}</td>
                         <td>
                             @if ($user->is_admin)
                                 <span class="rd-badge rd-badge--online"><span class="dot"></span>Admin</span>
+                            @elseif ($user->admin_roles_exists)
+                                <span class="rd-badge rd-badge--info">Delegated admin</span>
                             @else
                                 <span class="rd-badge rd-badge--muted">User</span>
                             @endif
@@ -91,12 +106,16 @@
                         <td><span class="rd-badge rd-badge--{{ $s[1] }}"><span class="dot"></span>{{ $s[0] }}</span></td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
-                                <a href="{{ route('admin.users.edit', $user) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
+                                @if ($canViewTarget)
+                                <a href="{{ route('admin.users.edit', $user) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canManageTarget ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canManageTarget ? 'Edit' : 'View' }}</a>
+                                @endif
+                                @if ($canManageTarget)
                                 <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete user '{{ $user->username }}'? This cannot be undone." aria-label="Delete {{ $user->username }}" title="Delete user"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -110,6 +129,7 @@
     </div>
 @endsection
 
+@if ($canEdit)
 @push('scripts')
 <script>
     $(function () {
@@ -117,17 +137,19 @@
             return $('.usr-check:checked').map(function () { return this.value; }).get();
         }
         function refreshBulk() {
+            var $all = $('.usr-check');
             var n = selectedIds().length;
             $('#bulkCount').text(n + ' selected');
             $('#bulkForm').toggleClass('is-visible', n > 0);
+            $('#checkAll')
+                .prop('checked', $all.length > 0 && n === $all.length)
+                .prop('indeterminate', n > 0 && n < $all.length);
         }
         $('#checkAll').on('change', function () {
             $('.usr-check').prop('checked', this.checked);
             refreshBulk();
         });
         $(document).on('change', '.usr-check', function () {
-            var all = $('.usr-check'), checked = $('.usr-check:checked');
-            $('#checkAll').prop('checked', all.length > 0 && checked.length === all.length);
             refreshBulk();
         });
         $('#bulkClear').on('click', function () {
@@ -165,3 +187,4 @@
     });
 </script>
 @endpush
+@endif

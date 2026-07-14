@@ -118,5 +118,12 @@ experience.
   is keyed by the controlled device, with no knowledge of who is connecting). **Recommendation:**
   don't build a separate Control‑Role transport; instead ship a thin "Control Role" *preset* UX
   on top of Strategy (a strategy whose editor is scoped to the 12 perm keys) if/when desired.
-- **Layer 3 (Admin Role) — pending.** Still the clean, valuable, OSS‑implementable item (console
-  authz delegation); a larger refactor replacing the `is_admin` boolean with policies.
+- **Layer 3 (Admin Role) — DONE and hardened.** Full administrators retain unconditional
+  access through `is_admin`; delegated administrators receive explicit view/edit permissions.
+  API-key management has its own `api_keys.view` / `api_keys.edit` permissions, delegated key
+  managers can only manage their own keys, and a key cannot exceed or outlive its owner's
+  current resource permissions. Because no safe role hierarchy exists yet, only a full
+  administrator may create or mutate admin roles, assign roles, promote accounts, or modify
+  other privileged accounts. Delegated `roles.view` remains read-only. The `/api/v1` user
+  write surface manages ordinary accounts only and cannot set `is_admin` or take over a full
+  or delegated administrator.

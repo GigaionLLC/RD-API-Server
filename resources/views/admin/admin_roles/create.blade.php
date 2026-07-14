@@ -14,7 +14,7 @@
             <p class="rd-page-header__description">Define a clear scope and the console actions delegated administrators can use.</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.roles.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.roles.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -31,7 +31,7 @@
                 @csrf
                 @include('admin.admin_roles._form')
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Create role</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Create role</button>
                 </div>
             </form>
         </div>

@@ -3,6 +3,22 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 08:28] - Security: close delegated administrator escalation paths
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Admin/{AdminRole,ApiKey,User}Controller.php`
+- `app/Http/Controllers/Api/V1/UserController.php`
+- `app/Http/Middleware/ApiKeyAuth.php`
+- `app/Models/{AdminRole,ApiKey}.php`
+- `resources/views/admin/{admin_roles,api_keys,users}/` and `resources/views/admin/partials/sidebar.blade.php`
+- `routes/web.php`
+- `tests/Feature/ApiKeyAuthorizationTest.php`
+- `docs/api/{README.md,openapi.yaml}`
+- `docs/modernization/{12-access-control-design,17-feature-research-2026-06}.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** The admin REST API no longer accepts `is_admin` on user writes and refuses mutation of privileged accounts. Added `api_keys.view` / `api_keys.edit` console permissions; RustDesk client wire routes are unchanged.
+**Summary:** Closed the delegated-admin-to-full-admin escalation chain: API keys are owner-bound and cannot exceed or outlive their owner's current permissions, administrator promotion and privileged-account takeover are excluded from API writes, and only full administrators can assign or mutate administrative authority. Delegated user managers retain ordinary-account management, with server-side denial and permission-aware UI regression coverage.
+
 ## [2026-07-14 08:09] - Security: prevent stored XSS in admin script data
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

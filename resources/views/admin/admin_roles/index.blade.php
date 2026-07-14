@@ -18,9 +18,11 @@
             <h1 class="rd-page-header__title">Admin Roles</h1>
             <p class="rd-page-header__description">Control administrative access with global, individual, and group-scoped roles.</p>
         </div>
+        @if ($canEdit)
         <div class="rd-page-header__actions">
             <a href="{{ route('admin.roles.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New role</a>
         </div>
+        @endif
     </header>
 
     <div class="rd-card rd-card--flush">
@@ -50,12 +52,14 @@
                         <td class="rd-muted">{{ $role->users_count }}</td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
-                                <a href="{{ route('admin.roles.edit', $role) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
+                                <a href="{{ route('admin.roles.edit', $role) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canEdit ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canEdit ? 'Edit' : 'View' }}</a>
+                                @if ($canEdit)
                                 <form method="POST" action="{{ route('admin.roles.destroy', $role) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete role '{{ $role->name }}'? Members lose these permissions." aria-label="Delete {{ $role->name }} role" title="Delete role"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

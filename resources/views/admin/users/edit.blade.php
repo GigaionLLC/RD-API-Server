@@ -6,10 +6,10 @@
         <div class="rd-page-header__copy">
             <div class="rd-page-header__eyebrow">People &amp; Access / Users</div>
             <h1 class="rd-page-header__title">{{ $user->username }}</h1>
-            <p class="rd-page-header__description">Manage identity, delegated access, account state, and sign-in policy.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? 'Manage identity, account state, and sign-in policy.' : 'Review identity, account state, and sign-in policy.' }}</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.users.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.users.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -28,21 +28,22 @@
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="email">Email</label>
-                        <input class="rd-input" id="email" name="email" type="email" value="{{ $user->email }}">
+                        <input class="rd-input" id="email" name="email" type="email" value="{{ $user->email }}" @disabled(! $canEdit)>
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="display_name">Display name</label>
-                        <input class="rd-input" id="display_name" name="display_name" value="{{ $user->display_name }}">
+                        <input class="rd-input" id="display_name" name="display_name" value="{{ $user->display_name }}" @disabled(! $canEdit)>
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="group_id">Group</label>
-                        <select class="rd-select" id="group_id" name="group_id">
+                        <select class="rd-select" id="group_id" name="group_id" @disabled(! $canEdit)>
                             <option value="">— None —</option>
                             @foreach ($groups as $g)
                                 <option value="{{ $g->id }}" @selected($user->group_id == $g->id)>{{ $g->name }}</option>
                             @endforeach
                         </select>
                     </div>
+                    @if ($canManageAdminAccess)
                     <div class="rd-field">
                         <label class="rd-label" for="is_admin">Role</label>
                         <select class="rd-select" id="is_admin" name="is_admin" aria-describedby="role-help">
@@ -67,9 +68,10 @@
                             @endif
                         </span>
                     </div>
+                    @endif
                     <div class="rd-field">
                         <label class="rd-label" for="status">Status</label>
-                        <select class="rd-select" id="status" name="status">
+                        <select class="rd-select" id="status" name="status" @disabled(! $canEdit)>
                             <option value="{{ \App\Models\User::STATUS_NORMAL }}" @selected($user->status === \App\Models\User::STATUS_NORMAL)>Active</option>
                             <option value="{{ \App\Models\User::STATUS_DISABLED }}" @selected($user->status === \App\Models\User::STATUS_DISABLED)>Disabled</option>
                             <option value="{{ \App\Models\User::STATUS_UNVERIFIED }}" @selected($user->status === \App\Models\User::STATUS_UNVERIFIED)>Unverified</option>
@@ -79,13 +81,13 @@
                         <div class="rd-label" id="login-policy-label">Login policy</div>
                         <label class="rd-check">
                             <input type="hidden" name="force_sso" value="0">
-                            <input type="checkbox" id="force_sso" name="force_sso" value="1" @checked($user->force_sso)>
+                            <input type="checkbox" id="force_sso" name="force_sso" value="1" @checked($user->force_sso) @disabled(! $canEdit)>
                             <span>Require SSO login (block local password; LDAP/OIDC still allowed)</span>
                         </label>
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="login_verify">Login verification</label>
-                        <select class="rd-select" id="login_verify" name="login_verify">
+                        <select class="rd-select" id="login_verify" name="login_verify" @disabled(! $canEdit)>
                             <option value="off" @selected($user->login_verify === 'off')>Off</option>
                             <option value="email" @selected($user->login_verify === 'email')>Email code</option>
                             <option value="totp" @selected($user->login_verify === 'totp')>TOTP</option>
@@ -93,16 +95,19 @@
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="note">Note</label>
-                        <input class="rd-input" id="note" name="note" value="{{ $user->note }}">
+                        <input class="rd-input" id="note" name="note" value="{{ $user->note }}" @disabled(! $canEdit)>
                     </div>
                     </div>
+                    @if ($canEdit)
                     <div class="rd-actions">
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Save</button>
                     </div>
+                    @endif
                 </form>
             </div>
         </div>
 
+        @if ($canEdit)
         <div class="rd-card rd-card--quiet">
             <div class="rd-card__header">
                 <h2 class="rd-card__title">Reset password</h2>
@@ -120,9 +125,11 @@
                 </form>
             </div>
         </div>
+        @endif
     </div>
 @endsection
 
+@if ($canManageAdminAccess)
 @push('scripts')
 <script>
     $(function () {
@@ -139,3 +146,4 @@
     });
 </script>
 @endpush
+@endif

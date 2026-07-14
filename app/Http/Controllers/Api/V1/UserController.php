@@ -39,7 +39,10 @@ class UserController extends Controller
             'password' => ['required', 'string', 'min:8'],
             'email' => ['nullable', 'email', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
-            'is_admin' => ['sometimes', 'boolean'],
+            // Administrative privilege is intentionally outside this API scope. Keeping it
+            // out of the write contract prevents a users.write key from minting a console
+            // superuser, even when the key belongs to a full administrator.
+            'is_admin' => ['prohibited'],
             'status' => ['sometimes', 'integer', Rule::in([User::STATUS_DISABLED, User::STATUS_NORMAL])],
         ]);
 
@@ -48,7 +51,7 @@ class UserController extends Controller
             'password' => $data['password'],
             'email' => $data['email'] ?? null,
             'display_name' => $data['display_name'] ?? null,
-            'is_admin' => $data['is_admin'] ?? false,
+            'is_admin' => false,
             'status' => $data['status'] ?? User::STATUS_NORMAL,
         ]);
 
@@ -61,12 +64,19 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user): JsonResponse
     {
+        // API automation may provision ordinary accounts, but it must not take over or
+        // disable any account that can administer the console. Full administrators retain
+        // that capability through the protected console instead.
+        if ($user->is_admin || $user->adminRoles()->exists()) {
+            return response()->json(['error' => 'Privileged accounts cannot be modified through the API'], 403);
+        }
+
         $data = $request->validate([
             'username' => ['sometimes', 'string', 'max:255', Rule::unique('users', 'username')->ignore($user->id)],
             'password' => ['sometimes', 'string', 'min:8'],
             'email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'display_name' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'is_admin' => ['sometimes', 'boolean'],
+            'is_admin' => ['prohibited'],
             'status' => ['sometimes', 'integer', Rule::in([User::STATUS_DISABLED, User::STATUS_NORMAL])],
         ]);
 

@@ -21,16 +21,23 @@
                 <p class="rd-help">Copy it now — it is shown only once.</p>
                 <div class="rd-actions rd-actions--wrap">
                     <input class="rd-input rd-mono rd-grow" id="newKey" value="{{ session('new_api_key') }}" readonly aria-label="New API key">
-                    <button type="button" class="rd-btn rd-btn--ghost" onclick="navigator.clipboard.writeText(document.getElementById('newKey').value);RD.toast('Copied','success');"><i class="ri-file-copy-line" aria-hidden="true"></i> Copy</button>
+                    <button type="button" class="rd-btn rd-btn--ghost" data-copy="#newKey"><i class="ri-file-copy-line" aria-hidden="true"></i> Copy</button>
                 </div>
             </div>
         </div>
     @endif
 
-    <div class="rd-grid rd-grid--2 rd-align-start">
+    <div class="rd-grid {{ $canEdit ? 'rd-grid--2' : '' }} rd-align-start">
+        @if ($canEdit)
         <div class="rd-card">
             <div class="rd-card__header"><h3 class="rd-card__title">Create API key</h3></div>
             <div class="rd-card__body">
+                @if ($scopeList === [])
+                    <div class="rd-callout rd-callout--info">
+                        <i class="ri-information-line" aria-hidden="true"></i>
+                        <div>Grant this account access to an API resource before issuing a key. A delegated key cannot exceed its owner's current permissions.</div>
+                    </div>
+                @else
                 <form method="POST" action="{{ route('admin.api-keys.store') }}">
                     @csrf
                     <div class="rd-form-grid rd-form-grid--2">
@@ -65,8 +72,10 @@
                     </div>
                     </div>
                 </form>
+                @endif
             </div>
         </div>
+        @endif
 
         <div class="rd-card">
             <div class="rd-card__header"><h3 class="rd-card__title">Using the API</h3></div>
@@ -95,6 +104,7 @@
                         <td class="rd-muted">{{ $key->last_used_at?->diffForHumans() ?? 'never' }}@if($key->last_used_ip)<div class="rd-table__meta rd-mono">{{ $key->last_used_ip }}</div>@endif</td>
                         <td class="rd-muted">{{ $key->expires_at?->toDateString() ?? '—' }}</td>
                         <td class="rd-table__actions">
+                            @if ($canEdit)
                             <div class="rd-actions rd-actions--end">
                                 <form method="POST" action="{{ route('admin.api-keys.rotate', $key) }}" class="m-0">
                                     @csrf
@@ -105,10 +115,13 @@
                                     <button type="submit" class="rd-icon-btn rd-icon-btn--danger" data-confirm="Revoke '{{ $key->name }}'? Clients using it will stop working." title="Revoke API key" aria-label="Revoke {{ $key->name }} API key"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
                             </div>
+                            @else
+                                <span class="rd-muted">View only</span>
+                            @endif
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8"><div class="rd-empty"><i class="rd-empty__icon ri-key-2-line" aria-hidden="true"></i><p class="rd-empty__title">No API keys yet</p><p class="rd-empty__body">Create a scoped key to connect trusted automation.</p></div></td></tr>
+                    <tr><td colspan="8"><div class="rd-empty"><i class="rd-empty__icon ri-key-2-line" aria-hidden="true"></i><p class="rd-empty__title">No API keys yet</p><p class="rd-empty__body">{{ $canEdit ? 'Create a scoped key to connect trusted automation.' : 'No keys owned by this account are available.' }}</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>

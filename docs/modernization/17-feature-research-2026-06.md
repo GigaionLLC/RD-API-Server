@@ -66,7 +66,8 @@ The genuinely high-value item was making the read-only REST API two-way. Shipped
 - `PUT /api/v1/devices/{id}` — reassign owner / device group / strategy / alias (`devices.write`).
 - `POST` + `PUT /api/v1/strategies[/{id}]` — create/update a strategy's options, bumping
   `modified_at` so the heartbeat pushes it (`strategies.write`).
-- `POST` + `PUT /api/v1/users[/{id}]` — provision/update accounts (`users.write`).
+- `POST` + `PUT /api/v1/users[/{id}]` — provision/update ordinary accounts (`users.write`);
+  administrator promotion and privileged-account mutation are intentionally excluded.
 - `POST /api/v1/address-books` + `DELETE /api/v1/address-books/{id}` — book CRUD (`address_book.write`).
 
 ## Suggested sequencing (remaining)

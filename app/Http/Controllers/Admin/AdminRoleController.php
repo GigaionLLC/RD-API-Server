@@ -17,26 +17,33 @@ use Illuminate\View\View;
  */
 class AdminRoleController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $roles = AdminRole::query()
             ->withCount('users')
             ->orderBy('name')
             ->paginate(20);
 
-        return view('admin.admin_roles.index', compact('roles'));
+        $canEdit = (bool) $request->user()->is_admin;
+
+        return view('admin.admin_roles.index', compact('roles', 'canEdit'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $this->authorizeRoleMutation($request);
+
         $role = new AdminRole(['type' => AdminRole::TYPE_GLOBAL, 'perms' => [], 'scope' => []]);
         $groups = Group::orderBy('name')->get(['id', 'name']);
+        $canEdit = true;
 
-        return view('admin.admin_roles.create', compact('role', 'groups'));
+        return view('admin.admin_roles.create', compact('role', 'groups', 'canEdit'));
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeRoleMutation($request);
+
         $data = $this->validateRole($request);
 
         AdminRole::create($data);
@@ -46,15 +53,18 @@ class AdminRoleController extends Controller
             ->with('status', 'Role created.');
     }
 
-    public function edit(AdminRole $role): View
+    public function edit(Request $request, AdminRole $role): View
     {
         $groups = Group::orderBy('name')->get(['id', 'name']);
+        $canEdit = (bool) $request->user()->is_admin;
 
-        return view('admin.admin_roles.edit', compact('role', 'groups'));
+        return view('admin.admin_roles.edit', compact('role', 'groups', 'canEdit'));
     }
 
     public function update(Request $request, AdminRole $role): RedirectResponse
     {
+        $this->authorizeRoleMutation($request);
+
         $role->fill($this->validateRole($request))->save();
 
         return redirect()
@@ -62,8 +72,10 @@ class AdminRoleController extends Controller
             ->with('status', 'Role updated.');
     }
 
-    public function destroy(AdminRole $role): RedirectResponse
+    public function destroy(Request $request, AdminRole $role): RedirectResponse
     {
+        $this->authorizeRoleMutation($request);
+
         $role->users()->detach();
         $role->delete();
 
@@ -101,5 +113,17 @@ class AdminRoleController extends Controller
             'perms' => $perms,
             'scope' => $scope,
         ];
+    }
+
+    /**
+     * Delegated role mutation cannot be made safe without a formal role hierarchy: an
+     * editor could otherwise rewrite a role assigned to themselves as global. Delegates may
+     * inspect roles through roles.view; only full administrators may change them.
+     */
+    private function authorizeRoleMutation(Request $request): void
+    {
+        if (! $request->user()->is_admin) {
+            abort(403, 'Only a full administrator may modify admin roles.');
+        }
     }
 }

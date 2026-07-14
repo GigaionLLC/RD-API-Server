@@ -17,6 +17,12 @@ X-API-Key: rdk_xxxxxxxx
 
 A missing/invalid/expired key → `401`. A key without the route's scope → `403`.
 
+Full administrators may inspect and manage every key. Delegated administrators need the
+dedicated `api_keys.view` / `api_keys.edit` console permissions, can only inspect and manage
+their own keys, and may only issue scopes backed by permissions they currently hold. Removing
+either API-key edit authority or the matching resource permission immediately prevents an
+existing delegated key from using that scope.
+
 ## Scopes
 
 | Scope | Grants |
@@ -24,7 +30,7 @@ A missing/invalid/expired key → `401`. A key without the route's scope → `40
 | `devices.read` | list devices |
 | `devices.write` | reassign a device's owner / group / strategy / alias |
 | `users.read` | list users |
-| `users.write` | create / update users |
+| `users.write` | create / update ordinary, non-administrative users |
 | `strategies.read` | list strategies |
 | `strategies.write` | create / update strategies (options pushed via heartbeat) |
 | `address_book.read` | list the key owner's address books + peers |
@@ -43,8 +49,8 @@ paginator shape: `{ "data": [...], "total", "per_page", "current_page", ... }`.
 | GET | `/api/v1/devices` | `devices.read` | `?q=` filters id/host/alias |
 | PUT | `/api/v1/devices/{id}` | `devices.write` | body `{ user_id?, device_group_id?, strategy_id?, alias? }`; null clears |
 | GET | `/api/v1/users` | `users.read` | `?q=` filters username/email |
-| POST | `/api/v1/users` | `users.write` | body `{ username, password, email?, display_name?, is_admin?, status? }` → `201` |
-| PUT | `/api/v1/users/{id}` | `users.write` | partial update; `password` re-hashed only if sent |
+| POST | `/api/v1/users` | `users.write` | body `{ username, password, email?, display_name?, status? }` → `201`; always creates a non-administrator |
+| PUT | `/api/v1/users/{id}` | `users.write` | partial update of an ordinary account; privileged accounts and `is_admin` are rejected |
 | GET | `/api/v1/strategies` | `strategies.read` | includes `options`, `assignments_count` |
 | POST | `/api/v1/strategies` | `strategies.write` | body `{ name, note?, enabled?, options? }` → `201` |
 | PUT | `/api/v1/strategies/{id}` | `strategies.write` | partial update; bumps `modified_at` so clients re-pull |
@@ -57,6 +63,9 @@ paginator shape: `{ "data": [...], "total", "per_page", "current_page", ... }`.
 | DELETE | `/api/v1/address-books/{id}/peers/{peer}` | `address_book.write` | |
 
 Address‑book endpoints are scoped to the **key owner's** books (`403` otherwise).
+Administrator promotion, delegated-role assignment, and mutation of any full or delegated
+administrator are intentionally console-only operations available to a full administrator;
+`users.write` never grants administrative authority.
 
 ## Examples
 

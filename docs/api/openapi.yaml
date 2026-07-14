@@ -120,7 +120,7 @@ paths:
     post:
       tags: [Admin · Users]
       summary: Create a user
-      description: Requires the `users.write` scope.
+      description: Requires the `users.write` scope. Always creates an ordinary, non-administrative account; `is_admin` is not accepted.
       requestBody:
         required: true
         content:
@@ -133,7 +133,6 @@ paths:
                 password: { type: string, minLength: 8 }
                 email: { type: string, format: email }
                 display_name: { type: string }
-                is_admin: { type: boolean }
                 status: { type: integer, enum: [0, 1] }
       responses:
         "201":
@@ -153,7 +152,7 @@ paths:
     put:
       tags: [Admin · Users]
       summary: Update a user
-      description: "Requires the `users.write` scope. Partial: only supplied fields change; `password` is re-hashed only when present."
+      description: "Requires the `users.write` scope. Partial ordinary-account update: only supplied fields change and `password` is re-hashed only when present. Full and delegated administrators cannot be modified, and `is_admin` is not accepted."
       requestBody:
         content:
           application/json:
@@ -164,7 +163,6 @@ paths:
                 password: { type: string, minLength: 8 }
                 email: { type: [string, "null"], format: email }
                 display_name: { type: [string, "null"] }
-                is_admin: { type: boolean }
                 status: { type: integer, enum: [0, 1] }
       responses:
         "200":
