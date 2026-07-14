@@ -45,8 +45,11 @@ docker compose -f docker-compose.dev.yml up -d --build
 ## Handy commands
 
 ```bash
-# add an admin from the CLI
-php artisan rustdesk:user <name> <password> --admin
+# add an admin from the CLI (prompts twice without echoing the password)
+php artisan rustdesk:user <name> --admin
+
+# non-interactive automation: pipe exactly one password line
+printf '%s\n' "$RUSTDESK_USER_PASSWORD" | php artisan rustdesk:user <name> --admin --password-stdin
 
 # regenerate the admin-console screenshots in docs/screenshots/ (seeds fictional demo data)
 docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash docker/demo-shots.sh

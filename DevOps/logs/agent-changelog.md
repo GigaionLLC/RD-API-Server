@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 12:06] - Security: protect CLI account password input
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Console/Commands/CreateUser.php`
+- `tests/Feature/CreateUserCommandTest.php`
+- `README.md`, `QUICKSTART.md`, `docs/DEVELOPMENT.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. The CLI keeps its deprecated positional password form for compatibility, while the safe default is a non-trimming hidden confirmation prompt and automation can use `--password-stdin`.
+**Summary:** Prevented accidental password echo, console-markup injection, and state-changing reset side effects. CLI password assignments now share the 12–255 character policy, reject echoed terminal input and invalid usernames/email before mutation, preserve disabled state and existing administrator authority, treat `--admin` as grant-only, and roll back email/authority changes when a federated reset is denied. Twenty-three related tests / 153 assertions, focused Pint, targeted PHPStan, and diff checks passed in Docker.
+
 ## [2026-07-14 10:32] - Security: bind LDAP identities explicitly
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

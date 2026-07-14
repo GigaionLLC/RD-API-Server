@@ -43,8 +43,10 @@ PORT=21114
 In the RustDesk client, set **API Server** to your `RUSTDESK_API_SERVER` and log in.
 
 Upgrades do not alter an existing administrator. If an earlier install used a default password,
-reset it in **Users** or run `php artisan rustdesk:user admin <new-password> --admin` inside the
-application container.
+reset it in **Users** or run `php artisan rustdesk:user admin --admin` inside the application
+container. The command asks for the password twice without echoing it. For non-interactive
+automation, pipe one password line to `--password-stdin`; passing a password as a positional
+argument is deprecated because shells can expose it in history and process listings.
 
 ## 3. Email (optional)
 
@@ -120,7 +122,7 @@ keep retries flowing:
 
 ```bash
 docker compose logs -f rustdesk-api      # view logs
-docker compose exec rustdesk-api php artisan rustdesk:user alice secret --admin   # add an admin
+docker compose exec rustdesk-api php artisan rustdesk:user alice --admin   # securely prompts twice
 docker compose down                      # stop (data is kept in the volume)
 docker compose pull && docker compose up -d   # update
 ```

@@ -153,7 +153,8 @@ On a new production database, startup stops before seeding if `ADMIN_PASS` is mi
 than 12 characters, a known/default placeholder, repeated, or derived from `ADMIN_USER`. Local
 and test seeders retain their development-only credential for fixtures. Existing installations
 are not rewritten; if an earlier deployment used a default password, reset it in **Users** or
-with `php artisan rustdesk:user admin <new-password> --admin`.
+with `php artisan rustdesk:user admin --admin`; the command prompts twice without echoing the
+password. Automation can pipe one line to `--password-stdin`.
 
 If TLS terminates at a reverse proxy, set `TRUSTED_PROXIES` to that proxy's exact IP address or
 network CIDR as seen by the application container (comma-separated when there is more than one).
