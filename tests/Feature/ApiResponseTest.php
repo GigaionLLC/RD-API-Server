@@ -49,11 +49,14 @@ class ApiResponseTest extends TestCase
 
     public function test_audit_endpoints_return_objects(): void
     {
+        Device::create(['rustdesk_id' => 'p1', 'uuid' => 'u1']);
+
         $this->assertSame('{}', $this->postJson('/api/audit/conn', [
-            'id' => 'p1', 'action' => 'new', 'conn_id' => 1,
+            'id' => 'p1', 'uuid' => 'u1', 'action' => 'new', 'conn_id' => 1,
+            'session_id' => 1,
         ])->getContent());
         $this->assertSame('{}', $this->postJson('/api/audit/alarm', [
-            'id' => 'p1', 'typ' => 0, 'info' => 'x',
+            'id' => 'p1', 'uuid' => 'u1', 'typ' => 0, 'info' => 'x',
         ])->getContent());
     }
 
@@ -85,10 +88,12 @@ class ApiResponseTest extends TestCase
     public function test_audit_active_guid_then_note_roundtrip(): void
     {
         $token = $this->clientToken();
+        Device::create(['rustdesk_id' => 'host1', 'uuid' => 'host-uuid']);
 
         // Controlled host opens a connection (unauthenticated audit ingest).
         $this->postJson('/api/audit/conn', [
-            'id' => 'host1', 'action' => 'new', 'conn_id' => 7, 'session_id' => 'sess-9',
+            'id' => 'host1', 'uuid' => 'host-uuid', 'action' => 'new', 'conn_id' => 7,
+            'session_id' => 'sess-9',
         ])->assertOk();
 
         // Controlling client fetches the live session's guid (bare JSON string).

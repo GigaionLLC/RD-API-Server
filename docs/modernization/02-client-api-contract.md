@@ -231,11 +231,38 @@ token owner; the optional cross-user `user_name` override is reserved for a full
 
 ---
 
-## 8. Audit ingestion ✅ — `POST /api/audit/conn`, `POST /api/audit/file`
+## 8. Audit ingestion ✅ — `POST /api/audit/conn`, `/file`, `/alarm`
 
 Already implemented. hbbs/clients post connection (`new`/`close`) and file‑transfer events.
 For parity with Pro's **alarm** logs and **console‑operation** logs we add new categories
 on top of this ingestion path (see catalog §15).
+
+### Audit-ingestion trust boundary
+
+These routes remain unauthenticated at the HTTP layer because the RustDesk fire-and-forget
+writers do not send an account bearer. The current client does, however, add `id` and `uuid` to
+all three event shapes in `connection.rs` (`post_conn_audit`, `post_file_audit`, and
+`post_alarm_audit`). The API requires an exact match to an existing approved device before an
+event can create an audit row, raise an alarm, send mail, or dispatch a webhook.
+
+Rejected identity, invalid fields, oversized bodies, and rate-limited events still receive the
+wire-compatible `{}` acknowledgement because the client ignores the response body. They have no
+side effects. Connection and alarm bodies are capped at 16 KiB; file bodies at 64 KiB. Default
+one-minute ceilings are 300 invalid events/source IP, 12,000 valid events/source IP, and 240
+connection, 1,200 file, or 60 alarm events/device. The corresponding `RUSTDESK_AUDIT_*`
+environment settings are documented in `.env.example`.
+
+`session_id` is a random JSON `u64`; ingestion decodes it with big-integer preservation before
+storing the exact decimal value. The host's post-auth connection event intentionally omits
+`action`, so omission continues to mean `new`.
+
+The legacy controlling-side note POST (`{id,session_id,note}`) does **not** contain a UUID and
+therefore cannot satisfy this device binding; it now acknowledges without mutating a session.
+The application also supports the account-bearer-authenticated `GET /api/audit/conn/active`
+followed by `PUT /api/audit` with the server-issued guid. A client still using the exact legacy
+POST will not persist a note unless upstream adds an attributable credential. A compatibility
+caller may add the exact device UUID, in which case the update is additionally scoped to
+`peer_id + session_id`.
 
 ### 8.1 RustDesk 1.4.9 auth‑detail additions (PR #15456, #15407, #15469) ✅
 
@@ -256,10 +283,11 @@ arrive as **integers, not strings**, and are **omitted** rather than sent as `0`
 keep them nullable and distinguish "not recorded" from an explicit value. Out‑of‑range codes
 are treated defensively (no label rendered, raw value still stored).
 
-PR **#15469** adds a new `AlarmAuditType` variant **`SessionScopeViolation = 9`** posted to
-`/api/audit/alarm` (`{id, name, ip, conn_type, message}`) when an authenticated session
-attempts an action outside its granted scope. Our alarm ingest already accepts any `typ`; we
-added a human label for code `9` ("Session‑scope permission violation").
+PR **#15469** adds a new `AlarmAuditType` variant **`SessionScopeViolation = 9`** posted through
+the standard `/api/audit/alarm` wrapper (`{id, uuid, typ, info}`) when an authenticated session
+attempts an action outside its granted scope. The event-specific detail is serialized inside
+`info`. Our alarm ingest accepts the wire enum range and adds a human label for code `9`
+("Session‑scope permission violation").
 
 **Not affected by 1.4.9:** login/2FA/OIDC endpoints, heartbeat/strategy, address book,
 sysinfo, devices/deploy, and recording are all unchanged — audit ingestion is the only

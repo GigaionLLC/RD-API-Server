@@ -66,3 +66,25 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Client IPs feed login and 2FA throttles, API-key IP allowlists, audit records, and last-seen
   metadata. Any new IP-based security control must use the framework request IP and retain this
   trusted-proxy boundary.
+
+## Audit Ingestion Boundary
+
+- The RustDesk audit feeds are fire-and-forget and do not carry an account bearer. Current
+  connection, file-transfer, and alarm writers do carry the controlled device's `id` and `uuid`.
+  A write is accepted only when both exactly match an existing approved device.
+- Unknown devices, UUID mismatches, unapproved devices, malformed fields, oversized bodies, and
+  rate-limited requests receive the normal empty JSON acknowledgement (`{}`) but produce no
+  database, email, or webhook side effects. This preserves the client wire contract without
+  exposing validation details to an unauthenticated caller.
+- Body ceilings are 16 KiB for connection events, 64 KiB for file events, and 16 KiB for alarms.
+  Stored strings, enums, IPs, arrays, and counters also have destination-appropriate limits;
+  JSON nesting is capped and random `u64` session identifiers are decoded without precision loss.
+- One-minute rate limits default to 300 invalid requests per source IP, 12,000 valid requests per
+  source IP, and per-device ceilings of 240 connection, 1,200 file, and 60 alarm events. Operators
+  may tune these with the `RUSTDESK_AUDIT_*` environment variables in `.env.example`.
+- The older `POST /api/audit/conn` note body contains no UUID and cannot be safely attributed, so
+  that exact legacy shape now acknowledges without changing a row. The application also provides
+  the bearer-authenticated `GET /api/audit/conn/active` plus `PUT /api/audit` guid flow. Clients
+  still using the exact legacy POST will not persist a note unless upstream adds an attributable
+  credential; a compatibility caller that adds the matching device UUID is additionally scoped by
+  both peer id and session id.

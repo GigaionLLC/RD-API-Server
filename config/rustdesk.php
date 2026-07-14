@@ -74,4 +74,19 @@ return [
             explode(',', (string) env('RUSTDESK_OIDC_ALLOWED_PORTS', '443'))
         ),
     ],
+
+    // Audit feeds are unauthenticated at the HTTP layer because the upstream RustDesk client
+    // does not send an account bearer. The controller instead binds each write to an existing
+    // approved device's id + UUID and applies both aggregate-IP and per-device burst limits.
+    'audit' => [
+        'rate_limits' => [
+            'invalid_per_ip' => (int) env('RUSTDESK_AUDIT_INVALID_PER_IP', 300),
+            'valid_per_ip' => (int) env('RUSTDESK_AUDIT_VALID_PER_IP', 12000),
+            'per_device' => [
+                'conn' => (int) env('RUSTDESK_AUDIT_CONN_PER_DEVICE', 240),
+                'file' => (int) env('RUSTDESK_AUDIT_FILE_PER_DEVICE', 1200),
+                'alarm' => (int) env('RUSTDESK_AUDIT_ALARM_PER_DEVICE', 60),
+            ],
+        ],
+    ],
 ];

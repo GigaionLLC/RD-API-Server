@@ -5,24 +5,28 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuditConn;
 use App\Models\AuditFile;
-use App\Models\Device;
 use App\Services\AlarmService;
+use App\Services\AuditIngestionGuard;
 use App\Services\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use JsonException;
 use Throwable;
 
 /**
- * Audit ingestion endpoints (docs/modernization/02-client-api-contract.md §8,
- * docs/modernization/13-deepscan-connection.md).
+ * Device-bound audit ingestion endpoints (docs/modernization/02-client-api-contract.md section 8).
  *
- * Unauthenticated: hbbs and clients POST connection, file-transfer and security-alarm events
- * here. We persist them as AuditConn / AuditFile / Alarm rows.
+ * RustDesk clients cannot attach an account bearer to these fire-and-forget requests. Each write
+ * is therefore bound to the exact id + UUID of an existing approved device before it may reach
+ * the database, mailer, or webhook pipeline.
  */
 class AuditController extends Controller
 {
+    public function __construct(private AuditIngestionGuard $ingestion) {}
+
     /**
      * The RustDesk client's connection alarm types (AlarmAuditType in the client).
      *
@@ -35,75 +39,105 @@ class AuditController extends Controller
         6 => 'IPv6 prefix abuse',
         7 => 'Terminal OS-login backoff',
         8 => 'Terminal session concurrency limit',
-        // RustDesk 1.4.9 (PR #15469): an authenticated session attempted an action outside its
-        // granted scope (remote / file_transfer / port_forward / view_camera / terminal).
         9 => 'Session-scope permission violation',
     ];
 
     /**
      * POST /api/audit/conn
-     * Two shapes:
-     *  - host connection event:  { id, action:"new"|"close", conn_id, peer:[id,name]?, ip, session_id, type,
-     *                              uuid, primary_auth?, two_factor?, conn_audit_ref? }
-     *  - operator session note:  { id, session_id, note }   (no `action`)
      *
-     * primary_auth / two_factor / conn_audit_ref are the RustDesk 1.4.9 additions (PR #15456,
-     * #15407). All three are optional — the client omits primary_auth/two_factor when None(0)
-     * and conn_audit_ref for direct-IP or pre-1.4.9 connections — so they stay null here.
+     * Host connection events carry id, uuid, conn_id, session_id, and optionally action, peer,
+     * type, IP, and authentication-attribution fields. The host's authenticated follow-up event
+     * omits action and retains the historical "new" default.
      */
     public function conn(Request $request, AlarmService $alarms, WebhookService $webhooks): JsonResponse
     {
-        // Operator session note (posted by the controlling side) — attach to the open session.
-        $note = $request->input('note');
-        $sessionId = (string) $request->input('session_id', '');
-        if ($note !== null && ! $request->has('action')) {
-            if ($sessionId !== '') {
-                AuditConn::where('session_id', $sessionId)
-                    ->where('action', AuditConn::ACTION_NEW)
-                    ->latest('id')
-                    ->first()
-                    ?->update(['note' => (string) $note]);
-            }
-
-            return response()->json((object) []);
+        $device = $this->ingestion->deviceFor($request, 'conn');
+        $payload = $this->payload($request);
+        if ($device === null || $payload === null) {
+            return $this->acknowledge();
         }
 
-        $peer = $request->input('peer', []);
-        $peer = is_array($peer) ? $peer : [];
+        // The legacy controlling-side note shape has no bearer token or UUID. It therefore
+        // no-ops unless a compatible caller supplies the controlled device's exact UUID. The
+        // current authenticated note flow is PUT /api/audit and uses a server-issued guid.
+        if (array_key_exists('note', $payload) && ! array_key_exists('action', $payload)) {
+            $data = $this->validated($payload, [
+                'id' => ['required', 'string', 'max:255'],
+                'uuid' => ['required', 'string', 'max:255'],
+                'session_id' => ['required'],
+                'note' => ['required', 'string', 'max:4000'],
+            ]);
+            if ($data === null) {
+                return $this->acknowledge();
+            }
 
-        $action = (string) $request->input('action', AuditConn::ACTION_NEW);
-        $peerId = (string) $request->input('id', '');
-        $ip = (string) $request->input('ip', $request->ip());
+            $sessionId = $this->wireIdentifier($data['session_id']);
+            if ($sessionId === null) {
+                return $this->acknowledge();
+            }
 
-        // RustDesk 1.4.9 auth-detail keys (PR #15456 / #15407). Kept null when the client omits
-        // them so the "not recorded" state is distinguishable from an explicit 0.
-        $primaryAuth = $request->input('primary_auth');
-        $twoFactor = $request->input('two_factor');
-        $connAuditRef = $request->input('conn_audit_ref');
+            AuditConn::query()
+                ->where('peer_id', $data['id'])
+                ->where('session_id', $sessionId)
+                ->where('action', AuditConn::ACTION_NEW)
+                ->latest('id')
+                ->first()
+                ?->update(['note' => $data['note']]);
+
+            return $this->acknowledge();
+        }
+
+        $data = $this->validated($payload, [
+            'id' => ['required', 'string', 'max:255'],
+            'uuid' => ['required', 'string', 'max:255'],
+            'conn_id' => ['required', 'integer', 'min:0', 'max:9223372036854775807'],
+            // session_id is a JSON u64. payload() preserves values above PHP_INT_MAX as strings.
+            'session_id' => ['required'],
+            'action' => ['sometimes', 'string', 'in:new,close'],
+            'peer' => ['sometimes', 'array', 'list', 'max:2'],
+            'peer.*' => ['nullable', 'string', 'max:255'],
+            'ip' => ['sometimes', 'nullable', 'ip'],
+            'type' => ['sometimes', 'integer', 'between:0,255'],
+            'primary_auth' => ['sometimes', 'nullable', 'integer', 'between:0,255'],
+            'two_factor' => ['sometimes', 'nullable', 'integer', 'between:0,255'],
+            'conn_audit_ref' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+        if ($data === null) {
+            return $this->acknowledge();
+        }
+
+        $sessionId = $this->wireIdentifier($data['session_id']);
+        if ($sessionId === null) {
+            return $this->acknowledge();
+        }
+
+        $peer = is_array($data['peer'] ?? null) ? $data['peer'] : [];
+        $action = (string) ($data['action'] ?? AuditConn::ACTION_NEW);
+        $peerId = (string) $data['id'];
+        $ip = (string) ($data['ip'] ?? $request->ip() ?? '');
 
         $audit = AuditConn::create([
-            // New connections get a guid the controlling client later looks up via
-            // GET /api/audit/conn/active to attach an end-of-session note (see active()).
             'guid' => $action === AuditConn::ACTION_NEW ? (string) Str::uuid() : null,
             'action' => $action,
-            'conn_id' => (int) $request->input('conn_id', 0),
+            'conn_id' => (int) $data['conn_id'],
             'peer_id' => $peerId,
             'from_peer' => (string) ($peer[0] ?? ''),
             'from_name' => (string) ($peer[1] ?? ''),
             'ip' => $ip,
             'session_id' => $sessionId,
-            'type' => (int) $request->input('type', 0),
-            'primary_auth' => is_numeric($primaryAuth) ? (int) $primaryAuth : null,
-            'two_factor' => is_numeric($twoFactor) ? (int) $twoFactor : null,
-            'conn_audit_ref' => is_string($connAuditRef) && $connAuditRef !== '' ? $connAuditRef : null,
-            'uuid' => (string) $request->input('uuid', ''),
+            'type' => (int) ($data['type'] ?? 0),
+            'primary_auth' => isset($data['primary_auth']) ? (int) $data['primary_auth'] : null,
+            'two_factor' => isset($data['two_factor']) ? (int) $data['two_factor'] : null,
+            'conn_audit_ref' => isset($data['conn_audit_ref']) && $data['conn_audit_ref'] !== ''
+                ? $data['conn_audit_ref']
+                : null,
+            'uuid' => $data['uuid'],
             'closed_at' => $action === AuditConn::ACTION_CLOSE ? now() : null,
         ]);
 
-        // Raise an alarm for newly established connections. Wrapped so audit never fails.
-        if ($action === AuditConn::ACTION_NEW && $peerId !== '') {
+        // Alarms and webhooks remain best-effort so their failures do not lose the audit row.
+        if ($action === AuditConn::ACTION_NEW) {
             try {
-                $device = Device::where('rustdesk_id', $peerId)->first();
                 $fromName = (string) ($peer[1] ?? $peer[0] ?? '');
                 $authSummary = $audit->authSummary();
                 $alarms->raise(
@@ -111,7 +145,7 @@ class AuditController extends Controller
                     $peerId,
                     'new_connection',
                     'New connection to '.$peerId.($fromName !== '' ? ' from '.$fromName : '').' ('.$ip.')'
-                        .($authSummary !== '' ? ' — authenticated via '.$authSummary : ''),
+                        .($authSummary !== '' ? ' - authenticated via '.$authSummary : ''),
                     $ip
                 );
             } catch (Throwable $e) {
@@ -122,7 +156,6 @@ class AuditController extends Controller
             }
         }
 
-        // Notify webhooks of the session lifecycle (distinct from the alarm above).
         $webhooks->dispatch(
             $action === AuditConn::ACTION_CLOSE ? 'connection.closed' : 'connection.new',
             [
@@ -130,37 +163,57 @@ class AuditController extends Controller
                 'from' => (string) ($peer[1] ?? $peer[0] ?? ''),
                 'ip' => $ip,
                 'session_id' => $sessionId,
-                // RustDesk 1.4.9 auth attribution (PR #15456/#15407); null when not reported.
                 'primary_auth' => $audit->primaryAuthLabel() ?: null,
                 'two_factor' => $audit->twoFactorLabel() ?: null,
                 'conn_audit_ref' => $audit->conn_audit_ref,
             ]
         );
 
-        return response()->json((object) []);
+        return $this->acknowledge();
     }
 
     /**
      * POST /api/audit/alarm
-     * Body: { id, uuid, typ:<int>, info:<json string|object> } — connection security alarms.
+     * Body: { id, uuid, typ:<int>, info:<json string|object> }.
      */
     public function alarm(Request $request, AlarmService $alarms): JsonResponse
     {
-        $peerId = (string) $request->input('id', '');
-        $typ = (int) $request->input('typ', -1);
-
-        $info = $request->input('info', '');
-        if (is_array($info)) {
-            $info = json_encode($info);
+        $device = $this->ingestion->deviceFor($request, 'alarm');
+        $payload = $this->payload($request);
+        if ($device === null || $payload === null) {
+            return $this->acknowledge();
         }
-        $info = (string) $info;
 
+        $data = $this->validated($payload, [
+            'id' => ['required', 'string', 'max:255'],
+            'uuid' => ['required', 'string', 'max:255'],
+            'typ' => ['required', 'integer', 'between:0,255'],
+            'info' => ['sometimes', 'nullable'],
+            'ip' => ['sometimes', 'nullable', 'ip'],
+        ]);
+        if ($data === null) {
+            return $this->acknowledge();
+        }
+
+        $info = $data['info'] ?? '';
+        if (is_array($info)) {
+            try {
+                $info = json_encode($info, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return $this->acknowledge();
+            }
+        }
+        if (! is_string($info) || strlen($info) > 8192) {
+            return $this->acknowledge();
+        }
+
+        $peerId = (string) $data['id'];
+        $typ = (int) $data['typ'];
         $label = self::ALARM_TYPES[$typ] ?? ('Security alarm (type '.$typ.')');
         $message = $info !== '' ? $label.': '.$info : $label;
-        $ip = (string) $request->input('ip', $request->ip());
+        $ip = (string) ($data['ip'] ?? $request->ip() ?? '');
 
         try {
-            $device = $peerId !== '' ? Device::where('rustdesk_id', $peerId)->first() : null;
             $alarms->raise($device, $peerId, $label, $message, $ip);
         } catch (Throwable $e) {
             Log::error('AlarmService raise failed in audit alarm', [
@@ -170,37 +223,59 @@ class AuditController extends Controller
             ]);
         }
 
-        return response()->json((object) []);
+        return $this->acknowledge();
     }
 
     /**
      * POST /api/audit/file
-     * Body: { id, peer_id, info, is_file, path, type, ip, uuid }.
+     * Body: { id, uuid, peer_id, info, is_file, path, type, ip }.
      */
     public function file(Request $request): JsonResponse
     {
+        if ($this->ingestion->deviceFor($request, 'file') === null) {
+            return $this->acknowledge();
+        }
+
+        $payload = $this->payload($request);
+        if ($payload === null) {
+            return $this->acknowledge();
+        }
+
+        $data = $this->validated($payload, [
+            'id' => ['required', 'string', 'max:255'],
+            'uuid' => ['required', 'string', 'max:255'],
+            'peer_id' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'from_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'info' => ['sometimes', 'nullable', 'string'],
+            'is_file' => ['sometimes', 'boolean'],
+            'path' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'type' => ['sometimes', 'integer', 'between:0,255'],
+            'ip' => ['sometimes', 'nullable', 'ip'],
+            'num' => ['sometimes', 'integer', 'between:0,2147483647'],
+        ]);
+        if ($data === null || strlen((string) ($data['info'] ?? '')) > 60000) {
+            return $this->acknowledge();
+        }
+
         AuditFile::create([
-            'peer_id' => (string) ($request->input('peer_id') ?? $request->input('id') ?? ''),
-            'from_peer' => (string) $request->input('id', ''),
-            'from_name' => (string) $request->input('from_name', ''),
-            'info' => (string) $request->input('info', ''),
-            'is_file' => $request->boolean('is_file', true),
-            'path' => (string) $request->input('path', ''),
-            'type' => (int) $request->input('type', 0),
-            'ip' => (string) $request->input('ip', $request->ip()),
-            'num' => (int) $request->input('num', 0),
-            'uuid' => (string) $request->input('uuid', ''),
+            'peer_id' => (string) ($data['peer_id'] ?? $data['id']),
+            'from_peer' => $data['id'],
+            'from_name' => (string) ($data['from_name'] ?? ''),
+            'info' => (string) ($data['info'] ?? ''),
+            'is_file' => (bool) ($data['is_file'] ?? true),
+            'path' => (string) ($data['path'] ?? ''),
+            'type' => (int) ($data['type'] ?? 0),
+            'ip' => (string) ($data['ip'] ?? $request->ip() ?? ''),
+            'num' => (int) ($data['num'] ?? 0),
+            'uuid' => $data['uuid'],
         ]);
 
-        return response()->json((object) []);
+        return $this->acknowledge();
     }
 
     /**
      * GET /api/audit/conn/active?id=&session_id=&conn_type=
-     * The controlling client polls this on a fresh connection to obtain the server-issued
-     * guid for the live session, which it caches and later uses to PUT a note (see note()).
-     * Returns the guid as a bare JSON string, or "" while the matching conn audit hasn't
-     * landed yet — the client retries with backoff (model.dart _queryAuditGuid).
+     * Returns the live session's server-issued guid as a bare JSON string.
      */
     public function active(Request $request): JsonResponse
     {
@@ -222,9 +297,8 @@ class AuditController extends Controller
     }
 
     /**
-     * PUT /api/audit — { guid, note }
-     * Attaches an operator's end-of-connection note to the audit record identified by the
-     * guid issued in active(). The client only checks for HTTP 200 (dialog.dart).
+     * PUT /api/audit - { guid, note }
+     * Attaches an operator note to the record identified by the authenticated client's guid.
      */
     public function note(Request $request): JsonResponse
     {
@@ -235,6 +309,61 @@ class AuditController extends Controller
             AuditConn::where('guid', $guid)->update(['note' => $note]);
         }
 
+        return $this->acknowledge();
+    }
+
+    /**
+     * Decode the raw JSON with exact u64 handling and a conservative nesting ceiling.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function payload(Request $request): ?array
+    {
+        try {
+            $payload = json_decode(
+                (string) $request->getContent(),
+                true,
+                32,
+                JSON_BIGINT_AS_STRING | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            return null;
+        }
+
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, array<int, string>>  $rules
+     * @return array<string, mixed>|null
+     */
+    private function validated(array $payload, array $rules): ?array
+    {
+        $validator = Validator::make($payload, $rules);
+
+        return $validator->fails() ? null : $validator->validated();
+    }
+
+    private function wireIdentifier(mixed $value): ?string
+    {
+        if (is_int($value) && $value >= 0) {
+            return (string) $value;
+        }
+
+        if (is_string($value) && $value !== '' && mb_strlen($value) <= 255) {
+            return $value;
+        }
+
+        return null;
+    }
+
+    private function acknowledge(): JsonResponse
+    {
         return response()->json((object) []);
     }
 }

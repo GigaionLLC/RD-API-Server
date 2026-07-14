@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Alarm;
 use App\Models\AuditConn;
+use App\Models\Device;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,12 +20,20 @@ class AuditConnAuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function device(string $id, string $uuid): void
+    {
+        Device::create(['rustdesk_id' => $id, 'uuid' => $uuid]);
+    }
+
     public function test_new_connection_persists_auth_details(): void
     {
+        $this->device('dev-a', 'ua');
+
         $this->postJson('/api/audit/conn', [
             'id' => 'dev-a', 'action' => 'new', 'conn_id' => 5, 'peer_id' => 'dev-a',
             'peer' => ['ctrl-1', 'Alice'], 'ip' => '203.0.113.9', 'session_id' => 'sess-a',
-            'type' => 0, 'primary_auth' => 3, 'two_factor' => 1, 'conn_audit_ref' => 'ref-token-xyz',
+            'uuid' => 'ua', 'type' => 0, 'primary_auth' => 3, 'two_factor' => 1,
+            'conn_audit_ref' => 'ref-token-xyz',
         ])->assertOk();
 
         $this->assertDatabaseHas('audit_conns', [
@@ -38,10 +47,13 @@ class AuditConnAuthTest extends TestCase
 
     public function test_missing_auth_fields_stay_null_for_backward_compatibility(): void
     {
+        $this->device('dev-b', 'ub');
+
         // A pre-1.4.9 client (or a plain click-through) omits the new keys entirely.
         $this->postJson('/api/audit/conn', [
             'id' => 'dev-b', 'action' => 'new', 'conn_id' => 1, 'peer_id' => 'dev-b',
-            'peer' => ['ctrl-2', 'Bob'], 'ip' => '198.51.100.4', 'session_id' => 'sess-b', 'type' => 0,
+            'peer' => ['ctrl-2', 'Bob'], 'ip' => '198.51.100.4', 'session_id' => 'sess-b',
+            'uuid' => 'ub', 'type' => 0,
         ])->assertOk();
 
         $row = AuditConn::where('peer_id', 'dev-b')->firstOrFail();
@@ -53,9 +65,11 @@ class AuditConnAuthTest extends TestCase
 
     public function test_close_event_carries_no_auth_details(): void
     {
+        $this->device('dev-c', 'uc');
+
         $this->postJson('/api/audit/conn', [
             'id' => 'dev-c', 'action' => 'close', 'conn_id' => 2, 'peer_id' => 'dev-c',
-            'session_id' => 'sess-c', 'type' => 0,
+            'session_id' => 'sess-c', 'uuid' => 'uc', 'type' => 0,
         ])->assertOk();
 
         $row = AuditConn::where('peer_id', 'dev-c')->firstOrFail();
@@ -66,10 +80,12 @@ class AuditConnAuthTest extends TestCase
 
     public function test_new_connection_alarm_message_includes_auth_summary(): void
     {
+        $this->device('dev-d', 'ud');
+
         $this->postJson('/api/audit/conn', [
             'id' => 'dev-d', 'action' => 'new', 'conn_id' => 3, 'peer_id' => 'dev-d',
             'peer' => ['ctrl-4', 'Dana'], 'ip' => '203.0.113.11', 'session_id' => 'sess-d',
-            'type' => 0, 'primary_auth' => 2, 'two_factor' => 2,
+            'uuid' => 'ud', 'type' => 0, 'primary_auth' => 2, 'two_factor' => 2,
         ])->assertOk();
 
         $alarm = Alarm::where('peer_id', 'dev-d')->firstOrFail();
@@ -78,6 +94,8 @@ class AuditConnAuthTest extends TestCase
 
     public function test_session_scope_violation_alarm_type_9_is_labelled(): void
     {
+        $this->device('dev-e', 'ue');
+
         // PR #15469: a new AlarmAuditType (9) posted to /api/audit/alarm must be accepted and
         // rendered with a human label rather than the generic fallback.
         $this->postJson('/api/audit/alarm', [

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuditConn;
+use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -13,6 +14,8 @@ class AuditSessionTest extends TestCase
 
     public function test_audit_alarm_creates_an_alarm(): void
     {
+        Device::create(['rustdesk_id' => 'dev-9', 'uuid' => 'u9']);
+
         $this->postJson('/api/audit/alarm', [
             'id' => 'dev-9', 'uuid' => 'u9', 'typ' => 0, 'info' => '203.0.113.5',
         ])->assertOk();
@@ -25,13 +28,16 @@ class AuditSessionTest extends TestCase
 
     public function test_operator_session_note_attaches_to_open_session(): void
     {
+        Device::create(['rustdesk_id' => 'dev-1', 'uuid' => 'u1']);
+
         AuditConn::create([
             'action' => AuditConn::ACTION_NEW, 'conn_id' => 1, 'peer_id' => 'dev-1',
             'session_id' => 'sess-1', 'type' => 0,
         ]);
 
         $this->postJson('/api/audit/conn', [
-            'id' => 'dev-1', 'session_id' => 'sess-1', 'note' => 'investigating',
+            'id' => 'dev-1', 'uuid' => 'u1', 'session_id' => 'sess-1',
+            'note' => 'investigating',
         ])->assertOk();
 
         $this->assertDatabaseHas('audit_conns', [

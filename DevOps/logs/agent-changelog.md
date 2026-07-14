@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:43] - Security: bind and bound audit ingestion
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/AuditIngestionGuard.php`, `app/Http/Controllers/Api/AuditController.php`
+- `config/rustdesk.php`, `.env.example`
+- `tests/Feature/{AuditIngestionSecurityTest,ApiResponseTest,AuditConnAuthTest,AuditSessionTest,WebhookTest}.php`
+- `Wiki/core/15-security.md`, `docs/modernization/{02-client-api-contract,16-response-contract}.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Audit response shapes remain `{}`. Connection, file, and alarm writes now require the exact ID/UUID of an approved device; the unauthenticated legacy note shape no-ops unless it adds that UUID.
+**Summary:** Added body and field ceilings, source-IP and per-device rate limits, exact `u64` session-ID decoding, and side-effect-free rejection before database, alarm, mail, or webhook work. The authenticated guid-based note flow remains available. Thirty-eight focused tests / 150 assertions plus Pint passed; current upstream RustDesk payload construction was checked against the official source.
+
 ## [2026-07-14 09:37] - Security: bind and limit OIDC token polling
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

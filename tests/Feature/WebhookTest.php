@@ -123,7 +123,9 @@ class WebhookTest extends TestCase
         ]);
         Device::create(['rustdesk_id' => '123', 'uuid' => 'u']);
 
-        $this->postJson('/api/audit/alarm', ['id' => '123', 'typ' => 1, 'info' => '{}'])->assertOk();
+        $this->postJson('/api/audit/alarm', [
+            'id' => '123', 'uuid' => 'u', 'typ' => 1, 'info' => '{}',
+        ])->assertOk();
 
         Http::assertSent(fn ($req) => $req->url() === 'https://example.test/a');
     }
