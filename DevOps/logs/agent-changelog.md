@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 10:32] - Security: bind LDAP identities explicitly
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/LdapService.php`, `app/Models/LdapIdentity.php`
+- `app/Http/Controllers/Admin/AuthController.php`, `app/Http/Controllers/Api/LoginController.php`
+- `database/migrations/2026_07_14_100004_create_ldap_identities_table.php`
+- `config/ldap.php`, `.env.example`
+- `tests/Feature/LdapIdentitySecurityTest.php`
+- `Wiki/core/15-security.md`, `docs/modernization/01-architecture-and-current-state.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds `ldap_identities` with unique local-user and provider/subject bindings. Login response shapes are unchanged; ambiguous pre-existing usernames create a separate collision-safe LDAP account instead of being linked.
+**Summary:** Closed local and delegated administrator takeover through LDAP username collisions. Login now uses only the exact persisted directory identity, requires an immutable configured subject, keeps links/linked usernames stable, and handles concurrent first login transactionally. Five focused tests / 54 assertions, 59 authentication regression tests / 390 assertions, Pint, targeted PHPStan, and migration up/down/reapply passed.
+
 ## [2026-07-14 10:30] - Security: fail closed on unknown device enrollment
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

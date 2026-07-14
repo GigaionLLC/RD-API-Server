@@ -136,8 +136,10 @@ class AuthController extends Controller
         if ($this->ldap->enabled()) {
             $attrs = $this->ldap->authenticate($credentials['username'], $credentials['password']);
             if ($attrs !== null) {
-                $user = $this->ldap->syncUser($attrs);
-                Auth::login($user, $request->boolean('remember'));
+                // Authenticate only the persisted provider/subject-linked user returned by LDAP.
+                // The submitted username is never used to select an existing local account.
+                $linkedUser = $this->ldap->syncUser($attrs);
+                Auth::login($linkedUser, $request->boolean('remember'));
                 $authenticated = true;
             }
         }

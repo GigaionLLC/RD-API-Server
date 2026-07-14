@@ -70,21 +70,25 @@ class LoginController extends Controller
         }
 
         // LDAP first-factor: on a credentials submission (not the email_code second step),
-        // try LDAP before any local lookup. On success the user is synced locally and we skip
-        // the local password check; on failure we fall through to the unchanged local path.
+        // resolve the authenticated provider/subject link before any local lookup. The exact
+        // linked user is authoritative; the submitted username must never select a local account.
         $ldapAuthenticated = false;
+        $ldapUser = null;
         if ($type !== 'email_code' && $this->ldap->enabled()) {
             $attrs = $this->ldap->authenticate($username, $password);
             if ($attrs !== null) {
-                $this->ldap->syncUser($attrs);
+                $ldapUser = $this->ldap->syncUser($attrs);
                 $ldapAuthenticated = true;
             }
         }
 
         /** @var User|null $user */
-        $user = User::where('username', $username)
-            ->orWhere('email', $username)
-            ->first();
+        $user = $ldapUser;
+        if ($user === null) {
+            $user = User::where('username', $username)
+                ->orWhere('email', $username)
+                ->first();
+        }
 
         if (! $user) {
             return response()->json(['error' => 'Invalid username or password']);

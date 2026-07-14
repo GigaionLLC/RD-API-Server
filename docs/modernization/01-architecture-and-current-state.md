@@ -91,7 +91,9 @@ Groups of routes (CRUD unless noted):
   auto‑register; account binding (`service/oauth.go`, `config/oauth.go`).
 - **LDAP/AD:** bind + search, attribute mapping, `admin-group` (promote) and `allow-group`
   (gate), optional user sync, LDAPS/StartTLS (`service/ldap.go`, `config/ldap.go`).
-  Falls back to local password on LDAP failure.
+  Falls back to local password on LDAP failure. Authenticated directory users resolve only
+  through a persisted provider + immutable subject (`entryUUID` by default; configure
+  `objectGUID` for Active Directory). A matching local username is never auto-linked.
 - **JWT:** optional — if `jwt.key` set, tokens are signed JWTs, else random hashes.
 - **Anti‑abuse:** captcha threshold + IP ban threshold (`utils` login limiter).
 - **Tokens:** `UserToken` is a session token with expiry + auto‑refresh (<1 day left).

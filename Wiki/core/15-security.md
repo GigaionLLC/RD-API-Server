@@ -64,6 +64,20 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   deleted and recreated. Deletion removes its links transactionally before the provider key
   can be reused, so a replacement issuer cannot inherit the previous users.
 
+## LDAP Identity Boundary
+
+- A successful directory bind does not authorize whichever local account happens to share its
+  username. LDAP users resolve only through a unique persisted directory-provider + immutable
+  subject hash; both client and console login use that exact linked user.
+- New directory identities receive a collision-safe local username and an unusable random local
+  password. Existing local or legacy accounts are never adopted automatically, so ambiguous
+  upgrades fail secure instead of inheriting full-admin flags or delegated roles.
+- `LDAP_SUBJECT_ATTR` must name an immutable identifier (`entryUUID` for OpenLDAP or
+  `objectGUID` for Active Directory); blank and reusable DN subjects fail closed. Set a stable
+  `LDAP_PROVIDER_ID` before intentionally moving the same directory to a different endpoint.
+- Provider/subject and one-link-per-user database uniqueness, transactions, and retries serialize
+  concurrent first logins. Later username/profile sync cannot move a link to another account.
+
 ## Inbound Proxy Boundary
 
 - Forwarded headers are ignored by default. A deployment behind a reverse proxy must set

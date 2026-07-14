@@ -2,10 +2,15 @@
 
 namespace App\Services;
 
+use App\Models\LdapIdentity;
 use App\Models\User;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use LDAP\Connection;
+use RuntimeException;
 
 /**
  * LDAP / Active Directory authentication and user synchronization.
@@ -15,11 +20,21 @@ use LDAP\Connection;
  * credentials (the password is never read from the directory). Group membership drives admin
  * rights and the optional allow-group gate.
  *
- * Every public method is defensive: it never throws on directory/connection errors — it logs and
- * returns null/false so the caller can fall back to local-password auth. Passwords are never logged.
+ * Directory/connection methods are defensive: they log and return null/false on LDAP failures so
+ * callers can fall back to local-password auth. Persistence errors from an authenticated identity
+ * deliberately propagate so login fails closed instead of selecting a local account. Passwords are
+ * never logged.
  */
 class LdapService
 {
+    private const PROVIDER_MAX_LENGTH = 100;
+
+    private const SUBJECT_HASH_LENGTH = 64;
+
+    private const USERNAME_MAX_LENGTH = 255;
+
+    private const PROVISION_ATTEMPTS = 3;
+
     /**
      * Whether LDAP authentication is configured and enabled.
      */
@@ -32,11 +47,11 @@ class LdapService
      * Verify the username/password against the directory.
      *
      * Returns the mapped attributes on success:
-     *   ['username','email','display_name','dn','is_admin','groups']
+     *   ['username','email','display_name','dn','is_admin','groups','provider','subject_hash']
      * Returns null on any failure (bad credentials, user not found, not in allow-group,
      * connection/search error). Never throws.
      *
-     * @return array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>}|null
+     * @return array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}|null
      */
     public function authenticate(string $username, string $password): ?array
     {
@@ -47,6 +62,13 @@ class LdapService
         // An empty password would otherwise trigger an LDAP "unauthenticated bind" that succeeds
         // without verifying anything — reject it up front.
         if ($username === '' || $password === '') {
+            return null;
+        }
+
+        $provider = $this->identityProvider();
+        if ($provider === null) {
+            Log::error('LDAP identity provider configuration is invalid.');
+
             return null;
         }
 
@@ -74,6 +96,15 @@ class LdapService
                 return null;
             }
 
+            $subject = $this->identitySubject($entry);
+            if ($subject === null) {
+                Log::error('LDAP user entry has no stable identity subject.', [
+                    'subject_attribute' => (string) config('ldap.subject_attr', 'entryUUID'),
+                ]);
+
+                return null;
+            }
+
             $groups = $this->extractGroups($entry);
 
             // 3. Honor the allow-group gate before attempting the user bind.
@@ -96,6 +127,8 @@ class LdapService
                 'dn' => $userDn,
                 'is_admin' => $this->isAdmin($groups),
                 'groups' => $groups,
+                'provider' => $provider,
+                'subject_hash' => hash('sha256', $subject),
             ];
         } catch (\Throwable $e) {
             Log::error('LDAP authenticate error: '.$e->getMessage());
@@ -109,43 +142,143 @@ class LdapService
     }
 
     /**
-     * Find-or-create the local User for a set of authenticated LDAP attributes.
+     * Resolve an authenticated LDAP identity to exactly one local user.
      *
-     * On create: stores a random local password (LDAP users authenticate via LDAP, not the local
-     * hash). On an existing user, attributes are refreshed only when `sync` is enabled.
+     * Existing unlinked users are deliberately never adopted by username or email. This makes an
+     * upgrade fail secure: the first login for an LDAP subject creates a separate collision-safe
+     * local account, while only a persisted provider/subject link can resolve future logins.
      *
-     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>}  $attrs
+     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}  $attrs
      */
     public function syncUser(array $attrs): User
     {
-        $username = $attrs['username'];
+        $provider = trim($attrs['provider']);
+        $subjectHash = strtolower($attrs['subject_hash']);
 
-        /** @var User|null $user */
-        $user = User::where('username', $username)->first();
-
-        if ($user === null) {
-            $user = new User;
-            $user->username = $username;
-            $user->email = $attrs['email'];
-            $user->display_name = $attrs['display_name'];
-            $user->is_admin = $attrs['is_admin'];
-            $user->status = User::STATUS_NORMAL;
-            // LDAP users never sign in with the local hash; store an unguessable random secret.
-            $user->password = Str::random(40);
-            $user->save();
-
-            return $user;
+        if ($provider === ''
+            || mb_strlen($provider) > self::PROVIDER_MAX_LENGTH
+            || preg_match('/[\x00-\x1F\x7F]/u', $provider) === 1) {
+            throw new InvalidArgumentException('LDAP provider identity is invalid.');
+        }
+        if (preg_match('/\A[a-f0-9]{'.self::SUBJECT_HASH_LENGTH.'}\z/', $subjectHash) !== 1) {
+            throw new InvalidArgumentException('LDAP subject identity is invalid.');
         }
 
-        // Existing user: only update attributes when sync is on.
+        // Unique database constraints are the final authority. Retrying the whole transaction
+        // safely resolves concurrent first-login races without leaving an orphan local account.
+        for ($attempt = 1; $attempt <= self::PROVISION_ATTEMPTS; $attempt++) {
+            try {
+                return DB::transaction(
+                    fn (): User => $this->syncUserInTransaction($attrs, $provider, $subjectHash),
+                    self::PROVISION_ATTEMPTS,
+                );
+            } catch (QueryException $exception) {
+                if ($attempt === self::PROVISION_ATTEMPTS) {
+                    throw $exception;
+                }
+            }
+        }
+
+        throw new RuntimeException('LDAP identity provisioning failed.');
+    }
+
+    /**
+     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}  $attrs
+     */
+    private function syncUserInTransaction(array $attrs, string $provider, string $subjectHash): User
+    {
+        $identity = LdapIdentity::query()
+            ->where('provider', $provider)
+            ->where('subject_hash', $subjectHash)
+            ->lockForUpdate()
+            ->first();
+
+        if ($identity !== null) {
+            $user = User::query()->whereKey($identity->user_id)->lockForUpdate()->first();
+            if ($user === null) {
+                throw new RuntimeException('LDAP identity references a missing local user.');
+            }
+
+            return $this->syncLinkedAttributes($user, $attrs);
+        }
+
+        $user = new User;
+        $user->username = $this->availableUsername($attrs['username'], $subjectHash);
+        $user->email = $this->nullableUserAttribute($attrs['email']);
+        $user->display_name = $this->nullableUserAttribute($attrs['display_name']);
+        $user->is_admin = $attrs['is_admin'];
+        $user->status = User::STATUS_NORMAL;
+        // LDAP users never use the local hash; make fallback password authentication infeasible.
+        $user->password = Str::random(64);
+        $user->save();
+
+        LdapIdentity::create([
+            'user_id' => $user->id,
+            'provider' => $provider,
+            'subject_hash' => $subjectHash,
+        ]);
+
+        return $user;
+    }
+
+    /**
+     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}  $attrs
+     */
+    private function syncLinkedAttributes(User $user, array $attrs): User
+    {
         if ((bool) config('ldap.sync', false)) {
-            $user->email = $attrs['email'];
-            $user->display_name = $attrs['display_name'];
+            // The local username and identity link are immutable. Mutable directory attributes
+            // may be refreshed, but they can never select or relink another local account.
+            $user->email = $this->nullableUserAttribute($attrs['email']);
+            $user->display_name = $this->nullableUserAttribute($attrs['display_name']);
             $user->is_admin = $attrs['is_admin'];
             $user->save();
         }
 
         return $user;
+    }
+
+    private function availableUsername(string $preferred, string $subjectHash): string
+    {
+        $preferred = preg_replace('/[\x00-\x1F\x7F]/u', '', $preferred) ?? '';
+        $preferred = trim($preferred);
+        if ($preferred === '') {
+            $preferred = 'ldap-user';
+        }
+        $preferred = mb_substr($preferred, 0, self::USERNAME_MAX_LENGTH);
+
+        if (! $this->usernameIsTaken($preferred)) {
+            return $preferred;
+        }
+
+        $identitySuffix = '-ldap-'.substr($subjectHash, 0, 12);
+        for ($sequence = 1; $sequence <= 1000; $sequence++) {
+            $sequenceSuffix = $sequence === 1 ? '' : '-'.$sequence;
+            $suffix = $identitySuffix.$sequenceSuffix;
+            $base = mb_substr($preferred, 0, self::USERNAME_MAX_LENGTH - mb_strlen($suffix));
+            $candidate = $base.$suffix;
+
+            if (! $this->usernameIsTaken($candidate)) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException('Could not allocate a unique LDAP username.');
+    }
+
+    private function usernameIsTaken(string $username): bool
+    {
+        return User::query()
+            ->where('username', $username)
+            ->orWhere('email', $username)
+            ->exists();
+    }
+
+    private function nullableUserAttribute(string $value): ?string
+    {
+        $value = trim($value);
+
+        return $value === '' ? null : mb_substr($value, 0, self::USERNAME_MAX_LENGTH);
     }
 
     /**
@@ -182,6 +315,51 @@ class LdapService
                 @ldap_unbind($connection);
             }
         }
+    }
+
+    /**
+     * Return the configured stable directory namespace. When no explicit identifier is supplied,
+     * derive one from the connection host, port, and search base. Configuration changes therefore
+     * fail closed into a new namespace instead of silently reusing another directory's subjects.
+     */
+    private function identityProvider(): ?string
+    {
+        $configured = trim((string) config('ldap.provider_id', ''));
+        if ($configured !== '') {
+            if (mb_strlen($configured) > self::PROVIDER_MAX_LENGTH
+                || preg_match('/[\x00-\x1F\x7F]/u', $configured) === 1) {
+                return null;
+            }
+
+            return $configured;
+        }
+
+        $host = strtolower(trim((string) config('ldap.host', '')));
+        $baseDn = strtolower(trim((string) config('ldap.base_dn', '')));
+        $port = (int) config('ldap.port', 389);
+        if ($host === '' || $baseDn === '' || $port < 1 || $port > 65535) {
+            return null;
+        }
+
+        return 'auto:'.hash('sha256', $host."\0".$port."\0".$baseDn);
+    }
+
+    /**
+     * Extract the immutable subject configured for identity binding. OpenLDAP commonly exposes
+     * entryUUID; Active Directory deployments should configure objectGUID.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private function identitySubject(array $entry): ?string
+    {
+        $attribute = trim((string) config('ldap.subject_attr', 'entryUUID'));
+        if ($attribute === '' || strcasecmp($attribute, 'dn') === 0) {
+            return null;
+        }
+
+        $subject = $this->attr($entry, $attribute);
+
+        return $subject === '' ? null : $subject;
     }
 
     /**
@@ -252,13 +430,20 @@ class LdapService
         $filterTemplate = (string) config('ldap.user_filter', '(uid=%s)');
         $filter = sprintf($filterTemplate, $this->escapeFilter($username));
 
-        $search = @ldap_search($connection, $baseDn, $filter, [
+        $attributes = [
             'dn',
             (string) config('ldap.username_attr', 'uid'),
             (string) config('ldap.email_attr', 'mail'),
             (string) config('ldap.displayname_attr', 'cn'),
             'memberof',
-        ]);
+        ];
+        $subjectAttribute = trim((string) config('ldap.subject_attr', 'entryUUID'));
+        if ($subjectAttribute !== '' && strcasecmp($subjectAttribute, 'dn') !== 0) {
+            $attributes[] = $subjectAttribute;
+        }
+        $attributes = array_values(array_unique($attributes));
+
+        $search = @ldap_search($connection, $baseDn, $filter, $attributes);
 
         if ($search === false) {
             Log::error('LDAP search failed: '.ldap_error($connection));

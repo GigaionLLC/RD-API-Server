@@ -22,6 +22,14 @@ return [
     // Where to search for users.
     'base_dn' => env('LDAP_BASE_DN', 'dc=example,dc=com'),
 
+    // Stable namespace for persisted LDAP identity links. Leave blank to derive it from
+    // host + port + base DN; set an explicit value before intentionally moving a directory.
+    'provider_id' => env('LDAP_PROVIDER_ID', ''),
+
+    // Immutable per-entry subject used for identity binding. OpenLDAP commonly provides entryUUID;
+    // use objectGUID for Active Directory. Blank or `dn` fails closed because DNs can be reused.
+    'subject_attr' => env('LDAP_SUBJECT_ATTR', 'entryUUID'),
+
     // Service account used to search the directory before the user re-bind.
     'bind_dn' => env('LDAP_BIND_DN', ''),
     'bind_password' => env('LDAP_BIND_PASSWORD', ''),
