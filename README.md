@@ -102,6 +102,7 @@ services:
     environment:
       APP_ENV: production
       APP_URL: https://api.your-domain.com
+      TRUSTED_PROXIES: CHANGE_ME_proxy_ip_or_cidr  # omit when clients connect directly
       ADMIN_USER: admin
       ADMIN_PASS: CHANGE_ME_admin            # first-run admin password
       DB_CONNECTION: mysql
@@ -135,6 +136,13 @@ volumes:
   rustdesk-db: {}
 ```
 </details>
+
+If TLS terminates at a reverse proxy, set `TRUSTED_PROXIES` to that proxy's exact IP address or
+network CIDR as seen by the application container (comma-separated when there is more than one).
+The application ignores
+`X-Forwarded-*` headers by default because trusting arbitrary senders would let a direct client
+spoof the address used by login throttles and API-key IP allowlists. Never set this value to a
+wildcard, and do not expose the application port through a path that bypasses the trusted proxy.
 
 **Full stack** — to run the RustDesk `hbbs`/`hbbr` rendezvous + relay alongside the API, copy
 **[examples/full-stack.docker-compose.yml](examples/full-stack.docker-compose.yml)** and follow

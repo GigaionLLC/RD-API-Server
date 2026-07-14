@@ -63,6 +63,8 @@ services:
       - APP_ENV=production
       - APP_DEBUG=false
       - APP_URL=https://api.your-domain.com
+      # Exact IP or CIDR of the TLS proxy from step 2; never use a wildcard:
+      - TRUSTED_PROXIES=CHANGE_ME_proxy_ip_or_cidr
       # First-run admin (seeded once; change it in the UI afterward):
       - ADMIN_USER=admin
       - ADMIN_PASS=CHANGE_ME_admin_password

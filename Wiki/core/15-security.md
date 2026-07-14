@@ -53,3 +53,16 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Cross-host endpoints remain supported when each endpoint independently passes the public
   network checks. The guard does not assume that every standards-compliant provider uses one
   hostname.
+
+## Inbound Proxy Boundary
+
+- Forwarded headers are ignored by default. A deployment behind a reverse proxy must set
+  `TRUSTED_PROXIES` to that proxy's explicit IP address or CIDR; multiple entries are separated
+  with commas.
+- Never trust a wildcard or a network that untrusted clients can reach directly. The proxy must
+  construct a trustworthy client chain instead of passing client-supplied forwarded headers
+  through unchanged, and the application port must not be exposed through a path that bypasses
+  the proxy.
+- Client IPs feed login and 2FA throttles, API-key IP allowlists, audit records, and last-seen
+  metadata. Any new IP-based security control must use the framework request IP and retain this
+  trusted-proxy boundary.

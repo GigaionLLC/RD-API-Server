@@ -27,11 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // Unauthenticated admin requests go to the admin login page.
         $middleware->redirectGuestsTo('/admin/login');
-
-        // Behind a reverse proxy that terminates TLS (the common deployment): trust the
-        // forwarded headers so the app detects HTTPS + the real client IP and generates
-        // correct URLs, redirects, and secure cookies.
-        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

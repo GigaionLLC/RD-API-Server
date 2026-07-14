@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:30] - Security: require explicit trusted proxies
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `bootstrap/app.php`, `config/trustedproxy.php`, `.env.example`
+- `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `tests/Feature/TrustedProxySecurityTest.php`
+- `README.md`, `Wiki/core/15-security.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds optional `TRUSTED_PROXIES`; forwarded headers are ignored by default. Routes and wire formats are unchanged.
+**Summary:** Removed wildcard proxy trust so direct clients cannot forge the IP used by login throttles and API-key allowlists. Operators behind a sanitizing reverse proxy can explicitly list exact IPs/CIDRs; wildcard, `REMOTE_ADDR`, malformed, and all-network entries are rejected. Verified the exploit before the fix and passed 20 focused security/rate-limit tests / 120 assertions, Pint, PHPStan, configuration caching, and all three Compose validations.
+
 ## [2026-07-14 09:25] - Security: restrict generic OIDC egress
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

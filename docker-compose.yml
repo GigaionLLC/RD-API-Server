@@ -35,6 +35,8 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       APP_URL: "${APP_URL:-http://localhost:21114}"
+      # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
 
       # First-run admin account (CHANGE THIS). Seeded once; later changes in the UI stick.
       ADMIN_USER: "${ADMIN_USER:-admin}"
