@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Strategy;
+use App\Services\ClientConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Admin REST API (v1) — strategies. Read needs `strategies.read`; create/update need
@@ -74,14 +76,28 @@ class StrategyController extends Controller
      */
     private function validateStrategy(Request $request, bool $creating): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
             'note' => ['sometimes', 'nullable', 'string', 'max:255'],
             'enabled' => ['sometimes', 'boolean'],
             'options' => ['sometimes', 'array'],
             // config_options are string-valued (tri-state "" / "Y" / "N" or free text).
-            'options.*' => ['nullable', 'string'],
+            'options.*' => ['nullable', 'string', static function (string $attribute, mixed $value, $fail): void {
+                if (ClientConfigService::containsControlCharacters((string) $value)) {
+                    $fail('Strategy option values must be a single line without control characters.');
+                }
+            }],
         ]);
+
+        foreach (array_keys((array) ($data['options'] ?? [])) as $key) {
+            if (! ClientConfigService::isValidOptionKey((string) $key)) {
+                throw ValidationException::withMessages([
+                    'options' => 'Strategy option keys may contain only letters, numbers, periods, underscores, and hyphens.',
+                ]);
+            }
+        }
+
+        return $data;
     }
 
     /**

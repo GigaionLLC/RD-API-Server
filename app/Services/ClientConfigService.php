@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\SvgWriter;
+use InvalidArgumentException;
 
 /**
  * Generates a RustDesk client "server config" so admins can pre-configure clients without
@@ -19,6 +20,10 @@ use Endroid\QrCode\Writer\SvgWriter;
  */
 class ClientConfigService
 {
+    public const UNLOCK_PIN_MIN_LENGTH = 4;
+
+    public const UNLOCK_PIN_MAX_LENGTH = 128;
+
     /**
      * The reversed url-safe-base64 config string (no padding).
      */
@@ -82,30 +87,88 @@ class ClientConfigService
      */
     public function installScript(array $options, string $unlockPin = ''): array
     {
+        if ($unlockPin !== '' && ! self::isValidUnlockPin($unlockPin)) {
+            throw new InvalidArgumentException('The unlock PIN contains unsupported characters or has an invalid length.');
+        }
+
+        $normalizedOptions = [];
+        foreach ($options as $key => $value) {
+            $key = (string) $key;
+            $value = (string) $value;
+
+            if (! self::isValidOptionKey($key)) {
+                throw new InvalidArgumentException('A strategy option key contains unsupported characters.');
+            }
+            if (self::containsControlCharacters($value)) {
+                throw new InvalidArgumentException('A strategy option value contains unsupported control characters.');
+            }
+            if ($value !== '') {
+                $normalizedOptions[$key] = $value;
+            }
+        }
+
         $binaries = [
-            'Linux' => 'sudo rustdesk',
-            'macOS' => 'sudo /Applications/RustDesk.app/Contents/MacOS/rustdesk',
-            'Windows' => '"%ProgramFiles%\\RustDesk\\rustdesk.exe"',
+            'Linux' => ['command' => 'sudo rustdesk', 'shell' => 'posix'],
+            'macOS' => ['command' => 'sudo /Applications/RustDesk.app/Contents/MacOS/rustdesk', 'shell' => 'posix'],
+            // Generate PowerShell rather than cmd.exe syntax. PowerShell single-quoted
+            // arguments do not expand %, !, $, subexpressions, or backticks.
+            'Windows' => ['command' => '& "$env:ProgramFiles\\RustDesk\\rustdesk.exe"', 'shell' => 'powershell'],
         ];
 
         $scripts = [];
-        foreach ($binaries as $os => $bin) {
+        foreach ($binaries as $os => $binary) {
+            $quote = $binary['shell'] === 'powershell'
+                ? self::quotePowerShellArgument(...)
+                : self::quotePosixArgument(...);
             $lines = [];
             if ($unlockPin !== '') {
-                $lines[] = $bin.' --set-unlock-pin '.$unlockPin;
+                $lines[] = $binary['command'].' --set-unlock-pin '.$quote($unlockPin);
             }
-            foreach ($options as $key => $value) {
-                $value = (string) $value;
-                if ($value === '') {
-                    continue;
-                }
-                // Quote values containing spaces (e.g. an IP whitelist) so they stay one argument.
-                $arg = str_contains($value, ' ') ? '"'.$value.'"' : $value;
-                $lines[] = $bin.' --option '.$key.' '.$arg;
+            foreach ($normalizedOptions as $key => $value) {
+                $lines[] = $binary['command'].' --option '.$quote($key).' '.$quote($value);
             }
             $scripts[$os] = implode("\n", $lines);
         }
 
         return $scripts;
+    }
+
+    /**
+     * Strategy option names become command-line arguments in deployment output. Keep the
+     * accepted syntax aligned with RustDesk's hyphenated option vocabulary while excluding
+     * whitespace, shell metacharacters, quotes, and control characters.
+     */
+    public static function isValidOptionKey(string $key): bool
+    {
+        return preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,254}\z/D', $key) === 1;
+    }
+
+    /**
+     * RustDesk requires 4-128 characters. The generator intentionally accepts only an
+     * unreserved, portable subset so a PIN stays safe across POSIX shells and PowerShell.
+     */
+    public static function isValidUnlockPin(string $pin): bool
+    {
+        // The allow-list below is ASCII-only, so byte length and character length match.
+        $length = strlen($pin);
+
+        return $length >= self::UNLOCK_PIN_MIN_LENGTH
+            && $length <= self::UNLOCK_PIN_MAX_LENGTH
+            && preg_match('/\A[A-Za-z0-9._~-]+\z/D', $pin) === 1;
+    }
+
+    public static function containsControlCharacters(string $value): bool
+    {
+        return preg_match('/[\x00-\x1F\x7F]/', $value) === 1;
+    }
+
+    private static function quotePosixArgument(string $value): string
+    {
+        return "'".str_replace("'", "'\\''", $value)."'";
+    }
+
+    private static function quotePowerShellArgument(string $value): string
+    {
+        return "'".str_replace("'", "''", $value)."'";
     }
 }

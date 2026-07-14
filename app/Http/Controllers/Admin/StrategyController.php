@@ -8,10 +8,12 @@ use App\Models\DeviceGroup;
 use App\Models\Strategy;
 use App\Models\StrategyAssignment;
 use App\Models\User;
+use App\Services\ClientConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -121,12 +123,32 @@ class StrategyController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
             'enabled' => ['nullable', 'boolean'],
             'opt' => ['nullable', 'array'],
-            'opt.*' => ['nullable', 'string'],
+            'opt.*' => ['nullable', 'string', static function (string $attribute, mixed $value, $fail): void {
+                if (ClientConfigService::containsControlCharacters((string) $value)) {
+                    $fail('Strategy option values must be a single line without control characters.');
+                }
+            }],
             'option_keys' => ['nullable', 'array'],
-            'option_keys.*' => ['nullable', 'string', 'max:255'],
+            'option_keys.*' => ['nullable', 'string', 'max:255', static function (string $attribute, mixed $value, $fail): void {
+                if ((string) $value !== '' && ! ClientConfigService::isValidOptionKey(trim((string) $value))) {
+                    $fail('Option keys may contain only letters, numbers, periods, underscores, and hyphens.');
+                }
+            }],
             'option_values' => ['nullable', 'array'],
-            'option_values.*' => ['nullable', 'string'],
+            'option_values.*' => ['nullable', 'string', static function (string $attribute, mixed $value, $fail): void {
+                if (ClientConfigService::containsControlCharacters((string) $value)) {
+                    $fail('Strategy option values must be a single line without control characters.');
+                }
+            }],
         ]);
+
+        foreach (array_keys((array) $request->input('opt', [])) as $key) {
+            if (! ClientConfigService::isValidOptionKey((string) $key)) {
+                throw ValidationException::withMessages([
+                    'opt' => 'Strategy option keys may contain only letters, numbers, periods, underscores, and hyphens.',
+                ]);
+            }
+        }
 
         $options = [];
 

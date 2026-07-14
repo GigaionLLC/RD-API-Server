@@ -31,39 +31,46 @@
                     <p>Values are prefilled from this server's RustDesk configuration. Review them here without changing the stored server settings, then generate formats for mobile, desktop, command-line, or managed installation.</p>
                 </div>
 
-                <form method="GET" action="{{ route('admin.client-config.index') }}" class="rd-stack rd-stack--md">
+                <form method="POST" action="{{ route('admin.client-config.generate') }}" class="rd-stack rd-stack--md">
+                    @csrf
                     <div class="rd-form-grid rd-form-grid--2">
                         <div class="rd-field">
                             <label class="rd-label" for="host">ID / Rendezvous server</label>
-                            <input class="rd-input" id="host" name="host" value="{{ $host }}" placeholder="rustdesk.example.com" required>
+                            <input class="rd-input" id="host" name="host" value="{{ old('host', $host) }}" placeholder="rustdesk.example.com" required @error('host') aria-invalid="true" aria-describedby="host-error" @enderror>
                             <span class="rd-help">Host name used by clients to find the ID server.</span>
+                            @error('host')<span class="rd-help rd-help--error" id="host-error">{{ $message }}</span>@enderror
                         </div>
                         <div class="rd-field">
                             <label class="rd-label" for="key">Public key</label>
-                            <input class="rd-input rd-mono" id="key" name="key" value="{{ $key }}" placeholder="hbbs public key (…=)">
+                            <input class="rd-input rd-mono" id="key" name="key" value="{{ old('key', $key) }}" placeholder="hbbs public key (…=)" @error('key') aria-invalid="true" aria-describedby="key-error" @enderror>
+                            @error('key')<span class="rd-help rd-help--error" id="key-error">{{ $message }}</span>@enderror
                         </div>
                         <div class="rd-field">
                             <label class="rd-label" for="relay">Relay server</label>
-                            <input class="rd-input" id="relay" name="relay" value="{{ $relay }}" placeholder="rustdesk.example.com (optional)">
+                            <input class="rd-input" id="relay" name="relay" value="{{ old('relay', $relay) }}" placeholder="rustdesk.example.com (optional)" @error('relay') aria-invalid="true" aria-describedby="relay-error" @enderror>
+                            @error('relay')<span class="rd-help rd-help--error" id="relay-error">{{ $message }}</span>@enderror
                         </div>
                         <div class="rd-field">
                             <label class="rd-label" for="api">API server</label>
-                            <input class="rd-input" id="api" name="api" value="{{ $api }}" placeholder="https://api.example.com">
+                            <input class="rd-input" id="api" name="api" value="{{ old('api', $api) }}" placeholder="https://api.example.com" @error('api') aria-invalid="true" aria-describedby="api-error" @enderror>
+                            @error('api')<span class="rd-help rd-help--error" id="api-error">{{ $message }}</span>@enderror
                         </div>
                         <div class="rd-field">
                             <label class="rd-label" for="unlock_pin">Default unlock PIN <span class="rd-muted">(optional)</span></label>
-                            <input class="rd-input rd-mono" id="unlock_pin" name="unlock_pin" value="{{ $unlockPin }}" placeholder="e.g. 1234" inputmode="numeric" autocomplete="off">
-                            <span class="rd-help">Protects local client settings. Set at install time through the CLI; a strategy cannot push it.</span>
+                            <input class="rd-input rd-mono" id="unlock_pin" name="unlock_pin" type="password" placeholder="e.g. 4821" minlength="4" maxlength="128" pattern="[A-Za-z0-9._~-]{4,128}" autocomplete="new-password" aria-describedby="unlock-pin-help" @error('unlock_pin') aria-invalid="true" aria-errormessage="unlock-pin-error" @enderror>
+                            <span class="rd-help" id="unlock-pin-help">Protects local client settings. Use 4–128 letters, numbers, or <code>._~-</code>. The PIN is submitted securely and never placed in the page URL.</span>
+                            @error('unlock_pin')<span class="rd-help rd-help--error" id="unlock-pin-error">{{ $message }}</span>@enderror
                         </div>
                         <div class="rd-field">
                             <label class="rd-label" for="strategy">Install script from Strategy <span class="rd-muted">(optional)</span></label>
-                            <select class="rd-select" id="strategy" name="strategy">
+                            <select class="rd-select" id="strategy" name="strategy" @error('strategy') aria-invalid="true" aria-describedby="strategy-error" @enderror>
                                 <option value="">— None —</option>
                                 @foreach ($strategies as $strategy)
-                                    <option value="{{ $strategy->id }}" @selected($strategyId === $strategy->id)>{{ $strategy->name }}</option>
+                                    <option value="{{ $strategy->id }}" @selected((int) old('strategy', $strategyId) === $strategy->id)>{{ $strategy->name }}</option>
                                 @endforeach
                             </select>
                             <span class="rd-help">Turns strategy options into <code>rustdesk --option …</code> commands for a deployment script.</span>
+                            @error('strategy')<span class="rd-help rd-help--error" id="strategy-error">{{ $message }}</span>@enderror
                         </div>
                     </div>
                     <div class="rd-actions rd-actions--end">
@@ -72,6 +79,13 @@
                 </form>
             </div>
         </section>
+
+        @if ($scriptWarning)
+            <div class="rd-callout rd-callout--danger" role="alert">
+                <i class="ri-error-warning-line" aria-hidden="true"></i>
+                <p>{{ $scriptWarning }}</p>
+            </div>
+        @endif
 
         @if ($installScript)
             <section class="rd-card" aria-labelledby="install-script-title">
@@ -84,7 +98,7 @@
                 <div class="rd-card__body rd-stack rd-stack--md">
                     <div class="rd-callout rd-callout--warning">
                         <i class="ri-shield-keyhole-line" aria-hidden="true"></i>
-                        <p>Run these commands as administrator or root on an installed client. They apply the selected strategy at deploy time. @if ($unlockPin !== '') The unlock PIN is included first. @endif</p>
+                        <p>Run these commands as administrator or root on an installed client. They apply the selected strategy at deploy time. Windows output is PowerShell. @if ($unlockPin !== '') The unlock PIN is included first. @endif</p>
                     </div>
                     @php
                         $scriptIcons = [
@@ -111,7 +125,7 @@
             </section>
         @endif
 
-        @if ($unlockPin !== '' && ! $selectedStrategy)
+        @if ($pinCommands && ! $selectedStrategy)
             <section class="rd-card rd-card--quiet" aria-labelledby="unlock-pin-title">
                 <div class="rd-card__header">
                     <div>
@@ -121,14 +135,9 @@
                     <code>--set-unlock-pin</code>
                 </div>
                 <div class="rd-card__body rd-stack rd-stack--md">
-                    <p class="rd-help">Run once as administrator or root. The PIN is encrypted per device and cannot be pushed by a strategy.</p>
+                    <p class="rd-help">Run once as administrator or root. The PIN is encrypted per device and cannot be pushed by a strategy. The Windows command uses PowerShell.</p>
                     @php
                         $pinIcons = ['Windows' => 'ri-windows-fill', 'macOS' => 'ri-apple-fill', 'Linux' => 'ri-ubuntu-fill'];
-                        $pinCommands = [
-                            'Windows' => '"%ProgramFiles%\\RustDesk\\rustdesk.exe" --set-unlock-pin '.$unlockPin,
-                            'macOS' => 'sudo /Applications/RustDesk.app/Contents/MacOS/rustdesk --set-unlock-pin '.$unlockPin,
-                            'Linux' => 'sudo rustdesk --set-unlock-pin '.$unlockPin,
-                        ];
                     @endphp
                     @foreach ($pinCommands as $os => $command)
                         @php

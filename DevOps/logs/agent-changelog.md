@@ -3,6 +3,21 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 08:30] - Security: harden client deployment command generation
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/ClientConfigService.php`
+- `app/Http/Controllers/Admin/ClientConfigController.php`
+- `app/Http/Controllers/Admin/StrategyController.php`
+- `app/Http/Controllers/Api/V1/StrategyController.php`
+- `resources/views/admin/client_config/index.blade.php`
+- `routes/web.php`
+- `tests/Feature/ClientConfigTest.php`
+- `tests/Feature/StrategyOptionSecurityTest.php`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Added a CSRF-protected `POST /admin/client-config` generation route. Existing `GET /admin/client-config` deep links remain supported for non-sensitive fields; RustDesk client wire routes are unchanged.
+**Summary:** Moved unlock-PIN generation out of URLs, prevented PIN repopulation, added no-store/no-referrer responses, allowlisted deployment option keys and PIN characters, rejected control characters, and generated correctly quoted POSIX and PowerShell commands. Unsafe legacy strategy data now produces a refusal warning instead of executable output, with hostile-input, permission, CSRF, and API regression coverage.
+
 ## [2026-07-14 08:28] - Security: close delegated administrator escalation paths
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

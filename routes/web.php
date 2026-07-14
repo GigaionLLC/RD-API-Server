@@ -169,6 +169,7 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::post('/admin/deploy-tokens', [DeployTokenController::class, 'store'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.store');
     Route::delete('/admin/deploy-tokens/{deployToken}', [DeployTokenController::class, 'destroy'])->middleware('permission:deploy.edit')->name('admin.deploy-tokens.destroy');
     Route::get('/admin/client-config', [ClientConfigController::class, 'index'])->middleware('permission:deploy.view')->name('admin.client-config.index');
+    Route::post('/admin/client-config', [ClientConfigController::class, 'generate'])->middleware('permission:deploy.view')->name('admin.client-config.generate');
 
     // Outbound webhooks / notifications (Slack / Telegram / generic JSON).
     Route::get('/admin/webhooks', [WebhookController::class, 'index'])->middleware('permission:webhooks.view')->name('admin.webhooks.index');
