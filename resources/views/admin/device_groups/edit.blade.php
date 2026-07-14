@@ -1,21 +1,31 @@
 @extends('layouts.admin')
 @section('title', 'Edit Device Group')
+@php
+    $canEdit = auth()->user()->hasPermission('device_groups.edit');
+    $selectedAccessGroups = $userGroups->filter(
+        static fn ($candidate): bool => in_array((int) $candidate->id, $accessGroupIds, true)
+    );
+@endphp
 
 @section('content')
     <header class="rd-page-header">
         <div class="rd-page-header__copy">
             <div class="rd-page-header__eyebrow">Fleet / Device Groups</div>
             <h1 class="rd-page-header__title">{{ $deviceGroup->name }}</h1>
-            <p class="rd-page-header__description">Maintain group identity and define which user groups can reach its devices.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? 'Maintain group identity and define which user groups can reach its devices.' : 'Review group identity and which user groups can reach its devices.' }}</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.device-groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.device-groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
     <div class="rd-card rd-card--quiet rd-max-w-md">
         <div class="rd-card__body">
+            @unless ($canEdit)
+                <div class="rd-callout rd-callout--info"><i class="ri-eye-line" aria-hidden="true"></i><p>You have view-only access to device groups.</p></div>
+            @endunless
             <form class="rd-liveform rd-stack rd-stack--lg" data-url="{{ route('admin.device-groups.update', $deviceGroup) }}" data-method="PUT">
+                <fieldset class="rd-fieldset-reset rd-stack rd-stack--lg" @disabled(! $canEdit)>
                 <div class="rd-form-grid rd-form-grid--2">
                     <div class="rd-field">
                         <label class="rd-label" for="name">Name</label>
@@ -27,6 +37,7 @@
                     </div>
                 </div>
                 <div class="rd-field">
+                    @if ($canEdit)
                     <label class="rd-label" for="access_groups">Accessible by these user groups</label>
                     <select class="rd-select" id="access_groups" multiple size="6" data-access-multiselect data-target="#access_group_ids" aria-describedby="access-groups-help">
                         @foreach ($userGroups as $g)
@@ -34,16 +45,30 @@
                         @endforeach
                     </select>
                     <input type="hidden" id="access_group_ids" name="access_group_ids" value="{{ implode(',', $accessGroupIds) }}">
+                    @else
+                    <span class="rd-label">Accessible by these user groups</span>
+                    <div class="rd-actions rd-actions--wrap">
+                        @forelse ($selectedAccessGroups as $selectedGroup)
+                            <span class="rd-badge rd-badge--muted">{{ $selectedGroup->name }}</span>
+                        @empty
+                            <span class="rd-muted">No user groups have explicit access.</span>
+                        @endforelse
+                    </div>
+                    @endif
                     <small class="rd-help" id="access-groups-help">Members of the selected user groups may access devices in this device group.</small>
                 </div>
+                @if ($canEdit)
                 <div class="rd-actions">
                     <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Save</button>
                 </div>
+                @endif
+                </fieldset>
             </form>
         </div>
     </div>
 @endsection
 
+@if ($canEdit)
 @push('scripts')
 <script>
     $(function () {
@@ -60,3 +85,4 @@
     });
 </script>
 @endpush
+@endif

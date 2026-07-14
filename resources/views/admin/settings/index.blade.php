@@ -7,6 +7,7 @@
     foreach ($settings as $row) {
         $settingsMap[$row->key] = $row->value;
     }
+    $canEdit = auth()->user()->hasPermission('settings.edit');
 @endphp
 
 @section('content')
@@ -14,7 +15,7 @@
         <div class="rd-page-header__copy">
             <div class="rd-page-header__eyebrow">System</div>
             <h1 class="rd-page-header__title">Settings</h1>
-            <p class="rd-page-header__description">Manage server key-value configuration and outbound email delivery.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? 'Manage server key-value configuration and outbound email delivery.' : 'Review server key-value configuration and outbound email delivery.' }}</p>
         </div>
     </header>
 
@@ -25,16 +26,23 @@
                 <h2 class="rd-card__title" id="system-settings-title">System settings</h2>
             </div>
             <div class="rd-card__body">
+                @unless ($canEdit)
+                    <div class="rd-callout rd-callout--info"><i class="ri-eye-line" aria-hidden="true"></i><p>You have view-only access to settings.</p></div>
+                @endunless
                 <form class="rd-liveform rd-stack rd-stack--lg" id="settingsForm" data-url="{{ route('admin.settings.update') }}" data-method="PUT">
+                    <fieldset class="rd-fieldset-reset rd-stack rd-stack--lg" @disabled(! $canEdit)>
                     <div class="rd-stack rd-stack--sm">
                         <div class="rd-label">Key / value pairs</div>
                         <div class="rd-stack rd-stack--sm" id="settingRows"></div>
                     </div>
                     <div class="rd-actions rd-actions--wrap">
-                        <button type="button" class="rd-btn rd-btn--ghost" id="addSetting"><i class="ri-add-line"></i> Add setting</button>
+                        @if ($canEdit)
+                        <button type="button" class="rd-btn rd-btn--ghost" id="addSetting"><i class="ri-add-line" aria-hidden="true"></i> Add setting</button>
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Save</button>
+                        @endif
                     </div>
                     <span class="rd-help">Removing a row and saving deletes that setting.</span>
+                    </fieldset>
                 </form>
             </div>
         </section>
@@ -46,6 +54,7 @@
             </div>
             <div class="rd-card__body">
                 <form class="rd-liveform rd-stack rd-stack--lg" data-url="{{ route('admin.settings.smtp') }}" data-method="PUT">
+                    <fieldset class="rd-fieldset-reset rd-stack rd-stack--lg" @disabled(! $canEdit)>
                     <div class="rd-form-grid rd-form-grid--2">
                     <div class="rd-field">
                         <label class="rd-label" for="host">Host</label>
@@ -79,8 +88,11 @@
                     </div>
                     </div>
                     <div class="rd-actions">
+                        @if ($canEdit)
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Save SMTP</button>
+                        @endif
                     </div>
+                    </fieldset>
                 </form>
             </div>
         </section>
@@ -91,6 +103,7 @@
 <script>
     $(function () {
         var settings = {{ \Illuminate\Support\Js::from($settingsMap) }};
+        var canEdit = @json($canEdit);
 
         function settingRow(key, value) {
             var $row = $(
@@ -106,6 +119,9 @@
             );
             $row.find('input[name="setting_keys[]"]').val(key || '');
             $row.find('input[name="setting_values[]"]').val(value == null ? '' : String(value));
+            if (!canEdit) {
+                $row.find('.rd-set-remove').remove();
+            }
             return $row;
         }
 

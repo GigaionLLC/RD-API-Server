@@ -1,5 +1,6 @@
 @extends('layouts.admin')
 @section('title', 'Deploy Tokens')
+@php($canEdit = auth()->user()->hasPermission('deploy.edit'))
 
 @section('content')
     @include('admin.partials.flash')
@@ -8,7 +9,7 @@
         <div class="rd-page-header__copy">
             <p class="rd-page-header__eyebrow">Policies &amp; Rollout</p>
             <h1 class="rd-page-header__title">Deploy Tokens</h1>
-            <p class="rd-page-header__description">Create enrollment credentials and review tokens used for device rollout.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? 'Create enrollment credentials and review tokens used for device rollout.' : 'Review tokens used for device rollout.' }}</p>
         </div>
         <div class="rd-page-header__actions">
             <a href="{{ route('admin.devices.pending') }}" class="rd-btn rd-btn--ghost"><i class="ri-shield-check-line" aria-hidden="true"></i> Pending Devices</a>
@@ -28,6 +29,7 @@
         </div>
     @endif
 
+    @if ($canEdit)
     <div class="rd-card rd-max-w-md">
         <div class="rd-card__header">
             <h3 class="rd-card__title">Create token</h3>
@@ -57,6 +59,7 @@
             </form>
         </div>
     </div>
+    @endif
 
     <div class="rd-card rd-card--flush">
         <div class="rd-card__header">
@@ -81,13 +84,17 @@
                         <td class="rd-muted">{{ $token->expires_at?->format('Y-m-d') ?? 'Never' }}</td>
                         <td class="rd-muted">{{ $token->last_used_at?->diffForHumans() ?? '—' }}</td>
                         <td class="rd-table__actions">
+                            @if ($canEdit)
                             <div class="rd-actions rd-actions--end">
                                 <form method="POST" action="{{ route('admin.deploy-tokens.destroy', $token) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Revoke this deploy token?"><i class="ri-delete-bin-line"></i> Revoke</button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Revoke this deploy token?"><i class="ri-delete-bin-line" aria-hidden="true"></i> Revoke</button>
                                 </form>
                             </div>
+                            @else
+                                <span class="rd-muted">View only</span>
+                            @endif
                         </td>
                     </tr>
                 @empty

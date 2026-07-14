@@ -1,21 +1,26 @@
 @extends('layouts.admin')
 @section('title', 'Edit Device')
+@php($canEdit = auth()->user()->hasPermission('devices.edit'))
 
 @section('content')
     <header class="rd-page-header">
         <div class="rd-page-header__copy">
             <div class="rd-page-header__eyebrow">Fleet / Devices</div>
             <h1 class="rd-page-header__title">{{ $device->hostname ?: $device->rustdesk_id }}</h1>
-            <p class="rd-page-header__description">Update ownership, grouping, rollout strategy, and connection approval.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? 'Update ownership, grouping, rollout strategy, and connection approval.' : 'Review ownership, grouping, rollout strategy, and connection approval.' }}</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.devices.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.devices.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
     <div class="rd-card rd-card--quiet rd-max-w-lg">
         <div class="rd-card__body">
+            @unless ($canEdit)
+                <div class="rd-callout rd-callout--info"><i class="ri-eye-line" aria-hidden="true"></i><p>You have view-only access to devices.</p></div>
+            @endunless
             <form class="rd-liveform rd-stack rd-stack--lg" data-url="{{ route('admin.devices.update', $device) }}" data-method="PUT">
+                <fieldset class="rd-fieldset-reset rd-stack rd-stack--lg" @disabled(! $canEdit)>
                 <div class="rd-form-grid rd-form-grid--2">
                     <div class="rd-field">
                         <label class="rd-label" for="rustdesk_id">RustDesk ID</label>
@@ -66,9 +71,12 @@
                         <span class="rd-help" id="approval-help">Unapproved devices are blocked from connecting.</span>
                     </div>
                 </div>
+                @if ($canEdit)
                 <div class="rd-actions">
                     <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Save</button>
                 </div>
+                @endif
+                </fieldset>
             </form>
         </div>
     </div>

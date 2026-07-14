@@ -1,5 +1,6 @@
 @extends('layouts.admin')
 @section('title', 'OAuth Providers')
+@php($canEdit = auth()->user()->hasPermission('oauth.edit'))
 
 @section('content')
     @include('admin.partials.flash')
@@ -10,9 +11,11 @@
             <h1 class="rd-page-header__title">OAuth / OIDC Providers</h1>
             <p class="rd-page-header__description">Manage external identity providers and automatic user registration.</p>
         </div>
+        @if ($canEdit)
         <div class="rd-page-header__actions">
             <a href="{{ route('admin.oauth-providers.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New provider</a>
         </div>
+        @endif
     </header>
 
     <div class="rd-card rd-card--flush">
@@ -44,12 +47,14 @@
                         </td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
-                                <a href="{{ route('admin.oauth-providers.edit', $provider) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
+                                <a href="{{ route('admin.oauth-providers.edit', $provider) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canEdit ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canEdit ? 'Edit' : 'View' }}</a>
+                                @if ($canEdit)
                                 <form method="POST" action="{{ route('admin.oauth-providers.destroy', $provider) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete provider '{{ $provider->op }}'?" aria-label="Delete {{ $provider->op }} provider" title="Delete provider"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

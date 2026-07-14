@@ -1,5 +1,9 @@
 @extends('layouts.admin')
 @section('title', 'Device Groups')
+@php
+    $canEdit = auth()->user()->hasPermission('device_groups.edit');
+    $canViewUserGroups = auth()->user()->hasPermission('groups.view');
+@endphp
 
 @section('content')
     @include('admin.partials.flash')
@@ -11,8 +15,12 @@
             <p class="rd-page-header__description">Organize fleet ownership and choose where new or ungrouped devices are placed.</p>
         </div>
         <div class="rd-page-header__actions rd-actions--wrap">
+            @if ($canViewUserGroups)
             <a href="{{ route('admin.groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-group-line" aria-hidden="true"></i> User Groups</a>
+            @endif
+            @if ($canEdit)
             <a href="{{ route('admin.device-groups.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New device group</a>
+            @endif
         </div>
     </header>
 
@@ -47,29 +55,33 @@
                         <td>
                             <span class="rd-table__primary">{{ $group->name }}</span>
                             @if ($group->is_default)
-                                <span class="rd-badge rd-badge--online" title="New and ungrouped devices are placed in this group"><i class="ri-star-fill"></i> Default — new devices land here</span>
+                                <span class="rd-badge rd-badge--online" title="New and ungrouped devices are placed in this group"><i class="ri-star-fill" aria-hidden="true"></i> Default — new devices land here</span>
                             @endif
                         </td>
                         <td class="rd-muted">{{ $group->devices_count }}</td>
                         <td class="rd-muted">{{ $group->note ?: '—' }}</td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
+                                @if ($canEdit)
                                 <form method="POST" action="{{ route('admin.device-groups.default', $group) }}" class="m-0">
                                     @csrf
                                     @if ($group->is_default)
-                                        <button type="submit" class="rd-btn rd-btn--ghost" data-confirm="Clear “{{ $group->name }}” as the default? New and ungrouped devices will no longer be auto-placed into any group until you set another default." title="Stop placing new devices here"><i class="ri-star-fill"></i> Unset default</button>
+                                        <button type="submit" class="rd-btn rd-btn--ghost" data-confirm="Clear “{{ $group->name }}” as the default? New and ungrouped devices will no longer be auto-placed into any group until you set another default." title="Stop placing new devices here"><i class="ri-star-fill" aria-hidden="true"></i> Unset default</button>
                                     @elseif ($defaultGroup)
-                                        <button type="submit" class="rd-btn rd-btn--ghost" data-confirm="Make “{{ $group->name }}” the default group? This replaces the current default “{{ $defaultGroup->name }}”, which reverts to a normal group (its devices stay put). New and ungrouped devices will then land in “{{ $group->name }}”." title="Make this the one default group (replaces the current default)"><i class="ri-star-line"></i> Set as default</button>
+                                        <button type="submit" class="rd-btn rd-btn--ghost" data-confirm="Make “{{ $group->name }}” the default group? This replaces the current default “{{ $defaultGroup->name }}”, which reverts to a normal group (its devices stay put). New and ungrouped devices will then land in “{{ $group->name }}”." title="Make this the one default group (replaces the current default)"><i class="ri-star-line" aria-hidden="true"></i> Set as default</button>
                                     @else
-                                        <button type="submit" class="rd-btn rd-btn--ghost" data-confirm="Make “{{ $group->name }}” the default group? New and ungrouped devices will be placed here." title="Place new/ungrouped devices in this group"><i class="ri-star-line"></i> Set as default</button>
+                                        <button type="submit" class="rd-btn rd-btn--ghost" data-confirm="Make “{{ $group->name }}” the default group? New and ungrouped devices will be placed here." title="Place new/ungrouped devices in this group"><i class="ri-star-line" aria-hidden="true"></i> Set as default</button>
                                     @endif
                                 </form>
-                                <a href="{{ route('admin.device-groups.edit', $group) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
+                                @endif
+                                <a href="{{ route('admin.device-groups.edit', $group) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canEdit ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canEdit ? 'Edit' : 'View' }}</a>
+                                @if ($canEdit)
                                 <form method="POST" action="{{ route('admin.device-groups.destroy', $group) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete device group '{{ $group->name }}'?" aria-label="Delete {{ $group->name }} device group" title="Delete device group"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

@@ -44,7 +44,16 @@ Prefer established `rd-*` primitives: `.rd-page-header`, `.rd-card`, `.rd-toolba
 - Keep wide tables inside `.rd-table-wrap` and prevent page-level horizontal overflow.
 - Use the responsive sidebar shell and existing mobile breakpoints.
 - Use `RD.confirm()` / `data-confirm` for destructive actions, never `window.confirm()`.
+- Put `data-confirm` on the submit control (or form) so mouse, keyboard, and implicit form
+  submissions share the same confirmation and focus-return behavior.
 - Use `RD.toast()` and the shared searchable combobox behavior rather than page-local copies.
+- Treat `*.view` and `*.edit` as different interface states: retain useful navigation and
+  data for viewers, hide mutation controls, disable non-editable form fields, and explain the
+  view-only state in a shared callout.
+- On validation failure, reopen the originating dialog, restore only non-sensitive input,
+  and focus an error summary; never repopulate passwords or file inputs.
+- Off-canvas navigation must make background content inert, keep focus inside the drawer,
+  provide an explicit close control, and return focus to its opener.
 - Preserve labels, focus states, keyboard operation, ARIA state, and reduced-motion support.
 - Verify both desktop themes plus tablet and mobile projects in Playwright, with axe coverage
   for representative pages.

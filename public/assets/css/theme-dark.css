@@ -236,6 +236,23 @@ p {
   color: var(--rd-text-bright);
 }
 
+.rd-sidebar__close {
+  position: absolute;
+  z-index: 1;
+  top: 15px;
+  right: 12px;
+  display: none;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--rd-border);
+  border-radius: var(--rd-radius-sm);
+  background: var(--rd-surface);
+  color: var(--rd-text);
+  cursor: pointer;
+  font-size: 19px;
+}
+
 .rd-logo {
   display: inline-grid;
   width: 34px;
@@ -798,6 +815,13 @@ p {
 .rd-field {
   min-width: 0;
   margin-bottom: 17px;
+}
+
+.rd-fieldset-reset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .rd-label {
@@ -1969,6 +1993,13 @@ textarea.form-control {
   font-size: 13px;
 }
 
+.rd-peer__note {
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--rd-text-muted);
+  font-size: 12px;
+}
+
 .rd-peer__platform {
   margin-top: 3px;
   color: var(--rd-text-muted);
@@ -2203,6 +2234,14 @@ textarea.form-control {
   .rd-sidebar__backdrop.is-visible {
     display: block;
     opacity: 1;
+  }
+
+  .rd-sidebar__brand {
+    padding-right: 60px;
+  }
+
+  .rd-sidebar__close {
+    display: inline-grid;
   }
 
   .rd-main {

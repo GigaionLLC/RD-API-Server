@@ -95,7 +95,7 @@
                         @error('code')<span class="rd-help rd-help--error" id="code-error">{{ $message }}</span>@enderror
                     </div>
                     <div class="rd-actions rd-actions--wrap">
-                        <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-check-line"></i> Verify &amp; enable</button>
+                        <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-check-line" aria-hidden="true"></i> Verify &amp; enable</button>
                         <a class="rd-btn rd-btn--ghost" href="{{ route('admin.2fa.show') }}">Cancel</a>
                     </div>
                 </form>
@@ -110,7 +110,7 @@
                 </div>
                 <form method="POST" action="{{ route('admin.2fa.enable') }}">
                     @csrf
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-shield-keyhole-line"></i> Enable two-factor</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-shield-keyhole-line" aria-hidden="true"></i> Enable two-factor</button>
                 </form>
             @endif
 

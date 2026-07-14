@@ -32,9 +32,7 @@ test('login is free of automatically detectable accessibility violations', async
     await expectNoAxeViolations(page);
 });
 
-test('representative authenticated pages pass automated accessibility checks', async ({ page }, testInfo) => {
-    test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop dark and light themes cover the full rendered shell.');
-
+test('representative authenticated pages pass automated accessibility checks', async ({ page }) => {
     await signIn(page);
     for (const path of ['/admin', '/admin/devices', '/admin/settings']) {
         await page.goto(path, { waitUntil: 'domcontentloaded' });

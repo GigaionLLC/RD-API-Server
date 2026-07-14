@@ -66,7 +66,9 @@
             <table class="rd-table">
                 <thead>
                     <tr>
-                        <th>@if ($canEdit)<input type="checkbox" id="checkAll" title="Select all on this page" aria-label="Select all manageable users on this page">@endif</th>
+                        @if ($canEdit)
+                            <th><input type="checkbox" id="checkAll" title="Select all on this page" aria-label="Select all manageable users on this page"></th>
+                        @endif
                         <th>Username</th>
                         <th>Email</th>
                         <th>Display name</th>
@@ -84,6 +86,7 @@
                         $canViewTarget = $canManageAdminAccess || ! $isPrivileged;
                     @endphp
                     <tr>
+                        @if ($canEdit)
                         <td>
                             @if ($canManageTarget)
                                 <input type="checkbox" class="usr-check" value="{{ $user->id }}" aria-label="Select {{ $user->username }}">
@@ -91,6 +94,7 @@
                                 <span class="rd-muted" aria-hidden="true">&mdash;</span>
                             @endif
                         </td>
+                        @endif
                         <td><span class="rd-table__primary">{{ $user->username }}</span></td>
                         <td class="rd-muted">{{ $user->email ?: '—' }}</td>
                         <td class="rd-muted">{{ $user->display_name ?: '—' }}</td>
@@ -120,7 +124,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7"><div class="rd-empty"><i class="rd-empty__icon ri-user-search-line" aria-hidden="true"></i><p class="rd-empty__title">No users found</p><p class="rd-empty__body">Try another search or create a user.</p></div></td></tr>
+                    <tr><td colspan="{{ $canEdit ? 7 : 6 }}"><div class="rd-empty"><i class="rd-empty__icon ri-user-search-line" aria-hidden="true"></i><p class="rd-empty__title">No users found</p><p class="rd-empty__body">Try another search or create a user.</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>

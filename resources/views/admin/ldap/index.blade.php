@@ -18,7 +18,7 @@
                 <form method="POST" action="{{ route('admin.ldap.test') }}" class="m-0">
                     @csrf
                     <button type="submit" class="rd-btn rd-btn--primary" @disabled(! $enabled)>
-                        <i class="ri-plug-line"></i> Test connection
+                        <i class="ri-plug-line" aria-hidden="true"></i> Test connection
                     </button>
                 </form>
             </div>
@@ -52,71 +52,73 @@
                 <h2 class="rd-card__title" id="ldap-config-title">Configuration snapshot</h2>
             </div>
             <div class="rd-card__body">
-            <table class="rd-table">
-                <caption class="visually-hidden">Current LDAP and Active Directory configuration</caption>
-                <tbody>
-                    <tr>
-                        <th scope="row">Status</th>
-                        <td>{{ $enabled ? 'Enabled' : 'Disabled' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Host</th>
-                        <td class="rd-mono">{{ $host !== '' ? $host : '—' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Port</th>
-                        <td class="rd-mono">{{ $port }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Base DN</th>
-                        <td class="rd-mono">{{ $baseDn !== '' ? $baseDn : '—' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Bind DN (service account)</th>
-                        <td class="rd-mono">{{ $bindDn !== '' ? $bindDn : '(anonymous)' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Bind password</th>
-                        <td>{{ $bindPasswordSet ? '•••••••• (set)' : '(not set)' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">User filter</th>
-                        <td><code>{{ $userFilter !== '' ? $userFilter : '—' }}</code></td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Username attribute</th>
-                        <td class="rd-mono">{{ $usernameAttr !== '' ? $usernameAttr : '—' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Email attribute</th>
-                        <td class="rd-mono">{{ $emailAttr !== '' ? $emailAttr : '—' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Display-name attribute</th>
-                        <td class="rd-mono">{{ $displayNameAttr !== '' ? $displayNameAttr : '—' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">StartTLS</th>
-                        <td>{{ $useStartTls ? 'On' : 'Off' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">TLS certificate verification</th>
-                        <td>{{ $tlsVerify ? 'On' : 'Off' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Admin group</th>
-                        <td class="rd-mono">{{ $adminGroup !== '' ? $adminGroup : '(none)' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Allow group</th>
-                        <td class="rd-mono">{{ $allowGroup !== '' ? $allowGroup : '(any)' }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Sync on login</th>
-                        <td>{{ $sync ? 'On' : 'Off' }}</td>
-                    </tr>
-                </tbody>
-            </table>
+                <div class="rd-table-wrap" role="region" tabindex="0" aria-label="LDAP and Active Directory configuration">
+                    <table class="rd-table">
+                        <caption class="visually-hidden">Current LDAP and Active Directory configuration</caption>
+                        <tbody>
+                            <tr>
+                                <th scope="row">Status</th>
+                                <td>{{ $enabled ? 'Enabled' : 'Disabled' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Host</th>
+                                <td class="rd-mono">{{ $host !== '' ? $host : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Port</th>
+                                <td class="rd-mono">{{ $port }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Base DN</th>
+                                <td class="rd-mono">{{ $baseDn !== '' ? $baseDn : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Bind DN (service account)</th>
+                                <td class="rd-mono">{{ $bindDn !== '' ? $bindDn : '(anonymous)' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Bind password</th>
+                                <td>{{ $bindPasswordSet ? '•••••••• (set)' : '(not set)' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">User filter</th>
+                                <td><code>{{ $userFilter !== '' ? $userFilter : '—' }}</code></td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Username attribute</th>
+                                <td class="rd-mono">{{ $usernameAttr !== '' ? $usernameAttr : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Email attribute</th>
+                                <td class="rd-mono">{{ $emailAttr !== '' ? $emailAttr : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Display-name attribute</th>
+                                <td class="rd-mono">{{ $displayNameAttr !== '' ? $displayNameAttr : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">StartTLS</th>
+                                <td>{{ $useStartTls ? 'On' : 'Off' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">TLS certificate verification</th>
+                                <td>{{ $tlsVerify ? 'On' : 'Off' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Admin group</th>
+                                <td class="rd-mono">{{ $adminGroup !== '' ? $adminGroup : '(none)' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Allow group</th>
+                                <td class="rd-mono">{{ $allowGroup !== '' ? $allowGroup : '(any)' }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Sync on login</th>
+                                <td>{{ $sync ? 'On' : 'Off' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
         </div>

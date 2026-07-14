@@ -64,7 +64,7 @@
                         <td class="rd-muted rd-mono">{{ $recording->finished_at?->format('Y-m-d H:i:s') ?? '—' }}</td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
-                                <a href="{{ route('admin.recordings.download', $recording) }}" class="rd-btn rd-btn--ghost"><i class="ri-download-2-line"></i> Download</a>
+                                <a href="{{ route('admin.recordings.download', $recording) }}" class="rd-btn rd-btn--ghost"><i class="ri-download-2-line" aria-hidden="true"></i> Download</a>
                                 @if ($canEdit)
                                     <form method="POST" action="{{ route('admin.recordings.destroy', $recording) }}" class="m-0">
                                         @csrf

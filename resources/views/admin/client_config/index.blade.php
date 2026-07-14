@@ -235,31 +235,3 @@
         @endif
     </div>
 @endsection
-
-@push('scripts')
-<script>
-    $(function () {
-        function fallbackCopy(element) {
-            element.focus();
-            element.select();
-            return document.execCommand('copy');
-        }
-
-        $('.rd-copy').on('click', function () {
-            var element = $($(this).data('copy'))[0];
-            var text = element.value;
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text)
-                    .then(function () { RD.toast('Copied to clipboard', 'success'); })
-                    .catch(function () {
-                        fallbackCopy(element);
-                        RD.toast('Copied to clipboard', 'success');
-                    });
-            } else {
-                fallbackCopy(element);
-                RD.toast('Copied to clipboard', 'success');
-            }
-        });
-    });
-</script>
-@endpush

@@ -38,7 +38,7 @@
                                     <input type="hidden" name="conn_id" value="{{ $s->conn_id }}">
                                     <button type="submit" class="rd-btn rd-btn--danger"
                                             data-confirm="Force-disconnect this session? It will drop on the device's next heartbeat.">
-                                        <i class="ri-shut-down-line"></i> Disconnect
+                                        <i class="ri-shut-down-line" aria-hidden="true"></i> Disconnect
                                     </button>
                                 </form>
                             @endif

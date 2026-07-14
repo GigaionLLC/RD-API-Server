@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -77,11 +78,20 @@ class AddressBookController extends Controller
      */
     public function importPeers(Request $request, AddressBook $addressBook): RedirectResponse
     {
-        $request->validate(['file' => ['required', 'file', 'mimes:csv,txt', 'max:4096']]);
+        $this->validateForModal(
+            $request,
+            'import',
+            ['file' => ['required', 'file', 'mimes:csv,txt', 'max:4096']],
+            ['id' => 'importModal'],
+            route('admin.address-books.show', $addressBook),
+        );
 
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         if ($handle === false) {
-            return back()->with('error', 'Could not read the uploaded file.');
+            return redirect()
+                ->route('admin.address-books.show', $addressBook)
+                ->withErrors(['file' => 'Could not read the uploaded file.'], 'import')
+                ->with('address_book_modal', ['id' => 'importModal']);
         }
 
         $limit = $addressBook->effectiveMaxPeers();
@@ -140,10 +150,16 @@ class AddressBookController extends Controller
      */
     public function updateSharing(Request $request, AddressBook $addressBook): RedirectResponse
     {
-        $data = $request->validate([
-            'note' => ['nullable', 'string', 'max:255'],
-            'max_peers' => ['nullable', 'integer', 'min:0', 'max:1000000'],
-        ]);
+        $data = $this->validateForModal(
+            $request,
+            'sharing',
+            [
+                'note' => ['nullable', 'string', 'max:255'],
+                'max_peers' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            ],
+            ['id' => 'shareModal', 'section' => 'sharing'],
+            route('admin.address-books.show', $addressBook),
+        );
 
         $addressBook->forceFill([
             'is_shared' => $request->boolean('is_shared'),
@@ -162,13 +178,25 @@ class AddressBookController extends Controller
      */
     public function storeCollaborator(Request $request, AddressBook $addressBook): RedirectResponse
     {
-        $data = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
-            'rule' => ['required', 'integer', Rule::in(array_keys(AddressBookCollaborator::RULES))],
-        ]);
+        $modalState = ['id' => 'shareModal', 'section' => 'collaborator'];
+        $data = $this->validateForModal(
+            $request,
+            'collaborator',
+            [
+                'user_id' => ['required', 'integer', 'exists:users,id'],
+                'user_search' => ['nullable', 'string', 'max:255'],
+                'rule' => ['required', 'integer', Rule::in(array_keys(AddressBookCollaborator::RULES))],
+            ],
+            $modalState,
+            route('admin.address-books.show', $addressBook),
+        );
 
         if ((int) $data['user_id'] === (int) $addressBook->user_id) {
-            return back()->with('error', 'The owner already has full control.');
+            return redirect()
+                ->route('admin.address-books.show', $addressBook)
+                ->withInput($request->except(['password', 'password_confirmation']))
+                ->withErrors(['user_id' => 'The owner already has full control.'], 'collaborator')
+                ->with('address_book_modal', $modalState);
         }
 
         AddressBookCollaborator::updateOrCreate(
@@ -202,19 +230,28 @@ class AddressBookController extends Controller
 
     public function storePeer(Request $request, AddressBook $addressBook): RedirectResponse
     {
-        $data = $this->validatePeer($request);
+        $modalState = ['id' => 'peerModal', 'mode' => 'add'];
+        $data = $this->validatePeer(
+            $request,
+            $modalState,
+            route('admin.address-books.show', $addressBook),
+        );
         $id = trim((string) $data['rustdesk_id']);
 
         if (AddressBookPeer::where('address_book_id', $addressBook->id)->where('rustdesk_id', $id)->exists()) {
-            return back()
-                ->withInput()
-                ->withErrors(['rustdesk_id' => "ID {$id} already exists in this address book."]);
+            return redirect()
+                ->route('admin.address-books.show', $addressBook)
+                ->withInput($request->except(['password', 'password_confirmation']))
+                ->withErrors(['rustdesk_id' => "ID {$id} already exists in this address book."], 'peer')
+                ->with('address_book_modal', $modalState);
         }
 
         if ($addressBook->isFull()) {
-            return back()
-                ->withInput()
-                ->withErrors(['rustdesk_id' => "This address book is full ({$addressBook->effectiveMaxPeers()} max)."]);
+            return redirect()
+                ->route('admin.address-books.show', $addressBook)
+                ->withInput($request->except(['password', 'password_confirmation']))
+                ->withErrors(['rustdesk_id' => "This address book is full ({$addressBook->effectiveMaxPeers()} max)."], 'peer')
+                ->with('address_book_modal', $modalState);
         }
 
         $peer = new AddressBookPeer([
@@ -232,7 +269,11 @@ class AddressBookController extends Controller
 
     public function updatePeer(Request $request, AddressBookPeer $peer): RedirectResponse
     {
-        $data = $this->validatePeer($request);
+        $data = $this->validatePeer(
+            $request,
+            ['id' => 'peerModal', 'mode' => 'edit', 'record_id' => $peer->getKey()],
+            route('admin.address-books.show', $peer->address_book_id),
+        );
         $this->fillPeer($peer, $data);
         $peer->save();
 
@@ -255,10 +296,16 @@ class AddressBookController extends Controller
 
     public function storeTag(Request $request, AddressBook $addressBook): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'color' => ['nullable', 'string', 'max:16'],
-        ]);
+        $data = $this->validateForModal(
+            $request,
+            'tag',
+            [
+                'name' => ['required', 'string', 'max:255'],
+                'color' => ['nullable', 'string', 'max:16'],
+            ],
+            ['id' => 'tagModal', 'mode' => 'add'],
+            route('admin.address-books.show', $addressBook),
+        );
 
         Tag::firstOrCreate(
             ['address_book_id' => $addressBook->id, 'name' => trim($data['name'])],
@@ -272,10 +319,16 @@ class AddressBookController extends Controller
 
     public function updateTag(Request $request, Tag $tag): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'color' => ['nullable', 'string', 'max:16'],
-        ]);
+        $data = $this->validateForModal(
+            $request,
+            'tag',
+            [
+                'name' => ['required', 'string', 'max:255'],
+                'color' => ['nullable', 'string', 'max:16'],
+            ],
+            ['id' => 'tagModal', 'mode' => 'edit', 'record_id' => $tag->getKey()],
+            route('admin.address-books.show', $tag->address_book_id),
+        );
 
         $old = $tag->name;
         $new = trim($data['name']);
@@ -338,16 +391,50 @@ class AddressBookController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatePeer(Request $request): array
+    private function validatePeer(Request $request, array $modalState, string $redirectUrl): array
     {
-        return $request->validate([
-            'rustdesk_id' => ['required', 'string', 'max:255'],
-            'alias' => ['nullable', 'string', 'max:255'],
-            'note' => ['nullable', 'string', 'max:300'],
-            'password' => ['nullable', 'string', 'max:255'],
-            'tags' => ['nullable', 'array'],
-            'tags.*' => ['string', 'max:255'],
-        ]);
+        return $this->validateForModal(
+            $request,
+            'peer',
+            [
+                'rustdesk_id' => ['required', 'string', 'max:255'],
+                'alias' => ['nullable', 'string', 'max:255'],
+                'note' => ['nullable', 'string', 'max:300'],
+                'password' => ['nullable', 'string', 'max:255'],
+                'tags' => ['nullable', 'array'],
+                'tags.*' => ['string', 'max:255'],
+            ],
+            $modalState,
+            $redirectUrl,
+        );
+    }
+
+    /**
+     * Validate a modal form in its own error bag and remember which dialog must be restored.
+     * The explicit redirect keeps direct form submissions on the address-book manager instead
+     * of relying on a Referer header.
+     *
+     * @param  array<string, mixed>  $rules
+     * @param  array<string, mixed>  $modalState
+     * @return array<string, mixed>
+     *
+     * @throws ValidationException
+     */
+    private function validateForModal(
+        Request $request,
+        string $errorBag,
+        array $rules,
+        array $modalState,
+        string $redirectUrl,
+    ): array {
+        try {
+            return $request->validateWithBag($errorBag, $rules);
+        } catch (ValidationException $exception) {
+            $request->session()->flash('address_book_modal', $modalState);
+            $exception->redirectTo($redirectUrl);
+
+            throw $exception;
+        }
     }
 
     /**

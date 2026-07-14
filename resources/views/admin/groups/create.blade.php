@@ -9,7 +9,7 @@
             <p class="rd-page-header__description">Group people for delegated access and device ownership rules.</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -46,7 +46,7 @@
                     @error('note')<span class="rd-help rd-help--error" id="note-error">{{ $message }}</span>@enderror
                 </div>
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Create group</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Create group</button>
                 </div>
             </form>
         </div>

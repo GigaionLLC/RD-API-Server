@@ -75,4 +75,24 @@ class AddressBookImportExportTest extends TestCase
 
         $this->assertSame(2, AddressBookPeer::where('address_book_id', $book->id)->count());
     }
+
+    public function test_invalid_import_reopens_the_dialog_with_a_named_error_bag(): void
+    {
+        $admin = $this->admin();
+        $book = AddressBook::create(['user_id' => $admin->id, 'name' => 'Book']);
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.address-books.import', $book));
+
+        $response
+            ->assertRedirect(route('admin.address-books.show', $book))
+            ->assertSessionHasErrors(['file'], null, 'import')
+            ->assertSessionHas('address_book_modal', ['id' => 'importModal']);
+
+        $this->followingRedirects()->post(route('admin.address-books.import', $book))
+            ->assertOk()
+            ->assertSee('id="import-error-summary"', false)
+            ->assertSee('data-reopen="true"', false)
+            ->assertSee('Select the file again before importing.');
+    }
 }

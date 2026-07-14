@@ -16,6 +16,20 @@ Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 **Database/API Changes:** None. Webhook delivery continues to use the stored raw destination internally; inbound routes and RustDesk client wire behavior are unchanged.
 **Summary:** Centralized credential-safe webhook labels and error filtering, hid raw URL/secret/error fields from model serialization, sanitized transport failures before logging and persistence, re-sanitized legacy history at render time, and limited view-only delegates to redacted configuration/history without mutation or resend controls.
 
+## [2026-07-14 08:54] - WebUI review: resilient workflows and permission-aware views
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `public/assets/{css/theme-dark.css,js/app.js}`
+- `app/Http/Controllers/Admin/AddressBookController.php`
+- `resources/views/admin/{address_books,deploy_tokens,device_groups,devices,groups,ldap,oauth_providers,partials,settings,strategies,users}/`
+- `resources/views/admin/{client_config,recordings,sessions,two_factor}/`
+- `e2e/{accessibility,gui,login,screenshots}.spec.ts`
+- `tests/Feature/{AdminAddressBookTest,AddressBookImportExportTest,AdminReadOnlyUiTest}.php`
+- `DESIGN.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Existing server-side permission boundaries and RustDesk client wire behavior are unchanged.
+**Summary:** Corrected modal validation recovery, nested confirmation and Enter-submit behavior, live-save races, stale combobox requests, clipboard fallbacks, persistent navigation state, mobile drawer focus/inert handling, narrow-screen overflow, and decorative icon semantics. View-only delegates now receive complete, non-mutating device, group, strategy, settings, OAuth, deploy-token, and address-book screens instead of misleading write controls, with focused feature, responsive, interaction, and accessibility regressions.
+
 ## [2026-07-14 08:42] - Security: prevent webhook server-side request forgery
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

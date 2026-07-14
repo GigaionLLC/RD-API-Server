@@ -1,4 +1,4 @@
-import { test, Page } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 /**
  * Capture the admin-console gallery and responsive flagship previews.
@@ -46,12 +46,11 @@ async function shot(page: Page, url: string, name: string) {
 async function strategyEditorShot(page: Page, name: string) {
     await page.goto('/admin/strategies', { waitUntil: 'domcontentloaded' });
     const edit = page.locator('a[href*="/edit"]').first();
-    if (await edit.count()) {
-        await edit.click();
-        await page.waitForLoadState('domcontentloaded');
-        await settle(page);
-        await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
-    }
+    await expect(edit, 'The seeded gallery requires at least one editable strategy.').toHaveCount(1);
+    await edit.click();
+    await page.waitForLoadState('domcontentloaded');
+    await settle(page);
+    await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
 }
 
 test('capture admin console screenshots', async ({ page }, testInfo) => {

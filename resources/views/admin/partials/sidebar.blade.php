@@ -42,6 +42,10 @@
 @endphp
 
 <aside class="rd-sidebar" id="rdSidebar" aria-label="Primary navigation">
+    <button class="rd-sidebar__close" type="button" aria-label="Close navigation"
+            aria-controls="rdSidebar">
+        <i class="ri-close-line" aria-hidden="true"></i>
+    </button>
     <a class="rd-sidebar__brand" href="/admin">
         <span class="rd-logo" aria-hidden="true"><i class="ri-remote-control-line"></i></span>
         <span class="rd-sidebar__brand-copy">

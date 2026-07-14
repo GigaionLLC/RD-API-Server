@@ -5,6 +5,7 @@
     $statusFilter = in_array($status, ['online', 'offline'], true) ? $status : '';
     $filtersActive = $q !== '' || $statusFilter !== '';
     $pageOnline = $devices->getCollection()->where('is_online', true)->count();
+    $canEdit = auth()->user()->hasPermission('devices.edit');
 @endphp
 
 @section('content')
@@ -64,6 +65,7 @@
             </form>
 
             {{-- Bulk-assign bar (shown when at least one device is selected). --}}
+            @if ($canEdit)
             <form method="POST" id="bulkForm" action="{{ route('admin.devices.bulk') }}" class="rd-bulkbar rd-actions--wrap" hidden>
                 @csrf
                 <div class="rd-bulkbar__count" aria-live="polite">
@@ -100,12 +102,15 @@
                     <span id="bulkIds"></span>
                 </div>
             </form>
+            @endif
 
             <div class="rd-table-wrap" role="region" tabindex="0" aria-label="Devices table">
                 <table class="rd-table">
                     <thead>
                         <tr>
-                            <th><label class="rd-check"><input type="checkbox" id="checkAll"><span class="visually-hidden">Select all devices on this page</span></label></th>
+                            @if ($canEdit)
+                                <th><label class="rd-check"><input type="checkbox" id="checkAll"><span class="visually-hidden">Select all devices on this page</span></label></th>
+                            @endif
                             <th>Device</th>
                             <th>OS</th>
                             <th>Owner</th>
@@ -117,7 +122,9 @@
                     <tbody>
                     @forelse ($devices as $device)
                         <tr>
-                            <td><label class="rd-check"><input class="dev-check" type="checkbox" value="{{ $device->id }}"><span class="visually-hidden">Select {{ $device->hostname ?: $device->alias ?: $device->rustdesk_id }}</span></label></td>
+                            @if ($canEdit)
+                                <td><label class="rd-check"><input class="dev-check" type="checkbox" value="{{ $device->id }}"><span class="visually-hidden">Select {{ $device->hostname ?: $device->alias ?: $device->rustdesk_id }}</span></label></td>
+                            @endif
                             <td>
                                 <span class="rd-table__primary">{{ $device->hostname ?: $device->alias ?: $device->rustdesk_id }}</span>
                                 <span class="rd-table__meta rd-mono">{{ $device->rustdesk_id }}</span>
@@ -132,18 +139,20 @@
                             <td class="rd-muted">{{ $device->last_online_at?->diffForHumans() ?? '—' }}</td>
                             <td>
                                 <div class="rd-table__actions">
-                                    <a href="{{ route('admin.devices.edit', $device) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line" aria-hidden="true"></i> Edit</a>
+                                    <a href="{{ route('admin.devices.edit', $device) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canEdit ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canEdit ? 'Edit' : 'View' }}</a>
+                                    @if ($canEdit)
                                     <form method="POST" action="{{ route('admin.devices.destroy', $device) }}" class="m-0">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="rd-icon-btn rd-icon-btn--danger" aria-label="Delete {{ $device->hostname ?: $device->alias ?: $device->rustdesk_id }}" title="Delete device" data-confirm="Delete this device? This cannot be undone."><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                     </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7">
+                            <td colspan="{{ $canEdit ? 7 : 6 }}">
                                 <div class="rd-empty">
                                     <i class="ri-computer-line rd-empty__icon" aria-hidden="true"></i>
                                     <p class="rd-empty__title">{{ $filtersActive ? 'No devices match these filters' : 'No devices have checked in yet' }}</p>
@@ -163,6 +172,7 @@
     </div>
 @endsection
 
+@if ($canEdit)
 @push('scripts')
 <script>
     $(function () {
@@ -191,19 +201,23 @@
 
         $('#checkAll').on('change', function () {
             $('.dev-check').prop('checked', this.checked);
+            $(this).prop('indeterminate', false);
             resetApplyAll();
             refreshBulk();
         });
 
         $(document).on('change', '.dev-check', function () {
             var all = $('.dev-check'), checked = $('.dev-check:checked');
-            $('#checkAll').prop('checked', all.length > 0 && checked.length === all.length);
+            $('#checkAll')
+                .prop('checked', all.length > 0 && checked.length === all.length)
+                .prop('indeterminate', checked.length > 0 && checked.length < all.length);
             resetApplyAll();
             refreshBulk();
         });
 
         $('#bulkClear').on('click', function () {
             $('.dev-check, #checkAll').prop('checked', false);
+            $('#checkAll').prop('indeterminate', false);
             resetApplyAll();
             refreshBulk();
         });
@@ -275,3 +289,4 @@
     });
 </script>
 @endpush
+@endif

@@ -9,7 +9,7 @@
             <p class="rd-page-header__description">Organize devices for assignment, access, and policy rollout.</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.device-groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.device-groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -38,7 +38,7 @@
                     </div>
                 </div>
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Create device group</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Create device group</button>
                 </div>
             </form>
         </div>

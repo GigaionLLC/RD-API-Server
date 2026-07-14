@@ -9,7 +9,7 @@
             <p class="rd-page-header__description">Configure OAuth or OpenID Connect sign-in for clients and the admin console.</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.oauth-providers.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.oauth-providers.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -41,8 +41,7 @@
                             <label class="rd-label" for="redirectUri">Client redirect URI</label>
                             <div class="rd-actions rd-actions--wrap">
                                 <input class="rd-input rd-input--mono rd-grow" id="redirectUri" value="{{ $redirectUri }}" readonly>
-                                <button type="button" class="rd-btn rd-btn--ghost" aria-label="Copy client redirect URI"
-                                        onclick="navigator.clipboard.writeText(document.getElementById('redirectUri').value);RD.toast('Copied','success');">
+                                <button type="button" class="rd-btn rd-btn--ghost" data-copy="#redirectUri" aria-label="Copy client redirect URI">
                                     <i class="ri-file-copy-line" aria-hidden="true"></i> Copy
                                 </button>
                             </div>
@@ -137,7 +136,7 @@
                 </div>
 
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Create provider</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Create provider</button>
                 </div>
             </form>
         </div>

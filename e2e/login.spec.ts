@@ -36,11 +36,13 @@ test('admin can sign in and reach the dashboard', async ({ page }) => {
 test('admin can open the strategies page', async ({ page }) => {
     await signIn(page);
     await page.goto('/admin/strategies');
-    await expect(page.locator('body')).toContainText(/Strateg/i);
+    await expect(page).toHaveURL(/\/admin\/strategies$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Strategies' })).toBeVisible();
 });
 
 test('admin can open the devices page', async ({ page }) => {
     await signIn(page);
     await page.goto('/admin/devices');
-    await expect(page.locator('body')).toContainText(/Devices/i);
+    await expect(page).toHaveURL(/\/admin\/devices$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Devices' })).toBeVisible();
 });

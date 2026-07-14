@@ -9,7 +9,7 @@
             <p class="rd-page-header__description">Start a policy container, then configure and assign client options from its editor.</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.strategies.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.strategies.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -42,7 +42,7 @@
                     <span>Configuration options are added on the edit page after creation.</span>
                 </div>
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Create strategy</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Create strategy</button>
                 </div>
             </form>
         </div>

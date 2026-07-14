@@ -6,6 +6,7 @@
 
     $current = $strategy->options ?? [];
     $customOptions = $customOptions ?? [];
+    $canEdit = auth()->user()->hasPermission('strategies.edit');
     $targetLabels = [
         StrategyAssignment::TARGET_DEVICE => 'Device',
         StrategyAssignment::TARGET_USER => 'User',
@@ -21,7 +22,7 @@
                 <div class="rd-breadcrumb" aria-label="Breadcrumb">Policies &amp; Rollout / Strategies / {{ $strategy->name }}</div>
                 <p class="rd-page-header__eyebrow">Client policy</p>
                 <h1 class="rd-page-header__title">{{ $strategy->name }}</h1>
-                <p class="rd-page-header__description">Set client defaults, make intentional overrides, and control which devices or people receive this strategy.</p>
+                <p class="rd-page-header__description">{{ $canEdit ? 'Set client defaults, make intentional overrides, and control which devices or people receive this strategy.' : 'Review client defaults, overrides, and rollout assignments.' }}</p>
             </div>
             <div class="rd-page-header__actions">
                 <span class="rd-badge rd-badge--{{ $strategy->enabled ? 'online' : 'muted' }}">
@@ -39,19 +40,22 @@
                 </div>
             </div>
             <div class="rd-card__body">
+                @unless ($canEdit)
+                    <div class="rd-callout rd-callout--info"><i class="ri-eye-line" aria-hidden="true"></i><p>You have view-only access to strategies.</p></div>
+                @endunless
                 <form class="rd-liveform rd-stack rd-stack--md" id="strategyForm" data-url="{{ route('admin.strategies.update', $strategy) }}" data-method="PUT">
                     <div class="rd-form-grid rd-form-grid--3">
                         <div class="rd-field">
                             <label class="rd-label" for="name">Name</label>
-                            <input class="rd-input" id="name" name="name" value="{{ $strategy->name }}" required>
+                            <input class="rd-input" id="name" name="name" value="{{ $strategy->name }}" required @disabled(! $canEdit)>
                         </div>
                         <div class="rd-field">
                             <label class="rd-label" for="note">Note</label>
-                            <input class="rd-input" id="note" name="note" value="{{ $strategy->note }}">
+                            <input class="rd-input" id="note" name="note" value="{{ $strategy->note }}" @disabled(! $canEdit)>
                         </div>
                         <div class="rd-field">
                             <label class="rd-label" for="enabled">Status</label>
-                            <select class="rd-select" id="enabled" name="enabled">
+                            <select class="rd-select" id="enabled" name="enabled" @disabled(! $canEdit)>
                                 <option value="1" @selected($strategy->enabled)>Enabled</option>
                                 <option value="0" @selected(! $strategy->enabled)>Disabled</option>
                             </select>
@@ -98,9 +102,13 @@
                             <div class="rd-toolbar rd-strategy-toolbar" aria-label="Bulk controls for the current category">
                                 <div class="rd-toolbar__group">
                                     <span class="rd-muted">Apply to this category:</span>
+                                    @if ($canEdit)
                                     <button type="button" class="rd-btn rd-btn--ghost" data-setall="Y"><i class="ri-toggle-line" aria-hidden="true"></i> All on</button>
                                     <button type="button" class="rd-btn rd-btn--ghost" data-setall="N"><i class="ri-toggle-line" aria-hidden="true"></i> All off</button>
                                     <button type="button" class="rd-btn rd-btn--ghost" data-setall="D"><i class="ri-restart-line" aria-hidden="true"></i> All default</button>
+                                    @else
+                                        <span class="rd-muted">View only</span>
+                                    @endif
                                 </div>
                             </div>
 
@@ -135,21 +143,21 @@
                                                             </label>
                                                             <div class="rd-strategy-option__control">
                                                                 @if ($opt['type'] === 'toggle')
-                                                                    <select class="rd-select @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" name="opt[{{ $opt['key'] }}]">
+                                                                    <select class="rd-select @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" name="opt[{{ $opt['key'] }}]" @disabled(! $canEdit)>
                                                                         <option value="" @selected($val === '')>Default</option>
                                                                         <option value="Y" @selected($val === 'Y')>On</option>
                                                                         <option value="N" @selected($val === 'N')>Off</option>
                                                                     </select>
                                                                 @elseif ($opt['type'] === 'select')
-                                                                    <select class="rd-select @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" name="opt[{{ $opt['key'] }}]">
+                                                                    <select class="rd-select @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" name="opt[{{ $opt['key'] }}]" @disabled(! $canEdit)>
                                                                         @foreach ($opt['choices'] as $choiceValue => $choiceLabel)
                                                                             <option value="{{ $choiceValue }}" @selected($val === (string) $choiceValue)>{{ $choiceLabel }}</option>
                                                                         @endforeach
                                                                     </select>
                                                                 @elseif ($opt['type'] === 'number')
-                                                                    <input class="rd-input @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" type="number" min="0" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default">
+                                                                    <input class="rd-input @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" type="number" min="0" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default" @disabled(! $canEdit)>
                                                                 @else
-                                                                    <input class="rd-input @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" type="text" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default">
+                                                                    <input class="rd-input @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" type="text" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default" @disabled(! $canEdit)>
                                                                 @endif
                                                             </div>
                                                         </div>
@@ -170,9 +178,11 @@
                                         </div>
                                     </header>
                                     <div id="optionRows" class="rd-stack rd-stack--sm"></div>
+                                    @if ($canEdit)
                                     <div class="rd-actions rd-actions--end">
                                         <button type="button" class="rd-btn rd-btn--ghost" id="addOption"><i class="ri-add-line" aria-hidden="true"></i> Add custom option</button>
                                     </div>
+                                    @endif
                                 </section>
                             </div>
                         </div>
@@ -180,7 +190,9 @@
 
                     <div class="rd-strategy-savebar">
                         <p class="rd-help">Saving updates the modified timestamp; clients pull changes within one heartbeat.</p>
+                        @if ($canEdit)
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Save</button>
+                        @endif
                     </div>
                 </form>
             </div>
@@ -195,6 +207,7 @@
                 <span class="rd-badge rd-badge--muted">{{ $strategy->assignments->count() }} {{ Str::plural('target', $strategy->assignments->count()) }}</span>
             </div>
 
+            @if ($canEdit)
             <form method="POST" action="{{ route('admin.strategies.assignments.store', $strategy) }}" class="rd-toolbar rd-strategy-assignment-form">
                 @csrf
                 <div class="rd-toolbar__group rd-grow">
@@ -223,6 +236,7 @@
                     <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> Assign</button>
                 </div>
             </form>
+            @endif
 
             <div class="rd-table-wrap" role="region" tabindex="0" aria-label="Strategy assignments table">
                 <table class="rd-table rd-table--compact">
@@ -242,11 +256,15 @@
                             <td class="rd-table__primary">{{ $label }}</td>
                             <td>
                                 <div class="rd-table__actions">
+                                    @if ($canEdit)
                                     <form method="POST" action="{{ route('admin.strategies.assignments.destroy', $assignment) }}" class="m-0">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="rd-icon-btn rd-icon-btn--danger" aria-label="Remove assignment for {{ $label }}" title="Remove assignment" data-confirm="Remove this assignment?"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                     </form>
+                                    @else
+                                        <span class="rd-muted">View only</span>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -272,6 +290,7 @@
 <script>
     $(function () {
         var customOptions = {{ \Illuminate\Support\Js::from((object) $customOptions) }};
+        var canEdit = @json($canEdit);
 
         function optionRow(key, value) {
             var $row = $(
@@ -283,6 +302,10 @@
             );
             $row.find('input[name="option_keys[]"]').val(key || '');
             $row.find('input[name="option_values[]"]').val(value == null ? '' : String(value));
+            if (!canEdit) {
+                $row.find(':input').prop('disabled', true);
+                $row.find('.rd-opt-remove').remove();
+            }
             return $row;
         }
 

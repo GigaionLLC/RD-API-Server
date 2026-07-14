@@ -1,5 +1,6 @@
 @extends('layouts.admin')
 @section('title', 'Strategies')
+@php($canEdit = auth()->user()->hasPermission('strategies.edit'))
 
 @section('content')
     @include('admin.partials.flash')
@@ -10,9 +11,11 @@
             <h1 class="rd-page-header__title">Strategies</h1>
             <p class="rd-page-header__description">Define client policy options and assign them across the managed fleet.</p>
         </div>
+        @if ($canEdit)
         <div class="rd-page-header__actions">
             <a href="{{ route('admin.strategies.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New strategy</a>
         </div>
+        @endif
     </header>
 
     <div class="rd-card rd-card--flush">
@@ -47,18 +50,22 @@
                         <td class="rd-muted">{{ $strategy->note ?: '—' }}</td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
+                                @if ($canEdit)
                                 <form method="POST" action="{{ route('admin.strategies.default', $strategy) }}" class="m-0">
                                     @csrf
                                     <button type="submit" class="rd-icon-btn" title="{{ $strategy->is_default ? 'Unset as default' : 'Set as default (fallback for unassigned devices)' }}" aria-label="{{ $strategy->is_default ? 'Unset '.$strategy->name.' as default' : 'Set '.$strategy->name.' as default' }}">
                                         <i class="{{ $strategy->is_default ? 'ri-star-fill' : 'ri-star-line' }}" aria-hidden="true"></i>
                                     </button>
                                 </form>
-                                <a href="{{ route('admin.strategies.edit', $strategy) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
+                                @endif
+                                <a href="{{ route('admin.strategies.edit', $strategy) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canEdit ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canEdit ? 'Edit' : 'View' }}</a>
+                                @if ($canEdit)
                                 <form method="POST" action="{{ route('admin.strategies.destroy', $strategy) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete strategy '{{ $strategy->name }}'?" aria-label="Delete {{ $strategy->name }} strategy" title="Delete strategy"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

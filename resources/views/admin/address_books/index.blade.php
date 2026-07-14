@@ -1,6 +1,8 @@
 @extends('layouts.admin')
 @section('title', 'Address Books')
 
+@php($canEdit = auth()->user()?->hasPermission('address_books.edit') ?? false)
+
 @section('content')
     @include('admin.partials.flash')
 
@@ -33,12 +35,14 @@
                         <td class="rd-muted">{{ $book->tags_count }}</td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
-                                <a href="{{ route('admin.address-books.show', $book) }}" class="rd-btn rd-btn--ghost"><i class="ri-eye-line"></i> View</a>
-                                <form method="POST" action="{{ route('admin.address-books.destroy', $book) }}" class="m-0">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this address book and all its peers/tags?" aria-label="Delete {{ $book->name ?: 'Default' }} address book" title="Delete address book"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
-                                </form>
+                                <a href="{{ route('admin.address-books.show', $book) }}" class="rd-btn rd-btn--ghost"><i class="ri-eye-line" aria-hidden="true"></i> View</a>
+                                @if ($canEdit)
+                                    <form method="POST" action="{{ route('admin.address-books.destroy', $book) }}" class="m-0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this address book and all its peers/tags?" aria-label="Delete {{ $book->name ?: 'Default' }} address book" title="Delete address book"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
+                                    </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

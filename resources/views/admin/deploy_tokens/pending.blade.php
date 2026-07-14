@@ -1,5 +1,6 @@
 @extends('layouts.admin')
 @section('title', 'Pending Devices')
+@php($canEdit = auth()->user()->hasPermission('deploy.edit'))
 
 @section('content')
     @include('admin.partials.flash')
@@ -8,7 +9,7 @@
         <div class="rd-page-header__copy">
             <p class="rd-page-header__eyebrow">Fleet</p>
             <h1 class="rd-page-header__title">Pending Devices</h1>
-            <p class="rd-page-header__description">Approve or reject devices that registered through the deployment workflow.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? 'Approve or reject devices that registered through the deployment workflow.' : 'Review devices awaiting deployment approval.' }}</p>
         </div>
         <div class="rd-page-header__actions">
             <a href="{{ route('admin.deploy-tokens.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-key-2-line" aria-hidden="true"></i> Deploy Tokens</a>
@@ -38,18 +39,22 @@
                         <td class="rd-muted">{{ $device->user->username ?? '—' }}</td>
                         <td class="rd-muted">{{ $device->created_at?->diffForHumans() ?? '—' }}</td>
                         <td class="rd-table__actions">
+                            @if ($canEdit)
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <form method="POST" action="{{ route('admin.devices.approve', $device) }}" class="m-0">
                                     @csrf
                                     @method('PUT')
-                                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-check-line"></i> Approve</button>
+                                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-check-line" aria-hidden="true"></i> Approve</button>
                                 </form>
                                 <form method="POST" action="{{ route('admin.devices.reject', $device) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Reject and delete this device?"><i class="ri-close-line"></i> Reject</button>
+                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Reject and delete this device?"><i class="ri-close-line" aria-hidden="true"></i> Reject</button>
                                 </form>
                             </div>
+                            @else
+                                <span class="rd-muted">View only</span>
+                            @endif
                         </td>
                     </tr>
                 @empty

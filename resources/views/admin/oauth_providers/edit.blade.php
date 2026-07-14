@@ -1,15 +1,16 @@
 @extends('layouts.admin')
 @section('title', 'Edit OAuth Provider')
+@php($canEdit = auth()->user()->hasPermission('oauth.edit'))
 
 @section('content')
     <header class="rd-page-header">
         <div class="rd-page-header__copy">
             <div class="rd-page-header__eyebrow">Integrations / OAuth Providers</div>
             <h1 class="rd-page-header__title">{{ $provider->op }}</h1>
-            <p class="rd-page-header__description">Maintain identity-provider credentials, discovery, and client sign-in behavior.</p>
+            <p class="rd-page-header__description">{{ $canEdit ? 'Maintain identity-provider credentials, discovery, and client sign-in behavior.' : 'Review identity-provider discovery and client sign-in behavior.' }}</p>
         </div>
         <div class="rd-page-header__actions">
-            <a href="{{ route('admin.oauth-providers.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="{{ route('admin.oauth-providers.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back</a>
         </div>
     </header>
 
@@ -21,9 +22,13 @@
                     <div><strong>Provider not saved.</strong> {{ $errors->first() }}</div>
                 </div>
             @endif
+            @unless ($canEdit)
+                <div class="rd-callout rd-callout--info"><i class="ri-eye-line" aria-hidden="true"></i><p>You have view-only access to OAuth providers. Stored client secrets remain hidden.</p></div>
+            @endunless
             <form method="POST" action="{{ route('admin.oauth-providers.update', $provider) }}" class="rd-stack rd-stack--lg">
                 @csrf
                 @method('PUT')
+                <fieldset class="rd-fieldset-reset rd-stack rd-stack--lg" @disabled(! $canEdit)>
 
                 <div class="rd-form-grid rd-form-grid--2">
                     <div class="rd-field">
@@ -108,9 +113,12 @@
                     </div>
                 </div>
 
+                @if ($canEdit)
                 <div class="rd-actions">
-                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line"></i> Save provider</button>
+                    <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-save-line" aria-hidden="true"></i> Save provider</button>
                 </div>
+                @endif
+                </fieldset>
             </form>
         </div>
     </div>

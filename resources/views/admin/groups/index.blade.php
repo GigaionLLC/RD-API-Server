@@ -6,6 +6,8 @@
         \App\Models\Group::TYPE_DEFAULT => 'Default',
         \App\Models\Group::TYPE_SHARED => 'Shared',
     ];
+    $canEdit = auth()->user()->hasPermission('groups.edit');
+    $canViewDeviceGroups = auth()->user()->hasPermission('device_groups.view');
 @endphp
 
 @section('content')
@@ -18,8 +20,12 @@
             <p class="rd-page-header__description">Organize users for shared access, policy assignment, and delegated administration.</p>
         </div>
         <div class="rd-page-header__actions rd-actions--wrap">
+            @if ($canViewDeviceGroups)
             <a href="{{ route('admin.device-groups.index') }}" class="rd-btn rd-btn--ghost"><i class="ri-device-line" aria-hidden="true"></i> Device Groups</a>
+            @endif
+            @if ($canEdit)
             <a href="{{ route('admin.groups.create') }}" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> New group</a>
+            @endif
         </div>
     </header>
 
@@ -44,12 +50,14 @@
                         <td class="rd-muted">{{ $group->note ?: '—' }}</td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
-                                <a href="{{ route('admin.groups.edit', $group) }}" class="rd-btn rd-btn--ghost"><i class="ri-pencil-line"></i> Edit</a>
+                                <a href="{{ route('admin.groups.edit', $group) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canEdit ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canEdit ? 'Edit' : 'View' }}</a>
+                                @if ($canEdit)
                                 <form method="POST" action="{{ route('admin.groups.destroy', $group) }}" class="m-0">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete group '{{ $group->name }}'?" aria-label="Delete {{ $group->name }} user group" title="Delete group"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
