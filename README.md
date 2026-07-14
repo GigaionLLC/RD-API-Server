@@ -79,8 +79,20 @@ A quick look at the dark admin console — full set in the
 ## 🚀 Quick start (production · Docker + MariaDB)
 
 The bundled **[`docker-compose.yml`](docker-compose.yml)** runs the published image behind
-**MariaDB** — the recommended setup. Copy it (or the example below), set your admin/DB passwords
-and RustDesk endpoints, then:
+**MariaDB** — the recommended setup. Copy it (or the example below), then create a local `.env`
+file with a unique admin password (at least 12 characters), your DB password, and RustDesk
+endpoints. There is no production admin-password default.
+
+```env
+ADMIN_PASS=<unique-admin-password-from-your-password-manager>
+DB_PASSWORD=<unique-database-password>
+RUSTDESK_ID_SERVER=id.your-domain.com:21116
+RUSTDESK_RELAY_SERVER=relay.your-domain.com:21117
+RUSTDESK_API_SERVER=https://api.your-domain.com
+RUSTDESK_KEY=<contents of id_ed25519.pub>
+```
+
+Then start the stack:
 
 ```bash
 docker compose up -d
@@ -104,7 +116,7 @@ services:
       APP_URL: https://api.your-domain.com
       TRUSTED_PROXIES: CHANGE_ME_proxy_ip_or_cidr  # omit when clients connect directly
       ADMIN_USER: admin
-      ADMIN_PASS: CHANGE_ME_admin            # first-run admin password
+      ADMIN_PASS: "${ADMIN_PASS:-}"          # required only while creating the first admin
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_DATABASE: rustdesk_api
@@ -136,6 +148,12 @@ volumes:
   rustdesk-db: {}
 ```
 </details>
+
+On a new production database, startup stops before seeding if `ADMIN_PASS` is missing, shorter
+than 12 characters, a known/default placeholder, repeated, or derived from `ADMIN_USER`. Local
+and test seeders retain their development-only credential for fixtures. Existing installations
+are not rewritten; if an earlier deployment used a default password, reset it in **Users** or
+with `php artisan rustdesk:user admin <new-password> --admin`.
 
 If TLS terminates at a reverse proxy, set `TRUSTED_PROXIES` to that proxy's exact IP address or
 network CIDR as seen by the application container (comma-separated when there is more than one).

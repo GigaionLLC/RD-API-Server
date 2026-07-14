@@ -5,6 +5,7 @@
 # Same as docker-compose.yml (MariaDB-backed), but BUILDS the runtime image from source
 # instead of pulling it from GHCR — use this to test your local changes as the production image.
 # (For day-to-day development with composer/artisan/tests, use docker/compose.toolchain.yml.)
+# Set ADMIN_PASS to a unique value of at least 12 characters before the first `up`.
 
 services:
   rustdesk-api:
@@ -24,9 +25,10 @@ services:
       # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
 
-      # First-run admin account (CHANGE THIS). Seeded once; later changes in the UI stick.
+      # This exercises the production bootstrap guard; there is deliberately no default.
+      # Existing installations may remove ADMIN_PASS after the administrator has been created.
       ADMIN_USER: "${ADMIN_USER:-admin}"
-      ADMIN_PASS: "${ADMIN_PASS:-admin}"
+      ADMIN_PASS: "${ADMIN_PASS:-}"
 
       # Database — MariaDB by default (matches the `db` service below).
       DB_CONNECTION: "${DB_CONNECTION:-mysql}"

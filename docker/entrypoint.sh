@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runtime entrypoint: prepares storage, app key, database, and caches, then starts Apache.
-# Designed so `docker compose up` works with zero manual steps.
+# Handles setup automatically after the required first-run secrets have been provided.
 set -e
 
 cd /var/www/html
@@ -27,6 +27,9 @@ if [ -z "${APP_KEY:-}" ]; then
     fi
     export APP_KEY
 fi
+
+# Discard a cache from an earlier container start before reading current bootstrap/database env.
+php artisan config:clear
 
 # --- Database ---
 # The compose files set DB_CONNECTION=mysql (MariaDB) by default. SQLite here is only the
@@ -59,10 +62,15 @@ php artisan migrate --force
 
 # --- First-run seed (idempotent via a marker so admin edits are never overwritten) ---
 if [ ! -f storage/app/.installed ]; then
-    echo "[entrypoint] first run: seeding default admin + mail templates + demo..."
-    php artisan db:seed --force || true
+    echo "[entrypoint] first run: seeding initial administrator + application defaults..."
+    # Never suppress this failure. In production the seeder rejects a missing, known, or weak
+    # ADMIN_PASS before creating the full administrator, and startup must remain fail-closed.
+    php artisan db:seed --force
     touch storage/app/.installed
 fi
+
+# The bootstrap password is never needed by the web process after the one-time seed.
+unset ADMIN_PASS
 
 # --- Production caches (rebuilt each boot so env changes take effect) ---
 php artisan config:cache

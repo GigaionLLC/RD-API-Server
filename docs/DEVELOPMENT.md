@@ -34,7 +34,9 @@ docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash -lc \
 ## Test the runtime image locally
 
 `docker-compose.dev.yml` builds the production image from source instead of pulling it from
-GHCR — use it to verify your changes as they'll ship:
+GHCR — use it to verify your changes as they'll ship. Because it runs with
+`APP_ENV=production`, set a unique `ADMIN_PASS` of at least 12 characters in your shell or local
+`.env` file first:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build

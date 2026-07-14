@@ -49,6 +49,20 @@ RUSTDESK_API_IMAGE='ghcr.io/gigaionllc/rustdesk-api-server:sha-abcdef@sha256:<64
   docker compose up -d
 ```
 
+## Production bootstrap credentials
+
+The production and production-like Compose files deliberately have no `ADMIN_PASS` fallback.
+Set a unique password of at least 12 characters in the shell or a local `.env` file before the
+first `up`. The runtime seeder rejects a missing, short, known/default, placeholder, repeated, or
+username-derived value before creating the full administrator. A failed seed is not marked as
+installed, so correcting `ADMIN_PASS` and restarting safely retries the bootstrap. Once the
+administrator exists, `ADMIN_PASS` may be removed from the deployment environment.
+
+The toolchain stack uses `APP_ENV=local` and keeps the predictable development seed credential
+needed by tests and screenshot fixtures. That fallback is never accepted by a production seed.
+After bootstrap the entrypoint removes `ADMIN_PASS` from the Apache process environment; the
+stored administrator password remains a one-way hash in the database.
+
 ## Updating a pin
 
 1. Select a supported, stable release from the upstream project's official release page. Update

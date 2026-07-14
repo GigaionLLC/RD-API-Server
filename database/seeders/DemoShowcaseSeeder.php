@@ -15,6 +15,7 @@ use App\Models\Strategy;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Webhook;
+use App\Support\BootstrapAdminCredentials;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -35,8 +36,19 @@ class DemoShowcaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $configuredPassword = config('bootstrap.admin.password');
         $admin = User::where('username', 'admin')->first()
-            ?? User::create(['username' => 'admin', 'password' => 'admin123456', 'is_admin' => true, 'status' => User::STATUS_NORMAL, 'display_name' => 'Administrator']);
+            ?? User::create([
+                'username' => 'admin',
+                'password' => BootstrapAdminCredentials::resolvePassword(
+                    is_string($configuredPassword) ? $configuredPassword : null,
+                    'admin',
+                    app()->environment('production'),
+                ),
+                'is_admin' => true,
+                'status' => User::STATUS_NORMAL,
+                'display_name' => 'Administrator',
+            ]);
 
         $users = $this->seedUsers();
         [$userGroups, $deviceGroups] = $this->seedGroups();

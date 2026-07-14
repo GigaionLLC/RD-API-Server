@@ -2,7 +2,15 @@
 
 Self-host RD‑API‑Server (admin console + client API for the RustDesk client) in one command.
 
-## 1. Run it
+## 1. Set first-run secrets and run it
+
+Create a `.env` file next to `docker-compose.yml`. Generate unique values with a password
+manager; do not copy the angle-bracket placeholders literally.
+
+```env
+ADMIN_PASS=<unique-admin-password-at-least-12-characters>
+DB_PASSWORD=<unique-database-password-used-by-the-app-and-MariaDB>
+```
 
 ```bash
 docker compose up -d
@@ -13,8 +21,11 @@ SQLite is single-writer and bottlenecks as devices scale). All data persists in 
 
 - **Admin console:** http://localhost:21114/admin
 - **Client API base:** http://localhost:21114/api
-- **Default login:** `admin` / `admin` — change it immediately (or set `ADMIN_PASS` before the
-  first `up`, see below).
+- **Initial login:** `admin` / the unique `ADMIN_PASS` you supplied above.
+
+Production has no default admin password. On a new database the container stops before seeding
+if `ADMIN_PASS` is missing, shorter than 12 characters, known/default, a placeholder, repeated,
+or derived from `ADMIN_USER`.
 
 ## 2. Point it at your RustDesk servers
 
@@ -22,8 +33,6 @@ Set these once (e.g. in a `.env` file next to `docker-compose.yml`, or in your s
 `docker compose up -d`:
 
 ```env
-ADMIN_PASS=choose-a-strong-password
-DB_PASSWORD=choose-a-strong-db-password     # used by both the app and the bundled MariaDB
 RUSTDESK_ID_SERVER=your.server:21116
 RUSTDESK_RELAY_SERVER=your.server:21117
 RUSTDESK_API_SERVER=http://your.server:21114
@@ -32,6 +41,10 @@ PORT=21114
 ```
 
 In the RustDesk client, set **API Server** to your `RUSTDESK_API_SERVER` and log in.
+
+Upgrades do not alter an existing administrator. If an earlier install used a default password,
+reset it in **Users** or run `php artisan rustdesk:user admin <new-password> --admin` inside the
+application container.
 
 ## 3. Email (optional)
 

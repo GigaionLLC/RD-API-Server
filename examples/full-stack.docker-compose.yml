@@ -3,7 +3,8 @@
 #   db    – MariaDB (for the API)      api  – this project (admin console + client API)
 #
 # Setup:
-#   1. Replace every CHANGE_ME and your-domain.com value below.
+#   1. Set a unique ADMIN_PASS (at least 12 characters) in your shell or a local .env file,
+#      then replace every CHANGE_ME and your-domain.com value below.
 #   2. Put the API behind a TLS-terminating reverse proxy:
 #        https://api.your-domain.com  ->  this-host:21114
 #   3. docker compose -f full-stack.docker-compose.yml up -d
@@ -65,9 +66,9 @@ services:
       - APP_URL=https://api.your-domain.com
       # Exact IP or CIDR of the TLS proxy from step 2; never use a wildcard:
       - TRUSTED_PROXIES=CHANGE_ME_proxy_ip_or_cidr
-      # First-run admin (seeded once; change it in the UI afterward):
+      # First-run admin (seeded once). There is deliberately no production password default:
       - ADMIN_USER=admin
-      - ADMIN_PASS=CHANGE_ME_admin_password
+      - "ADMIN_PASS=${ADMIN_PASS:-}"
       # Database:
       - DB_CONNECTION=mysql
       - DB_HOST=rustdesk-db

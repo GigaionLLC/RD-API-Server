@@ -1,6 +1,7 @@
 # rustdesk-api — production self-host (recommended).
 #
-#   docker compose up -d
+#   1. Set ADMIN_PASS, DB_PASSWORD, and the RUSTDESK_* values in a local .env file.
+#   2. docker compose up -d
 #
 # Pulls the published image and runs on http://localhost:21114 (admin at /admin), backed by
 # MariaDB.
@@ -12,7 +13,7 @@
 # (roughly < 50 devices) or evaluation — see "Prefer SQLite?" at the bottom to switch.
 #
 # Before first run, set these (shell env or a .env file next to this compose file):
-#   ADMIN_PASS   - first-run admin password (change from the default)
+#   ADMIN_PASS   - unique first-run admin password (required, at least 12 characters)
 #   DB_PASSWORD  - MariaDB password for the app user (change from the default)
 #   RUSTDESK_*   - your hbbs/hbbr endpoints + key (see QUICKSTART.md)
 #
@@ -38,9 +39,11 @@ services:
       # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
 
-      # First-run admin account (CHANGE THIS). Seeded once; later changes in the UI stick.
+      # First-run admin account. There is no production fallback: the runtime refuses to create
+      # a missing administrator from an empty, known, placeholder, derived, or short password.
+      # Existing installations may remove ADMIN_PASS after the administrator has been created.
       ADMIN_USER: "${ADMIN_USER:-admin}"
-      ADMIN_PASS: "${ADMIN_PASS:-admin}"
+      ADMIN_PASS: "${ADMIN_PASS:-}"
 
       # Database — MariaDB by default (matches the `db` service below). CHANGE DB_PASSWORD.
       DB_CONNECTION: "${DB_CONNECTION:-mysql}"

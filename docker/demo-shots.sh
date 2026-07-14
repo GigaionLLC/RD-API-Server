@@ -8,6 +8,10 @@
 # database/database.sqlite is backed up and restored, so your dev data is untouched.
 set -e
 
+# This is an explicit development fixture workflow. A clean checkout may not have a .env file,
+# so opt into the local-only seed credential instead of inheriting Laravel's production default.
+export APP_ENV="${APP_ENV:-local}"
+
 DB=/app/database/database.sqlite
 BAK=/app/database/database.sqlite.demobak
 

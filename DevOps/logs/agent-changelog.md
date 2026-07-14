@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:54] - Security: remove the production admin-password default
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Support/BootstrapAdminCredentials.php`, `config/bootstrap.php`
+- `database/seeders/{DatabaseSeeder,DemoShowcaseSeeder}.php`
+- `docker/{entrypoint,demo-shots}.sh`, `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `.env.example`, `README.md`, `QUICKSTART.md`, `docker/README.md`, `docs/DEVELOPMENT.md`
+- `tests/Unit/BootstrapAdminCredentialsTest.php`, `tests/Feature/BootstrapAdminSeederTest.php`
+- `phpstan-baseline.neon`, `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. New production databases require an explicit safe `ADMIN_PASS` to create the first administrator; existing administrators and local/test fixtures are unchanged.
+**Summary:** Removed the known production credential, rejected short/default/placeholder/repeated/username-derived bootstrap values, made failed seeds stop startup without writing the install marker, cleared stale configuration before seeding, and removed the one-time password before caching configuration or starting Apache. Existing deployments may remove the variable after bootstrap. Twenty-two focused tests / 40 assertions, Pint, targeted PHPStan, shell syntax, and Compose validation passed.
+
 ## [2026-07-14 09:48] - Security: neutralize formulas in CSV exports
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

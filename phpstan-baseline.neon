@@ -71,9 +71,3 @@ parameters:
 			identifier: method.nonObject
 			count: 1
 			path: app/Services/TwoFactorService.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 2
-			path: database/seeders/DatabaseSeeder.php
