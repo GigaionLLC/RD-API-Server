@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 @section('title', 'OAuth Providers')
-@php($canEdit = auth()->user()->hasPermission('oauth.edit'))
+@php($canEdit = (bool) auth()->user()->is_admin)
 
 @section('content')
     @include('admin.partials.flash')

@@ -54,6 +54,16 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   network checks. The guard does not assume that every standards-compliant provider uses one
   hostname.
 
+## Identity Provider Trust Boundary
+
+- OAuth/OIDC issuer, client, and provider-type configuration is an authentication trust root.
+  Delegated administrators may inspect redacted provider state but only a full administrator
+  may create, update, or delete a provider.
+- Existing external identities are keyed inside that trust domain. A provider with linked
+  identities cannot change its issuer, client, type, or key in place; it must be explicitly
+  deleted and recreated. Deletion removes its links transactionally before the provider key
+  can be reused, so a replacement issuer cannot inherit the previous users.
+
 ## Inbound Proxy Boundary
 
 - Forwarded headers are ignored by default. A deployment behind a reverse proxy must set

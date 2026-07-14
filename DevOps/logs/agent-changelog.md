@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 10:19] - Security: protect OAuth identity trust roots
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Admin/OauthProviderController.php`, `app/Models/AdminRole.php`
+- `resources/views/admin/oauth_providers/{index,edit}.blade.php`
+- `tests/Feature/OauthProviderAuthorizationSecurityTest.php`
+- `Wiki/core/15-security.md`, `docs/modernization/12-access-control-design.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Delegates retain redacted `oauth.view`; provider creation, mutation, and deletion now require a full administrator. Deleting a provider also deletes its `UserThird` links transactionally.
+**Summary:** Closed delegated full-admin impersonation through provider replacement. Linked identities can no longer cross silently to a different provider key, type, client, or issuer, and an old `op` cannot inherit links after deletion/recreation. Eleven focused SSO/read-only tests / 105 assertions, Pint, targeted PHPStan, and diff checks passed.
+
 ## [2026-07-14 10:12] - Security: bind stock-client TOTP challenges
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

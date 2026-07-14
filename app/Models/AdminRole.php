@@ -54,7 +54,9 @@ class AdminRole extends Model
         'Recordings' => ['recordings.view', 'recordings.edit'],
         'Deploy' => ['deploy.view', 'deploy.edit'],
         'Webhooks' => ['webhooks.view', 'webhooks.edit'],
-        'OAuth' => ['oauth.view', 'oauth.edit'],
+        // Identity-provider configuration is an authentication trust root. Delegates may
+        // inspect its redacted state, but only legacy/full administrators may mutate it.
+        'OAuth' => ['oauth.view'],
         'LDAP' => ['ldap.view'],
         'Settings' => ['settings.view', 'settings.edit'],
         'API Keys' => ['api_keys.view', 'api_keys.edit'],

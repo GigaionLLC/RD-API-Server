@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 @section('title', 'Edit OAuth Provider')
-@php($canEdit = auth()->user()->hasPermission('oauth.edit'))
+@php($canEdit = (bool) auth()->user()->is_admin)
 
 @section('content')
     <header class="rd-page-header">
@@ -23,7 +23,7 @@
                 </div>
             @endif
             @unless ($canEdit)
-                <div class="rd-callout rd-callout--info"><i class="ri-eye-line" aria-hidden="true"></i><p>You have view-only access to OAuth providers. Stored client secrets remain hidden.</p></div>
+                <div class="rd-callout rd-callout--info"><i class="ri-eye-line" aria-hidden="true"></i><p>You have view-only access to OAuth providers. Only a full administrator may change an authentication trust root, and stored client secrets remain hidden.</p></div>
             @endunless
             <form method="POST" action="{{ route('admin.oauth-providers.update', $provider) }}" class="rd-stack rd-stack--lg">
                 @csrf

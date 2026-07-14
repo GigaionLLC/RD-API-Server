@@ -124,7 +124,11 @@ experience.
   managers can only manage their own keys, and a key cannot exceed or outlive its owner's
   current resource permissions. Because no safe role hierarchy exists yet, only a full
   administrator may create or mutate admin roles, assign roles, promote accounts, or modify
-  other privileged accounts. Delegated `roles.view` remains read-only. The `/api/v1` user
+  other privileged accounts. OAuth/OIDC provider mutation is also full-admin-only because it
+  replaces an authentication trust root; delegated `oauth.view` remains redacted and read-only.
+  A linked provider's issuer/type/client cannot be changed in place, and deleting a provider
+  removes its external-identity links before its key can be reused. Delegated `roles.view`
+  remains read-only. The `/api/v1` user
   write surface manages ordinary accounts only and cannot set `is_admin` or take over a full
   or delegated administrator. Alarm and recording permissions are likewise split into
   `.view` and `.edit`: view access keeps listing/filtering and recording downloads read-only,

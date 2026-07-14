@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\OauthProvider;
+use App\Models\UserThird;
 use App\Services\OauthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -25,8 +27,10 @@ class OauthProviderController extends Controller
         return view('admin.oauth_providers.index', compact('providers'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $this->authorizeProviderMutation($request);
+
         $provider = new OauthProvider([
             'type' => OauthService::TYPE_OIDC,
             'auto_register' => false,
@@ -44,6 +48,8 @@ class OauthProviderController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeProviderMutation($request);
+
         $data = $this->validateProvider($request, null);
 
         OauthProvider::create($data);
@@ -65,7 +71,11 @@ class OauthProviderController extends Controller
 
     public function update(Request $request, OauthProvider $oauthProvider): RedirectResponse
     {
+        $this->authorizeProviderMutation($request);
+
         $data = $this->validateProvider($request, $oauthProvider);
+
+        $this->assertTrustDomainChangeIsSafe($oauthProvider, $data);
 
         // Leave the stored secret untouched when the field is left blank on edit.
         if (($data['client_secret'] ?? '') === '') {
@@ -79,9 +89,16 @@ class OauthProviderController extends Controller
             ->with('status', 'OAuth provider updated.');
     }
 
-    public function destroy(OauthProvider $oauthProvider): RedirectResponse
+    public function destroy(Request $request, OauthProvider $oauthProvider): RedirectResponse
     {
-        $oauthProvider->delete();
+        $this->authorizeProviderMutation($request);
+
+        DB::transaction(function () use ($oauthProvider): void {
+            // Identity links are meaningful only inside the provider trust domain. Removing
+            // them prevents a later provider with the same `op` from inheriting old accounts.
+            UserThird::where('op', $oauthProvider->op)->delete();
+            $oauthProvider->delete();
+        });
 
         return redirect()
             ->route('admin.oauth-providers.index')
@@ -121,5 +138,42 @@ class OauthProviderController extends Controller
         $validated['pkce_method'] = $validated['pkce_method'] ?? 'S256';
 
         return $validated;
+    }
+
+    /**
+     * Provider credentials define an authentication trust root. Delegated administrators may
+     * inspect its non-secret settings, but only a full administrator may create or mutate it.
+     */
+    private function authorizeProviderMutation(Request $request): void
+    {
+        if (! (bool) $request->user()?->is_admin) {
+            abort(403, 'Only a full administrator may modify identity providers.');
+        }
+    }
+
+    /**
+     * Existing `op + open_id` links must never silently cross into another issuer/client/type.
+     * The administrator can delete the provider (which removes its links) and recreate it when
+     * an intentional trust-domain replacement is required.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertTrustDomainChangeIsSafe(OauthProvider $provider, array $data): void
+    {
+        $trustFields = ['op', 'type', 'client_id', 'issuer'];
+        $changesTrustDomain = false;
+
+        foreach ($trustFields as $field) {
+            if ((string) $provider->getAttribute($field) !== (string) ($data[$field] ?? '')) {
+                $changesTrustDomain = true;
+                break;
+            }
+        }
+
+        if ($changesTrustDomain && UserThird::where('op', $provider->op)->exists()) {
+            throw ValidationException::withMessages([
+                'op' => 'This provider has linked identities. Delete and recreate it to change its identity trust domain.',
+            ]);
+        }
     }
 }
