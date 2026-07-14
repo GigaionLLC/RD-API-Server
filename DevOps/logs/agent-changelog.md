@@ -3,6 +3,15 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:17] - CI security: pin third-party GitHub Actions
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.github/workflows/{ci,docker-publish}.yml`
+- `docker/README.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Replaced every movable third-party GitHub Action tag with the exact upstream commit behind its intended major release, retained readable major-version comments, and documented the review and update process. Workflow behavior and action major versions are unchanged; all 14 references were syntax-checked and verified as full 40-character revisions.
+
 ## [2026-07-14 09:08] - Build security: pin Docker and toolchain inputs
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

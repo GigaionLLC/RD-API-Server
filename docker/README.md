@@ -1,4 +1,4 @@
-# Docker dependency pins
+# Build dependency pins
 
 The build and Compose definitions pin third-party images to an exact release tag and the
 corresponding multi-architecture manifest digest. A tag documents the intended version; the
@@ -28,6 +28,14 @@ instead of freezing individual package revisions that those repositories may ret
 digests, application dependency locks, and exact standalone tool versions remain fixed; rebuilds
 can still receive Debian security updates. Never replace the pinned official Node image with a
 downloaded repository setup script or execute a remote response through a shell.
+
+## GitHub Actions
+
+Every third-party `uses:` entry under `.github/workflows/` is pinned to a full commit SHA, with
+its intended major version retained as an inline comment. When updating an action, resolve the
+major tag from the action's official upstream Git repository, use the peeled commit for an
+annotated tag, review that commit's release notes and diff, and update every matching workflow
+reference together. Do not replace a full SHA with a movable tag.
 
 ## First-party application image
 
