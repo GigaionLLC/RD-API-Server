@@ -29,9 +29,36 @@ trait ExportsCsv
             // cursor() streams one row at a time from a single query, so it stays memory-safe
             // for large exports while preserving the query's own ordering.
             foreach ($query->cursor() as $record) {
-                fputcsv($out, array_map(static fn ($v) => $v ?? '', $row($record)));
+                fputcsv($out, array_map(fn ($value) => $this->safeCsvCell($value), $row($record)));
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Neutralize spreadsheet formulas while keeping the original value visible in exports.
+     * Leading ASCII controls/space and a UTF-8 BOM are ignored for detection because common
+     * spreadsheet applications may discard them before evaluating a cell.
+     */
+    private function safeCsvCell(mixed $value): mixed
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $candidate = ltrim($value, "\x00..\x20");
+        while (str_starts_with($candidate, "\xEF\xBB\xBF")) {
+            $candidate = ltrim(substr($candidate, 3), "\x00..\x20");
+        }
+
+        if ($candidate !== '' && str_contains('=+-@', $candidate[0])) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 }

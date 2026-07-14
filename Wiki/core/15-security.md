@@ -94,3 +94,6 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Database-backed HTML mail templates are trusted layout, but every runtime placeholder is
   centrally HTML-escaped by `MailService`. Usernames, device labels, links, and audit messages are
   text values and must never be inserted as raw markup.
+- Every admin CSV export passes through the shared export concern. Cells whose first meaningful
+  character is `=`, `+`, `-`, or `@` are prefixed with an apostrophe, including attempts hidden
+  behind leading controls, spaces, or a UTF-8 BOM, so spreadsheet software treats them as text.

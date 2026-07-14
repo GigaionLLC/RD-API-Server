@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:48] - Security: neutralize formulas in CSV exports
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Admin/Concerns/ExportsCsv.php`
+- `tests/Feature/ExportCsvTest.php`
+- `Wiki/core/15-security.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. CSV contents remain otherwise unchanged; dangerous text cells gain a leading apostrophe.
+**Summary:** Routed every admin CSV row through a shared cell encoder that detects formula prefixes even when hidden behind leading ASCII controls, whitespace, or repeated UTF-8 BOMs. Covered `=`, `+`, `-`, and `@` vectors. Eight focused tests / 28 assertions plus Pint passed.
+
 ## [2026-07-14 09:47] - Security: escape runtime values in HTML mail
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

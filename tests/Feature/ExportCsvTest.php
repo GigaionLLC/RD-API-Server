@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\LoginLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -52,6 +53,36 @@ class ExportCsvTest extends TestCase
 
         $this->assertStringContainsString('keep-1', $csv);
         $this->assertStringNotContainsString('other-2', $csv);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function spreadsheetFormulaCells(): array
+    {
+        return [
+            'equals hidden behind BOM and whitespace' => ["\xEF\xBB\xBF \t=HYPERLINK(\"https://example.test\",\"open\")"],
+            'plus hidden behind a tab' => ["\t+SUM(1,1)"],
+            'minus hidden behind spaces' => ['  -2+3'],
+            'at sign hidden behind a control' => ["\x0B@SUM(1,1)"],
+        ];
+    }
+
+    #[DataProvider('spreadsheetFormulaCells')]
+    public function test_exports_neutralize_spreadsheet_formula_cells(string $formula): void
+    {
+        Device::create(['rustdesk_id' => 'formula-device', 'uuid' => 'formula-uuid', 'alias' => $formula]);
+
+        $csv = $this->actingAs($this->admin())
+            ->get(route('admin.devices.export'))
+            ->assertOk()
+            ->streamedContent();
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($csv));
+        $this->assertIsArray($lines);
+        $row = str_getcsv($lines[1]);
+
+        $this->assertSame("'".$formula, $row[1]);
     }
 
     public function test_connection_audit_export_streams_csv(): void
