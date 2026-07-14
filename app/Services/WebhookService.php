@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
+use App\Support\WebhookUrlRedactor;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -45,7 +46,10 @@ class WebhookService
                 $this->deliver($hook, $event, $payload);
             }
         } catch (Throwable $e) {
-            Log::error('WebhookService dispatch failed', ['event' => $event, 'error' => $e->getMessage()]);
+            Log::error('WebhookService dispatch failed', [
+                'event' => $event,
+                'error' => WebhookUrlRedactor::redactText($e->getMessage()),
+            ]);
         }
     }
 
@@ -89,11 +93,13 @@ class WebhookService
         } catch (Throwable $e) {
             $error = $e->getMessage();
             $statusCode = str_contains(strtolower($error), 'timed out') ? 'timeout' : 'error';
+            $safeError = $hook->redactSensitiveText($error);
             Log::warning('Webhook delivery failed', [
                 'webhook_id' => $hook->id,
                 'event' => $delivery->event,
-                'error' => $error,
+                'error' => $safeError,
             ]);
+            $error = $safeError;
         }
 
         $attempts = $delivery->attempts + 1;

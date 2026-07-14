@@ -1,5 +1,8 @@
 @extends('layouts.admin')
 @section('title', 'Webhooks')
+@php
+    $canEdit = auth()->user()->hasPermission('webhooks.edit');
+@endphp
 
 @section('content')
     @include('admin.partials.flash')
@@ -13,6 +16,7 @@
     </header>
 
     <div class="rd-stack rd-stack--lg">
+    @if ($canEdit)
     <div class="rd-grid rd-grid--2 rd-align-start">
         <div class="rd-card">
             <div class="rd-card__header"><h3 class="rd-card__title">Create webhook</h3></div>
@@ -81,6 +85,12 @@
             </div>
         </div>
     </div>
+    @else
+        <div class="rd-callout rd-callout--info" role="status">
+            You have view-only access. Webhook destinations and delivery history are available,
+            but creating, testing, toggling, and deleting webhooks requires edit permission.
+        </div>
+    @endif
 
     <div class="rd-card rd-card--flush">
         <div class="rd-card__header"><h3 class="rd-card__title">Configured webhooks</h3></div>
@@ -89,8 +99,11 @@
                 <thead><tr><th>Name</th><th>Type</th><th>Events</th><th>Status</th><th>Last fired</th><th>State</th><th class="rd-table__actions">Actions</th></tr></thead>
                 <tbody>
                 @forelse ($webhooks as $hook)
+                    @php
+                        $displayUrl = $hook->redactedUrl();
+                    @endphp
                     <tr>
-                        <td><span class="rd-table__primary">{{ $hook->name }}</span><div class="rd-table__meta rd-mono" title="{{ $hook->url }}">{{ $hook->url }}</div></td>
+                        <td><span class="rd-table__primary">{{ $hook->name }}</span><div class="rd-table__meta rd-mono" title="{{ $displayUrl }}">{{ $displayUrl }}</div></td>
                         <td class="rd-muted">{{ $typeList[$hook->type] ?? $hook->type }}</td>
                         <td><div class="rd-actions rd-actions--wrap">@foreach ($hook->events as $e)<span class="rd-badge rd-badge--muted">{{ $e }}</span>@endforeach</div></td>
                         <td class="rd-muted">
@@ -103,14 +116,19 @@
                         </td>
                         <td class="rd-muted">{{ $hook->last_triggered_at?->diffForHumans() ?? 'never' }}</td>
                         <td>
-                            <form method="POST" action="{{ route('admin.webhooks.toggle', $hook) }}" class="m-0">
-                                @csrf
-                                <button type="submit" class="rd-btn rd-btn--ghost" aria-pressed="{{ $hook->enabled ? 'true' : 'false' }}" aria-label="{{ $hook->enabled ? 'Disable '.$hook->name : 'Enable '.$hook->name }} webhook"><span class="rd-badge {{ $hook->enabled ? 'rd-badge--online' : 'rd-badge--muted' }}">{{ $hook->enabled ? 'enabled' : 'disabled' }}</span></button>
-                            </form>
+                            @if ($canEdit)
+                                <form method="POST" action="{{ route('admin.webhooks.toggle', $hook) }}" class="m-0">
+                                    @csrf
+                                    <button type="submit" class="rd-btn rd-btn--ghost" aria-pressed="{{ $hook->enabled ? 'true' : 'false' }}" aria-label="{{ $hook->enabled ? 'Disable '.$hook->name : 'Enable '.$hook->name }} webhook"><span class="rd-badge {{ $hook->enabled ? 'rd-badge--online' : 'rd-badge--muted' }}">{{ $hook->enabled ? 'enabled' : 'disabled' }}</span></button>
+                                </form>
+                            @else
+                                <span class="rd-badge {{ $hook->enabled ? 'rd-badge--online' : 'rd-badge--muted' }}">{{ $hook->enabled ? 'enabled' : 'disabled' }}</span>
+                            @endif
                         </td>
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end">
                             <a href="{{ route('admin.webhooks.deliveries', $hook) }}" class="rd-icon-btn" title="Delivery history" aria-label="View {{ $hook->name }} delivery history"><i class="ri-history-line" aria-hidden="true"></i></a>
+                            @if ($canEdit)
                             <form method="POST" action="{{ route('admin.webhooks.test', $hook) }}" class="m-0">
                                 @csrf
                                 <button type="submit" class="rd-icon-btn" title="Send a test event" aria-label="Send a test event to {{ $hook->name }}"><i class="ri-send-plane-line" aria-hidden="true"></i></button>
@@ -119,11 +137,12 @@
                                 @csrf @method('DELETE')
                                 <button type="submit" class="rd-icon-btn rd-icon-btn--danger" data-confirm="Delete webhook '{{ $hook->name }}'?" title="Delete webhook" aria-label="Delete {{ $hook->name }} webhook"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                             </form>
+                            @endif
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7"><div class="rd-empty"><i class="rd-empty__icon ri-webhook-line" aria-hidden="true"></i><p class="rd-empty__title">No webhooks yet</p><p class="rd-empty__body">Create a webhook to send operational events elsewhere.</p></div></td></tr>
+                    <tr><td colspan="7"><div class="rd-empty"><i class="rd-empty__icon ri-webhook-line" aria-hidden="true"></i><p class="rd-empty__title">No webhooks yet</p><p class="rd-empty__body">{{ $canEdit ? 'Create a webhook to send operational events elsewhere.' : 'No webhook destinations are configured.' }}</p></div></td></tr>
                 @endforelse
                 </tbody>
             </table>

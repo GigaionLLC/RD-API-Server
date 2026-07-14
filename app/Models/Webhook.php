@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\WebhookUrlRedactor;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,6 +21,7 @@ use Illuminate\Support\Carbon;
     'name', 'type', 'url', 'secret', 'events', 'enabled',
     'last_triggered_at', 'last_status', 'failure_count',
 ])]
+#[Hidden(['url', 'secret'])]
 class Webhook extends Model
 {
     use HasFactory;
@@ -79,5 +82,26 @@ class Webhook extends Model
     public function subscribesTo(string $event): bool
     {
         return in_array($event, $this->events ?? [], true);
+    }
+
+    /**
+     * A display-safe destination label. Delivery code must continue using the raw `url` value.
+     */
+    public function redactedUrl(): string
+    {
+        return WebhookUrlRedactor::redact((string) $this->url, (string) $this->type);
+    }
+
+    /**
+     * Remove this webhook's URL and shared secret from a transport or historical error.
+     */
+    public function redactSensitiveText(string $text): string
+    {
+        return WebhookUrlRedactor::redactText(
+            $text,
+            (string) $this->url,
+            $this->secret === null ? null : (string) $this->secret,
+            (string) $this->type,
+        );
     }
 }

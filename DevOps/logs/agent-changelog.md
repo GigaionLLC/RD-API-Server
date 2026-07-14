@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:06] - Security: redact webhook credentials and delivery errors
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Support/WebhookUrlRedactor.php`
+- `app/Models/{Webhook,WebhookDelivery}.php`
+- `app/Services/WebhookService.php`
+- `resources/views/admin/webhooks/{index,deliveries}.blade.php`
+- `tests/Feature/WebhookCredentialRedactionTest.php`
+- `Wiki/core/15-security.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Webhook delivery continues to use the stored raw destination internally; inbound routes and RustDesk client wire behavior are unchanged.
+**Summary:** Centralized credential-safe webhook labels and error filtering, hid raw URL/secret/error fields from model serialization, sanitized transport failures before logging and persistence, re-sanitized legacy history at render time, and limited view-only delegates to redacted configuration/history without mutation or resend controls.
+
 ## [2026-07-14 08:42] - Security: prevent webhook server-side request forgery
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
