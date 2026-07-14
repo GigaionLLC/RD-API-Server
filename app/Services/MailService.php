@@ -106,7 +106,13 @@ class MailService
     {
         $replacements = [];
         foreach ($vars as $key => $value) {
-            $replacements['{$'.$key.'}'] = (string) $value;
+            // Templates are HTML. Treat every runtime placeholder as text so device names,
+            // usernames, audit messages, and links cannot inject markup or scriptable attrs.
+            $replacements['{$'.$key.'}'] = htmlspecialchars(
+                (string) $value,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
         }
 
         return strtr($contents, $replacements);

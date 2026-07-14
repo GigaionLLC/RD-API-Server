@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:47] - Security: escape runtime values in HTML mail
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/MailService.php`
+- `tests/Feature/MailTemplateSecurityTest.php`
+- `Wiki/core/15-security.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Kept administrator-authored HTML template layout intact while centrally encoding every runtime placeholder as text, preventing usernames, device labels, audit messages, and links from injecting markup or event attributes into delivered and logged mail. One focused test / five assertions plus Pint passed.
+
 ## [2026-07-14 09:43] - Security: bind and bound audit ingestion
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

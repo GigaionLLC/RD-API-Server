@@ -88,3 +88,9 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   still using the exact legacy POST will not persist a note unless upstream adds an attributable
   credential; a compatibility caller that adds the matching device UUID is additionally scoped by
   both peer id and session id.
+
+## Generated Output Boundaries
+
+- Database-backed HTML mail templates are trusted layout, but every runtime placeholder is
+  centrally HTML-escaped by `MailService`. Usernames, device labels, links, and audit messages are
+  text values and must never be inserted as raw markup.
