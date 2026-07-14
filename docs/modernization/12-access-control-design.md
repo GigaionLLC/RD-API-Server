@@ -126,4 +126,8 @@ experience.
   administrator may create or mutate admin roles, assign roles, promote accounts, or modify
   other privileged accounts. Delegated `roles.view` remains read-only. The `/api/v1` user
   write surface manages ordinary accounts only and cannot set `is_admin` or take over a full
-  or delegated administrator.
+  or delegated administrator. Alarm and recording permissions are likewise split into
+  `.view` and `.edit`: view access keeps listing/filtering and recording downloads read-only,
+  while deletion requires the corresponding edit permission. Existing delegated roles are
+  not automatically granted this new destructive capability; legacy `is_admin` and global
+  roles retain full access.

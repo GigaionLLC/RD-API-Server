@@ -1,6 +1,10 @@
 @extends('layouts.admin')
 @section('title', 'Recordings')
 
+@php
+    $canEdit = auth()->user()->hasPermission('recordings.edit');
+@endphp
+
 @section('content')
     @include('admin.partials.flash')
 
@@ -61,11 +65,13 @@
                         <td class="rd-table__actions">
                             <div class="rd-actions rd-actions--end rd-actions--wrap">
                                 <a href="{{ route('admin.recordings.download', $recording) }}" class="rd-btn rd-btn--ghost"><i class="ri-download-2-line"></i> Download</a>
-                                <form method="POST" action="{{ route('admin.recordings.destroy', $recording) }}" class="m-0">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this recording? The file will be removed." aria-label="Delete recording" title="Delete recording"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
-                                </form>
+                                @if ($canEdit)
+                                    <form method="POST" action="{{ route('admin.recordings.destroy', $recording) }}" class="m-0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this recording? The file will be removed." aria-label="Delete recording" title="Delete recording"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
+                                    </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

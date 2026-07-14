@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 08:38] - Security: separate alarm and recording deletion permissions
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Models/AdminRole.php`
+- `routes/web.php`
+- `resources/views/admin/alarms/index.blade.php`
+- `resources/views/admin/recordings/index.blade.php`
+- `tests/Feature/AlarmRecordingAuthorizationTest.php`
+- `docs/modernization/12-access-control-design.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Added `alarms.edit` and `recordings.edit` console permissions. No schema, RustDesk client route, or wire-format changes.
+**Summary:** Changed alarm and recording deletion from view permission to explicit edit permission, hid destructive controls from view-only delegates, preserved recording downloads for viewers, and added denial/allow/full-admin regression coverage. Existing delegated view roles do not silently gain deletion authority.
+
 ## [2026-07-14 08:30] - Security: harden client deployment command generation
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

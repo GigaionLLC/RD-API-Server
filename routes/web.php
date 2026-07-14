@@ -146,11 +146,11 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     // Recordings
     Route::get('/admin/recordings', [RecordingController::class, 'index'])->middleware('permission:recordings.view')->name('admin.recordings.index');
     Route::get('/admin/recordings/{recording}/download', [RecordingController::class, 'download'])->middleware('permission:recordings.view')->name('admin.recordings.download');
-    Route::delete('/admin/recordings/{recording}', [RecordingController::class, 'destroy'])->middleware('permission:recordings.view')->name('admin.recordings.destroy');
+    Route::delete('/admin/recordings/{recording}', [RecordingController::class, 'destroy'])->middleware('permission:recordings.edit')->name('admin.recordings.destroy');
 
-    // Alarms (read-only log)
+    // Alarms
     Route::get('/admin/alarms', [AlarmController::class, 'index'])->middleware('permission:alarms.view')->name('admin.alarms.index');
-    Route::delete('/admin/alarms/{alarm}', [AlarmController::class, 'destroy'])->middleware('permission:alarms.view')->name('admin.alarms.destroy');
+    Route::delete('/admin/alarms/{alarm}', [AlarmController::class, 'destroy'])->middleware('permission:alarms.edit')->name('admin.alarms.destroy');
 
     // OAuth / OIDC providers (client SSO login configuration)
     Route::get('/admin/oauth-providers', [OauthProviderController::class, 'index'])->middleware('permission:oauth.view')->name('admin.oauth-providers.index');

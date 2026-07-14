@@ -1,6 +1,10 @@
 @extends('layouts.admin')
 @section('title', 'Alarms')
 
+@php
+    $canEdit = auth()->user()->hasPermission('alarms.edit');
+@endphp
+
 @section('content')
     @include('admin.partials.flash')
 
@@ -39,7 +43,9 @@
                         <th>Message</th>
                         <th>IP</th>
                         <th>Emailed</th>
-                        <th class="rd-table__actions">Actions</th>
+                        @if ($canEdit)
+                            <th class="rd-table__actions">Actions</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -56,19 +62,21 @@
                                 <span class="dot"></span>{{ $alarm->emailed ? 'Yes' : 'No' }}
                             </span>
                         </td>
-                        <td class="rd-table__actions">
-                            <div class="rd-actions rd-actions--end">
-                                <form method="POST" action="{{ route('admin.alarms.destroy', $alarm) }}" class="m-0">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this alarm?" aria-label="Delete alarm" title="Delete alarm"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
-                                </form>
-                            </div>
-                        </td>
+                        @if ($canEdit)
+                            <td class="rd-table__actions">
+                                <div class="rd-actions rd-actions--end">
+                                    <form method="POST" action="{{ route('admin.alarms.destroy', $alarm) }}" class="m-0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rd-btn rd-btn--danger" data-confirm="Delete this alarm?" aria-label="Delete alarm" title="Delete alarm"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8">
+                        <td colspan="{{ $canEdit ? 8 : 7 }}">
                             <div class="rd-empty">
                                 <i class="rd-empty__icon ri-alarm-warning-line" aria-hidden="true"></i>
                                 <p class="rd-empty__title">No alarms</p>
