@@ -220,12 +220,23 @@ pattern.
 
 ## Local asset policy
 
-`npm run build:vendor` runs `scripts/copy-admin-vendor.mjs` and copies pinned package assets:
+`npm run build:vendor` runs `scripts/copy-admin-vendor.mjs`, cleans the generated vendor
+directory, and copies pinned package assets:
 
 - Bootstrap CSS and bundled JavaScript to `public/assets/vendor/bootstrap/`
 - jQuery to `public/assets/vendor/jquery/`
 - Remix Icon CSS and WOFF2 font to `public/assets/vendor/remixicon/`
 - ApexCharts to `public/assets/vendor/apexcharts/`
+
+The generator removes Bootstrap source-map trailers because maps are not shipped, limits the
+Remix Icon font declaration to the shipped WOFF2 file, and writes the runtime packages' full
+license texts plus `THIRD_PARTY_NOTICES.txt`. The Remix stylesheet carries a local-modification
+notice as required by its Apache-2.0 license.
+
+After `npm ci --ignore-scripts`, run `npm run check:vendor` to compare both the complete file
+inventory and every byte against a fresh in-memory build. CI performs this check so a package,
+generator, notice, or checked-in asset cannot drift independently. Run `npm run build:vendor`
+and commit all generated changes whenever a pinned runtime package changes.
 
 The admin and authentication layouts must reference these local assets with Laravel's
 `asset()` helper. Do not add CDN URLs, remote fonts, or another icon system. Keep ApexCharts

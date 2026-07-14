@@ -4,3 +4,9 @@ resources/web2/**/* linguist-vendored
 # Keep shell scripts LF so they run inside Linux containers regardless of host OS.
 *.sh text eol=lf
 docker/entrypoint.sh text eol=lf
+
+# Generated frontend text must compare byte-for-byte on every platform.
+public/assets/vendor/**/*.css text eol=lf
+public/assets/vendor/**/*.js text eol=lf
+public/assets/vendor/**/*.txt text eol=lf
+public/assets/vendor/**/*.woff2 binary

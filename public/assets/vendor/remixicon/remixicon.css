@@ -8,14 +8,10 @@
 *
 * Date: 2024-10-28
 */
+/* Local distribution modification: font sources are limited to the shipped WOFF2 asset. */
 @font-face {
   font-family: "remixicon";
-  src: url('remixicon.eot?t=1730118419915'); /* IE9*/
-  src: url('remixicon.eot?t=1730118419915#iefix') format('embedded-opentype'), /* IE6-IE8 */
-  url("remixicon.woff2?t=1730118419915") format("woff2"),
-  url("remixicon.woff?t=1730118419915") format("woff"),
-  url('remixicon.ttf?t=1730118419915') format('truetype'), /* chrome, firefox, opera, Safari, Android, iOS 4.2+*/
-  url('remixicon.svg?t=1730118419915#remixicon') format('svg'); /* iOS 4.1- */
+  src: url("remixicon.woff2?t=1730118419915") format("woff2");
   font-display: swap;
 }
 

@@ -23,4 +23,12 @@ export default [
             'no-empty': ['error', { allowEmptyCatch: true }],
         },
     },
+    {
+        files: ['scripts/**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+            globals: globals.node,
+        },
+    },
 ];

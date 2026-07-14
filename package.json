@@ -5,8 +5,9 @@
     "scripts": {
         "build": "vite build",
         "build:vendor": "node scripts/copy-admin-vendor.mjs",
+        "check:vendor": "node scripts/copy-admin-vendor.mjs --check",
         "dev": "vite",
-        "lint:js": "eslint public/assets/js",
+        "lint:js": "eslint public/assets/js scripts",
         "test:e2e": "playwright test"
     },
     "devDependencies": {

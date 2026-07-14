@@ -19,13 +19,16 @@ docker compose -f docker/compose.toolchain.yml run --rm app php artisan migrate 
 
 ```bash
 docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash -lc \
-  './vendor/bin/pint --test && ./vendor/bin/phpstan analyse --memory-limit=1G && php artisan test && npx eslint public/assets/js'
+  'npm ci --ignore-scripts --no-audit --no-fund && npm run check:vendor && npm run lint:js && \
+   ./vendor/bin/pint --test && ./vendor/bin/phpstan analyse --memory-limit=1G && php artisan test'
 ```
 
 - **Pint** — code style (`./vendor/bin/pint` to auto-fix).
 - **PHPStan** — level 5 static analysis (needs `--memory-limit=1G`).
 - **PHPUnit** — `php artisan test` (uses SQLite `:memory:`).
-- **ESLint** — `public/assets/js`.
+- **ESLint** — browser code in `public/assets/js` and Node-based build scripts in `scripts`.
+- **Vendor integrity** — `npm run check:vendor` rebuilds the local admin assets in memory and
+  verifies their complete inventory and byte content against the checked-in distribution.
 - **Playwright** — end-to-end (`npx playwright test`), against a running server.
 
 ## Test the runtime image locally

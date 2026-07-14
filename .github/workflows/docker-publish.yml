@@ -24,6 +24,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.0'
+          cache: npm
+
+      - name: Install locked frontend dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify checked-in admin vendor assets
+        run: npm run check:vendor
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v6

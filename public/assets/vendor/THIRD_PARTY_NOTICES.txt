@@ -1,0 +1,33 @@
+THIRD-PARTY NOTICES FOR ADMIN WEB ASSETS
+
+This directory is generated from the exact packages locked in package-lock.json.
+The following software is redistributed in the production web application:
+
+- bootstrap 5.3.8 (MIT) - Bootstrap CSS and JavaScript; license: licenses/bootstrap.txt
+- @popperjs/core 2.11.8 (MIT) - Popper, bundled into Bootstrap JavaScript; license: licenses/popperjs-core.txt
+- jquery 3.7.1 (MIT) - jQuery JavaScript; license: licenses/jquery.txt
+- remixicon 4.5.0 (Apache-2.0) - Remix Icon CSS and WOFF2 font; license: licenses/remixicon.txt
+- apexcharts 3.54.0 (MIT) - ApexCharts JavaScript; license: licenses/apexcharts.txt
+- @yr/monotone-cubic-spline 1.0.3 (MIT) - bundled into ApexCharts; license: licenses/monotone-cubic-spline.txt
+- svg.js 2.7.1 (MIT) - bundled into ApexCharts; license: licenses/svg-js.txt
+- svg.draggable.js 2.2.2 (MIT) - bundled into ApexCharts; license: licenses/svg-draggable-js.txt
+- svg.easing.js 2.0.0 (MIT) - bundled into ApexCharts; license: licenses/svg-easing-js.txt
+- svg.filter.js 2.0.2 (MIT) - bundled into ApexCharts; license: licenses/svg-filter-js.txt
+- svg.pathmorphing.js 0.1.3 (MIT) - bundled into ApexCharts; license: licenses/svg-pathmorphing-js.txt
+- svg.resize.js 1.4.3 (MIT) - bundled into ApexCharts; license: licenses/svg-resize-js.txt
+- svg.select.js 3.0.1 (MIT) - bundled into ApexCharts; license: licenses/svg-select-js.txt
+
+Complete upstream license texts are included in the licenses/ directory. Copyright and
+license headers embedded in the generated CSS and JavaScript are retained.
+
+Local packaging changes:
+- Bootstrap source-map trailers are removed because source maps are not distributed.
+- Remix Icon's @font-face declaration is limited to the WOFF2 file that is distributed.
+
+Development and CI only (not copied into public assets or the production runtime):
+
+- @axe-core/playwright 4.12.1 (MPL-2.0) - accessibility test integration
+- axe-core 4.12.1 (MPL-2.0) - accessibility test engine
+
+These development-only packages are installed from package-lock.json for accessibility
+testing and carry their upstream license files inside their npm packages.

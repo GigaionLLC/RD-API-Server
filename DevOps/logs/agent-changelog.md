@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:07] - Frontend supply chain: reproducible assets and notices
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `scripts/copy-admin-vendor.mjs`, `package.json`, `eslint.config.mjs`, `.gitattributes`
+- `public/assets/vendor/` (generated runtime assets, full license texts, and third-party notice)
+- `.github/workflows/{ci,docker-publish}.yml`
+- `Wiki/core/06-design-system.md`, `docs/DEVELOPMENT.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Made checked-in browser dependencies byte-for-byte reproducible from the lockfile, removed dangling font/source-map references, included the complete redistribution notices and upstream license texts, added fail-closed inventory/drift verification, moved CI to locked script-disabled installs on supported Node 24.18.0, and made both CI and image publication block on vendor divergence.
+
 ## [2026-07-14 09:06] - Security: redact webhook credentials and delivery errors
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

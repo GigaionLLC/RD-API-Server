@@ -28,15 +28,20 @@ jobs:
         run: php artisan test
 
   js:
-    name: JS lint
+    name: JS lint + vendor integrity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - run: npm install --no-audit --no-fund
-      - run: npx eslint public/assets/js
+          node-version: '24.18.0'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify checked-in admin vendor assets
+        run: npm run check:vendor
+      - name: ESLint
+        run: npm run lint:js
 
   e2e:
     name: E2E (Playwright)
@@ -58,8 +63,9 @@ jobs:
           php artisan db:seed --force
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - run: npm install --no-audit --no-fund
+          node-version: '24.18.0'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - name: Serve app
         # PHP_CLI_SERVER_WORKERS lets the built-in server handle concurrent requests
