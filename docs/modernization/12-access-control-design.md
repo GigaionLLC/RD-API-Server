@@ -131,3 +131,7 @@ experience.
   while deletion requires the corresponding edit permission. Existing delegated roles are
   not automatically granted this new destructive capability; legacy `is_admin` and global
   roles retain full access.
+- **Shared address books — fail closed when sharing is paused.** Owners retain full access and
+  collaborator rows remain available for a later re-enable, but non-owner read/write grants are
+  dormant while `is_shared` is false. Disabled books are omitted from shared-profile discovery,
+  and direct GUID requests cannot use a retained collaborator row to bypass that state.

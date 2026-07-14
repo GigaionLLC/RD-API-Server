@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:21] - Security: suspend disabled address-book shares
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Models/AddressBook.php`
+- `app/Http/Controllers/Api/AddressBookController.php`
+- `tests/Feature/SharedAddressBookTest.php`
+- `docs/modernization/12-access-control-design.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Shared profile and direct book access now honor the existing `is_shared` state; wire shapes are unchanged.
+**Summary:** Made retained collaborator grants dormant whenever an owner pauses sharing, omitted disabled books from shared-profile discovery, and preserved collaborator rows for safe restoration when sharing is re-enabled. Focused coverage confirms former collaborators cannot list, read, or mutate a disabled book while owner access remains unchanged.
+
 ## [2026-07-14 09:17] - CI security: pin third-party GitHub Actions
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

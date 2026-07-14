@@ -116,7 +116,7 @@ class AddressBookController extends Controller
             ->get();
         foreach ($collabs as $collab) {
             $book = $collab->addressBook;
-            if ($book !== null) {
+            if ($book !== null && $book->is_shared) {
                 $profiles[] = $this->profileShape($book, (string) ($book->user->username ?? ''), (int) $collab->rule);
             }
         }

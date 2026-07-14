@@ -91,6 +91,12 @@ class AddressBook extends Model
             return AddressBookCollaborator::RULE_FULL;
         }
 
+        // Keep collaborator rows when sharing is paused so an owner can safely restore the
+        // same access later, but make those grants dormant until sharing is enabled again.
+        if (! $this->is_shared) {
+            return null;
+        }
+
         return $this->collaborators()
             ->where('user_id', $user->id)
             ->value('rule');

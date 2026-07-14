@@ -113,6 +113,44 @@ class SharedAddressBookTest extends TestCase
         $this->assertDatabaseMissing('address_book_peers', ['address_book_id' => $book->id, 'rustdesk_id' => '999']);
     }
 
+    public function test_disabling_sharing_suspends_existing_collaborator_access(): void
+    {
+        $token = $this->tokenFor('former-editor');
+        $collaborator = User::where('username', 'former-editor')->firstOrFail();
+        $owner = $this->user('owner');
+        $book = AddressBook::create([
+            'user_id' => $owner->id,
+            'name' => 'Paused team book',
+            'is_shared' => false,
+        ]);
+        AddressBookCollaborator::create([
+            'address_book_id' => $book->id,
+            'user_id' => $collaborator->id,
+            'rule' => AddressBookCollaborator::RULE_FULL,
+        ]);
+
+        $this->assertFalse($book->canRead($collaborator));
+        $this->assertFalse($book->canWrite($collaborator));
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/ab/shared/profiles')
+            ->assertOk()
+            ->assertJsonPath('total', 0);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/ab/peer/add/'.$book->id, ['id' => 'suspended'])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('address_book_peers', [
+            'address_book_id' => $book->id,
+            'rustdesk_id' => 'suspended',
+        ]);
+        $this->assertDatabaseHas('address_book_collaborators', [
+            'address_book_id' => $book->id,
+            'user_id' => $collaborator->id,
+        ]);
+    }
+
     public function test_admin_shares_a_book_and_adds_a_collaborator(): void
     {
         $admin = User::create([
