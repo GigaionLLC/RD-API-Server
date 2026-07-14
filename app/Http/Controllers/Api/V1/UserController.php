@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AccountCredentialService;
 use App\Services\AdminScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -15,7 +17,10 @@ use Illuminate\Validation\Rule;
  */
 class UserController extends Controller
 {
-    public function __construct(private readonly AdminScopeService $scope) {}
+    public function __construct(
+        private readonly AdminScopeService $scope,
+        private readonly AccountCredentialService $credentials,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -103,7 +108,19 @@ class UserController extends Controller
             $this->scope->authorizeUserGroup($request->user(), (int) $data['group_id'], 'users.edit');
         }
 
-        $user->fill($data)->save();
+        $previousEmail = $user->email;
+        $password = array_key_exists('password', $data) ? (string) $data['password'] : null;
+        unset($data['password']);
+
+        if ($password !== null) {
+            $user = DB::transaction(function () use ($user, $data, $password, $previousEmail): User {
+                $user->fill($data)->save();
+
+                return $this->credentials->replacePassword($user, $password, [$previousEmail]);
+            });
+        } else {
+            $user->fill($data)->save();
+        }
 
         return response()->json(['data' => $this->shape($user)]);
     }

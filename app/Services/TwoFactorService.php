@@ -244,6 +244,7 @@ class TwoFactorService
 
             VerifyCode::create([
                 'user_id' => $user->id,
+                'credential_version' => max(1, (int) $user->credential_version),
                 'type' => VerifyCode::TYPE_TOTP,
                 'uuid' => $uuid,
                 'challenge_hash' => hash('sha256', $secret),
@@ -290,6 +291,12 @@ class TwoFactorService
                 ->first();
 
             if ($record === null) {
+                return false;
+            }
+
+            if (! $this->credentialVersionMatches($record, $user)) {
+                $record->forceFill(['status' => VerifyCode::STATUS_INACTIVE])->save();
+
                 return false;
             }
 
@@ -360,6 +367,7 @@ class TwoFactorService
 
             VerifyCode::create([
                 'user_id' => $user->id,
+                'credential_version' => max(1, (int) $user->credential_version),
                 'type' => VerifyCode::TYPE_EMAIL,
                 'uuid' => $uuid,
                 'challenge_hash' => hash('sha256', $secret),
@@ -410,6 +418,12 @@ class TwoFactorService
                 return false;
             }
 
+            if (! $this->credentialVersionMatches($record, $user)) {
+                $record->forceFill(['status' => VerifyCode::STATUS_INACTIVE])->save();
+
+                return false;
+            }
+
             if ($record->expires_at === null || $record->expires_at->isPast()) {
                 $record->forceFill(['status' => VerifyCode::STATUS_INACTIVE])->save();
 
@@ -446,5 +460,13 @@ class TwoFactorService
 
             return true;
         });
+    }
+
+    private function credentialVersionMatches(VerifyCode $record, User $user): bool
+    {
+        $current = User::query()->whereKey($user->id)->value('credential_version');
+
+        return $current !== null
+            && (int) $record->credential_version === max(1, (int) $current);
     }
 }

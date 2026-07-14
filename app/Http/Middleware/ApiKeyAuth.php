@@ -35,6 +35,10 @@ class ApiKeyAuth
             return response()->json(['error' => 'Invalid API key'], 401);
         }
 
+        if ((int) $key->credential_version !== max(1, (int) $user->credential_version)) {
+            return response()->json(['error' => 'Invalid API key'], 401);
+        }
+
         if (! $key->ipAllowed((string) $request->ip())) {
             return response()->json(['error' => 'This API key is not allowed from your IP address'], 403);
         }

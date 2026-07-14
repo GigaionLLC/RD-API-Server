@@ -107,7 +107,7 @@
             </div>
         </div>
 
-        @if ($canEdit)
+        @if ($canEdit && ! $isFederated)
         <div class="rd-card rd-card--quiet">
             <div class="rd-card__header">
                 <h2 class="rd-card__title">Reset password</h2>
@@ -117,12 +117,24 @@
                     <div class="rd-field">
                         <label class="rd-label" for="password">New password</label>
                         <input class="rd-input" id="password" name="password" type="password" autocomplete="new-password" placeholder="••••••••" aria-describedby="new-password-help">
-                        <span class="rd-help" id="new-password-help">At least 6 characters. The user must use the new password on next login.</span>
+                        <span class="rd-help" id="new-password-help">At least 6 characters. This signs the user out everywhere and revokes their client, API, and deployment credentials. Linked LDAP and SSO accounts cannot be reset here; change access at their identity provider.</span>
                     </div>
                     <div class="rd-actions">
                         <button type="submit" class="rd-btn rd-btn--primary rd-btn--save" data-state="idle">Reset password</button>
                     </div>
                 </form>
+            </div>
+        </div>
+        @elseif ($canEdit)
+        <div class="rd-card rd-card--quiet">
+            <div class="rd-card__header">
+                <h2 class="rd-card__title">Password managed externally</h2>
+            </div>
+            <div class="rd-card__body">
+                <div class="rd-callout rd-callout--info" role="status">
+                    <i class="ri-shield-keyhole-line" aria-hidden="true"></i>
+                    <p>This account is linked to LDAP or SSO. Change its access at the identity provider; a local password cannot be assigned here.</p>
+                </div>
             </div>
         </div>
         @endif

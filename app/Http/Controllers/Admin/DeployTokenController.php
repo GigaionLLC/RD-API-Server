@@ -46,6 +46,7 @@ class DeployTokenController extends Controller
 
         DeployToken::create([
             'user_id' => Auth::id(),
+            'credential_version' => max(1, (int) $request->user()->credential_version),
             'token' => $token,
             'name' => $data['name'] ?? null,
             'expires_at' => $data['expires_at'] ?? null,

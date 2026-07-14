@@ -597,6 +597,7 @@ class OauthService
     {
         $token = AuthToken::create([
             'user_id' => $user->id,
+            'credential_version' => max(1, (int) $user->credential_version),
             'rustdesk_id' => (string) ($session['id'] ?? '') ?: null,
             'uuid' => (string) ($session['uuid'] ?? '') ?: null,
             'device_os' => (string) ($session['device_os'] ?? '') ?: null,

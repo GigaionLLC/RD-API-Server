@@ -275,6 +275,7 @@ class LoginController extends Controller
 
         return AuthToken::create([
             'user_id' => $user->id,
+            'credential_version' => max(1, (int) $user->credential_version),
             'rustdesk_id' => (string) $request->input('id', '') ?: null,
             'uuid' => (string) $request->input('uuid', '') ?: null,
             'device_os' => (string) ($device['os'] ?? '') ?: null,

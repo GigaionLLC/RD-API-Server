@@ -13,12 +13,13 @@ use Illuminate\Support\Str;
  * A scoped API key for the admin REST API. The plaintext secret is shown once at creation;
  * only its SHA-256 hash is stored.
  *
+ * @property int $credential_version
  * @property array<int, string> $scopes
  * @property Carbon|null $expires_at
  * @property Carbon|null $last_used_at
  */
 #[Fillable([
-    'user_id', 'name', 'token_hash', 'prefix', 'scopes', 'allowed_ips',
+    'user_id', 'credential_version', 'name', 'token_hash', 'prefix', 'scopes', 'allowed_ips',
     'expires_at', 'last_used_at', 'last_used_ip',
 ])]
 class ApiKey extends Model
@@ -68,6 +69,7 @@ class ApiKey extends Model
     {
         return [
             'scopes' => 'array',
+            'credential_version' => 'integer',
             'last_used_at' => 'datetime',
             'expires_at' => 'datetime',
         ];

@@ -46,6 +46,7 @@ class ApiKeyController extends Controller
 
         ApiKey::create([
             'user_id' => $request->user()->id,
+            'credential_version' => max(1, (int) $request->user()->credential_version),
             'name' => $data['name'],
             'token_hash' => $hash,
             'prefix' => $prefix,
@@ -68,10 +69,12 @@ class ApiKeyController extends Controller
         $this->authorizeKeyManagement($request, $apiKey);
 
         [$plain, $prefix, $hash] = ApiKey::generateSecret();
+        $ownerVersion = max(1, (int) $apiKey->user()->value('credential_version'));
 
         $apiKey->forceFill([
             'token_hash' => $hash,
             'prefix' => $prefix,
+            'credential_version' => $ownerVersion,
             'last_used_at' => null,
             'last_used_ip' => null,
         ])->save();

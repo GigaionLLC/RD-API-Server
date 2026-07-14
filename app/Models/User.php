@@ -14,6 +14,8 @@ use Illuminate\Notifications\Notifiable;
 /**
  * An account that can sign in to the admin console and/or the RustDesk client.
  * Mirrors the client UserPayload (see docs/modernization/02-client-api-contract.md §3b).
+ *
+ * @property int $credential_version
  */
 #[Fillable([
     'username', 'email', 'password', 'display_name', 'avatar', 'is_admin', 'status',
@@ -45,6 +47,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'credential_version' => 'integer',
             'two_factor_confirmed_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',

@@ -72,10 +72,20 @@ class DemoShowcaseSeeder extends Seeder
             ['username' => 'dave', 'display_name' => 'Dave Okoro', 'email' => 'dave@example.com'],
         ];
 
-        return array_map(fn (array $p) => User::updateOrCreate(
-            ['username' => $p['username']],
-            ['display_name' => $p['display_name'], 'email' => $p['email'], 'password' => 'demo12345678', 'status' => User::STATUS_NORMAL, 'is_admin' => false],
-        ), $people);
+        return array_map(function (array $p): User {
+            $user = User::firstOrCreate(
+                ['username' => $p['username']],
+                ['password' => 'demo12345678'],
+            );
+            $user->fill([
+                'display_name' => $p['display_name'],
+                'email' => $p['email'],
+                'status' => User::STATUS_NORMAL,
+                'is_admin' => false,
+            ])->save();
+
+            return $user;
+        }, $people);
     }
 
     /** @return array{0: array<string, Group>, 1: array<string, DeviceGroup>} */
@@ -357,7 +367,8 @@ class DemoShowcaseSeeder extends Seeder
         foreach ($defs as $i => [$name, $scopes, $prefix]) {
             ApiKey::updateOrCreate(
                 ['name' => $name],
-                ['user_id' => $admin->id, 'token_hash' => hash('sha256', Str::random(40)), 'prefix' => $prefix,
+                ['user_id' => $admin->id, 'credential_version' => max(1, (int) $admin->credential_version),
+                    'token_hash' => hash('sha256', Str::random(40)), 'prefix' => $prefix,
                     'scopes' => $scopes, 'last_used_at' => Carbon::now()->subHours($i * 6 + 1), 'last_used_ip' => '203.0.113.'.(40 + $i)],
             );
         }

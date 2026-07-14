@@ -51,6 +51,10 @@ class DeploymentService
             return null;
         }
 
+        if ((int) $deployToken->credential_version !== max(1, (int) $owner->credential_version)) {
+            return null;
+        }
+
         return $deployToken;
     }
 
@@ -134,7 +138,7 @@ class DeploymentService
             }
 
             $tokenOwner = $token->user;
-            if ($user->id !== $token->user_id && ! ($tokenOwner?->is_admin ?? false)) {
+            if ($user->id !== $token->user_id && ! $tokenOwner->is_admin) {
                 return 'Only a full administrator can assign a device to another user.';
             }
 

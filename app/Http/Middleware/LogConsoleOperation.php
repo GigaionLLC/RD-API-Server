@@ -28,6 +28,9 @@ class LogConsoleOperation
 
     public function handle(Request $request, Closure $next): Response
     {
+        // Capture the actor before the controller. A self-password-reset intentionally logs
+        // its browser session out, but the successful reset must still retain attribution.
+        $actor = Auth::user();
         $response = $next($request);
 
         try {
@@ -35,8 +38,7 @@ class LogConsoleOperation
                 return $response;
             }
 
-            $user = Auth::user();
-            if (! $user) {
+            if (! $actor) {
                 return $response;
             }
 
@@ -46,7 +48,7 @@ class LogConsoleOperation
             }
 
             ConsoleAudit::create([
-                'user_id' => $user->getAuthIdentifier(),
+                'user_id' => $actor->getAuthIdentifier(),
                 'method' => $request->getMethod(),
                 'route_name' => $routeName,
                 'path' => $request->path(),

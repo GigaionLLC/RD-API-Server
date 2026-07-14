@@ -3,6 +3,7 @@
 use App\Http\Middleware\ApiKeyAuth;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureCredentialVersion;
 use App\Http\Middleware\LogConsoleOperation;
 use App\Http\Middleware\RustAuth;
 use Illuminate\Foundation\Application;
@@ -25,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'console.audit' => LogConsoleOperation::class,
             'apikey' => ApiKeyAuth::class,
         ]);
+        $middleware->authenticateSessions();
+        $middleware->appendToGroup('web', EnsureCredentialVersion::class);
         // Unauthenticated admin requests go to the admin login page.
         $middleware->redirectGuestsTo('/admin/login');
     })

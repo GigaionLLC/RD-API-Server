@@ -10,9 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * A verification code (email or TOTP) issued to a user.
+ *
+ * @property int $credential_version
  */
 #[Fillable([
-    'user_id', 'type', 'uuid', 'challenge_hash', 'code', 'failed_attempts',
+    'user_id', 'credential_version', 'type', 'uuid', 'challenge_hash', 'code', 'failed_attempts',
     'max_attempts', 'rustdesk_id', 'status', 'expires_at', 'consumed_at',
 ])]
 #[Hidden(['challenge_hash', 'code'])]
@@ -35,6 +37,7 @@ class VerifyCode extends Model
     {
         return [
             'type' => 'integer',
+            'credential_version' => 'integer',
             'status' => 'integer',
             'failed_attempts' => 'integer',
             'max_attempts' => 'integer',

@@ -10,8 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * A token used to deploy/enroll new devices on behalf of a user.
+ *
+ * @property int $credential_version
  */
-#[Fillable(['user_id', 'token', 'name', 'expires_at', 'last_used_at'])]
+#[Fillable(['user_id', 'credential_version', 'token', 'name', 'expires_at', 'last_used_at'])]
 #[Hidden(['token'])]
 class DeployToken extends Model
 {
@@ -24,6 +26,7 @@ class DeployToken extends Model
     {
         return [
             'expires_at' => 'datetime',
+            'credential_version' => 'integer',
             'last_used_at' => 'datetime',
         ];
     }

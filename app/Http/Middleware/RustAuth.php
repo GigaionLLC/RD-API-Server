@@ -45,6 +45,10 @@ class RustAuth
             return response()->json(['error' => 'Not authenticated'], 401);
         }
 
+        if ((int) $authToken->credential_version !== max(1, (int) $user->credential_version)) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
+
         // Touch last-used for activity tracking (best-effort, no validation).
         $authToken->forceFill(['last_used_at' => now()])->saveQuietly();
 

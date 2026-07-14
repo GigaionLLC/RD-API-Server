@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminRole;
 use App\Models\Group;
+use App\Models\LdapIdentity;
 use App\Models\User;
+use App\Models\UserThird;
+use App\Services\AccountCredentialService;
 use App\Services\AdminScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -18,7 +22,10 @@ use Illuminate\View\View;
  */
 class UserController extends Controller
 {
-    public function __construct(private readonly AdminScopeService $scope) {}
+    public function __construct(
+        private readonly AdminScopeService $scope,
+        private readonly AccountCredentialService $credentials,
+    ) {}
 
     /**
      * GET /admin/users/search?q= — live picker results (id + username) for the searchable
@@ -184,6 +191,8 @@ class UserController extends Controller
         $assignedRoleIds = $canManageAdminAccess
             ? $user->adminRoles()->pluck('admin_roles.id')->map(static fn ($id): int => (int) $id)->all()
             : [];
+        $isFederated = LdapIdentity::query()->where('user_id', $user->id)->exists()
+            || UserThird::query()->where('user_id', $user->id)->exists();
 
         return view('admin.users.edit', compact(
             'user',
@@ -192,6 +201,7 @@ class UserController extends Controller
             'assignedRoleIds',
             'canEdit',
             'canManageAdminAccess',
+            'isFederated',
         ));
     }
 
@@ -268,7 +278,16 @@ class UserController extends Controller
             'password' => ['required', 'string', 'min:6'],
         ]);
 
-        $user->forceFill(['password' => $data['password']])->save();
+        $selfReset = (int) $request->user()->id === (int) $user->id;
+        $this->credentials->replacePassword($user, $data['password']);
+
+        if ($selfReset) {
+            Auth::logoutCurrentDevice();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json(['redirect' => route('admin.login')]);
+        }
 
         return response()->json([]);
     }

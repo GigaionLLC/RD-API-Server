@@ -184,6 +184,11 @@
           json: true,
           data: serializeLiveForm($form)
         }).done(function (response) {
+          if (response && typeof response.redirect === 'string' && response.redirect !== '') {
+            window.location.assign(response.redirect);
+            return;
+          }
+
           if (response && response.error) {
             setLiveFormState($button, 'error');
             RD.toast(response.error, 'error');
