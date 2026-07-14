@@ -210,8 +210,9 @@ class TwoFactorController extends Controller
 
     /**
      * Resolve a still-valid deferred login. The HMAC deliberately binds the challenge to the
-     * password hash accepted during primary authentication without storing that hash in the
-     * session. A password replacement therefore makes the pending challenge unusable.
+     * password hash and credential version accepted during primary authentication without
+     * storing either value in the session. Password replacement or explicit credential
+     * revocation therefore makes the pending challenge unusable.
      */
     private function pendingUser(Request $request): ?User
     {
@@ -244,7 +245,7 @@ class TwoFactorController extends Controller
     {
         return hash_hmac(
             'sha256',
-            $user->getAuthIdentifier().'|'.$user->getAuthPassword(),
+            $user->getAuthIdentifier().'|'.max(1, (int) $user->credential_version).'|'.$user->getAuthPassword(),
             (string) config('app.key'),
         );
     }

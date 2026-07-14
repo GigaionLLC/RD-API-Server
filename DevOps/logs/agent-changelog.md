@@ -3,6 +3,15 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 12:15] - Security: bind pending 2FA to credential version
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Admin/TwoFactorController.php`
+- `tests/Feature/AdminTwoFactorTest.php`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Existing pending-challenge session keys and HTTP behavior are unchanged.
+**Summary:** Extended the HMAC-protected admin two-factor login marker to bind the account's credential version as well as its password hash. A version-only credential revocation now invalidates a pending challenge even if the hash does not change. Eleven focused tests / 101 assertions, Pint, targeted PHPStan, and diff checks passed in Docker.
+
 ## [2026-07-14 12:06] - Security: protect CLI account password input
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

@@ -120,6 +120,26 @@ class AdminTwoFactorTest extends TestCase
         $this->assertPendingChallengeCleared();
     }
 
+    public function test_credential_version_change_invalidates_a_pending_challenge(): void
+    {
+        $secret = app(TwoFactorService::class)->generateSecret();
+        $admin = $this->admin([
+            'two_factor_enabled' => true,
+            'two_factor_secret' => $secret,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+        ]);
+
+        $this->post('/admin/login', ['username' => 'admin', 'password' => 'secret12345'])
+            ->assertRedirect(route('admin.2fa.challenge'));
+
+        $admin->forceFill(['credential_version' => 2])->save();
+
+        $this->post(route('admin.2fa.challenge.verify'), ['code' => $this->code($secret)])
+            ->assertRedirect(route('admin.login'));
+        $this->assertGuest();
+        $this->assertPendingChallengeCleared();
+    }
+
     public function test_expired_pending_challenge_is_rejected(): void
     {
         $secret = app(TwoFactorService::class)->generateSecret();
