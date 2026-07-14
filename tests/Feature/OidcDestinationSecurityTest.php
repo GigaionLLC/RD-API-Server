@@ -315,7 +315,10 @@ class OidcDestinationSecurityTest extends TestCase
         $this->assertNotSame('', $code);
         $this->assertStringStartsWith('https://login.example.net/oauth/authorize?audience=desktop&', $url);
         $this->assertTrue(app(OauthService::class)->handleCallback($code, 'provider-code')['ok']);
-        $this->assertStringContainsString('access_token', app(OauthService::class)->pollResult($code));
+        $this->assertStringContainsString(
+            'access_token',
+            app(OauthService::class)->pollResult($code, 'device', 'uuid')
+        );
         Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'token.example.net'));
         Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'profile.example.net'));
     }

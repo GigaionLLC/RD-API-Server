@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\UserThird;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -48,6 +49,8 @@ class OauthService
 
     private const OIDC_TIMEOUT_SECONDS = 10;
 
+    private const POLL_RETRY_WINDOW_SECONDS = 15;
+
     public function __construct(private readonly OidcDestinationGuard $oidcDestinationGuard) {}
 
     /**
@@ -71,6 +74,12 @@ class OauthService
      */
     public function beginAuth(string $op, string $id, string $uuid, array $deviceInfo): array
     {
+        $id = trim($id);
+        $uuid = trim($uuid);
+        if ($id === '' || strlen($id) > 255 || $uuid === '' || strlen($uuid) > 255) {
+            return ['', ''];
+        }
+
         $provider = $this->enabledProvider($op);
         if (! $provider) {
             return ['', ''];
@@ -234,8 +243,9 @@ class OauthService
         $session->save();
 
         Log::channel('stderr')->info('OIDC callback resolved user', [
-            'code' => $state, 'op' => $provider->op, 'user_id' => $user->id,
-            'username' => $user->username, 'status' => (int) $user->status,
+            'op' => $provider->op,
+            'user_id' => $user->id,
+            'status' => (int) $user->status,
         ]);
 
         return ['ok' => true, 'error' => ''];
@@ -514,27 +524,66 @@ class OauthService
      * Poll a pending session. Returns the AuthBody JSON string when ready, otherwise the
      * pending error JSON the client recognizes ("No authed oidc is found").
      */
-    public function pollResult(string $code): string
+    public function pollResult(string $code, string $rustdeskId, string $uuid): string
     {
-        $session = OauthSession::find($code);
-
-        if ($session && ! $session->isExpired() && ! empty($session->auth_body)) {
-            // The stored value is already the exact JSON string to return.
-            $json = (string) $session->auth_body;
-
-            // Diagnostic: log the EXACT delivered JSON (token masked via string replace so we
-            // don't mangle {} into [] by decoding). To stderr so it lands in `docker logs`.
-            $loggable = (string) preg_replace('/("access_token":")[^"]*/', '$1***', $json);
-            Log::channel('stderr')->info('OIDC auth-query delivering token', [
-                'code' => $code, 'bytes' => strlen($json), 'json' => $loggable,
-            ]);
-
-            // Idempotent: keep the session until it expires (do NOT consume on first read), so a
-            // client that re-polls — or a momentary parse hiccup — can still pick up the token.
-            // The row is pruned on expiry by beginAuth's cleanup.
-            return $json;
+        $code = trim($code);
+        $rustdeskId = trim($rustdeskId);
+        $uuid = trim($uuid);
+        if ($code === '' || $rustdeskId === '' || $uuid === '') {
+            return $this->pendingPollResult();
         }
 
+        return DB::transaction(function () use ($code, $rustdeskId, $uuid): string {
+            $session = OauthSession::whereKey($code)->lockForUpdate()->first();
+            if (! $session || $session->isExpired()) {
+                $session?->delete();
+
+                return $this->pendingPollResult();
+            }
+
+            $storedId = (string) $session->rustdesk_id;
+            $storedUuid = (string) $session->uuid;
+            if ($storedId === '' || $storedUuid === ''
+                || ! hash_equals($storedId, $rustdeskId)
+                || ! hash_equals($storedUuid, $uuid)) {
+                return $this->pendingPollResult();
+            }
+
+            $deliveryCount = (int) $session->delivery_count;
+            $retryExpired = $deliveryCount > 0 && (
+                $session->delivered_at === null
+                || $session->delivered_at->lt(now()->subSeconds(self::POLL_RETRY_WINDOW_SECONDS))
+            );
+            if (empty($session->auth_body) || $deliveryCount >= 2 || $retryExpired) {
+                if (! empty($session->auth_body)) {
+                    $session->forceFill(['auth_body' => null])->save();
+                }
+
+                return $this->pendingPollResult();
+            }
+
+            // The stored value is already the exact JSON string required by the client's
+            // strict parser. Permit one short retry for a dropped response, then erase it.
+            $json = (string) $session->auth_body;
+            $deliveryCount++;
+            $session->forceFill([
+                'delivery_count' => $deliveryCount,
+                'delivered_at' => $session->delivered_at ?? now(),
+                'auth_body' => $deliveryCount >= 2 ? null : $session->auth_body,
+            ])->save();
+
+            Log::channel('stderr')->info('OIDC auth-query delivered token', [
+                'op' => (string) $session->op,
+                'bytes' => strlen($json),
+                'delivery' => $deliveryCount,
+            ]);
+
+            return $json;
+        });
+    }
+
+    private function pendingPollResult(): string
+    {
         return (string) json_encode(['error' => 'No authed oidc is found']);
     }
 

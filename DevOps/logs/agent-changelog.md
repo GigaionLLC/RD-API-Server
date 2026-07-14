@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 09:37] - Security: bind and limit OIDC token polling
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/OauthService.php`, `app/Http/Controllers/Api/OauthController.php`
+- `app/Models/OauthSession.php`
+- `database/migrations/2026_07_14_100001_add_delivery_state_to_oauth_sessions_table.php`
+- `tests/Feature/{OidcPkceTest,OidcDestinationSecurityTest}.php`
+- `docs/modernization/02-client-api-contract.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds `oauth_sessions.delivery_count` and nullable `delivered_at`. OIDC poll response shapes are unchanged; polls now require the originating `id`/`uuid` and allow at most two deliveries in 15 seconds.
+**Summary:** Removed the bearer-like poll code and token body from logs, bound token delivery to the device that began the flow, required bounded non-empty device identity, serialized delivery with a database lock, and erased the stored AuthBody after one short retry. Forty-nine focused OIDC/SSO tests / 129 assertions plus Pint passed.
+
 ## [2026-07-14 09:34] - Security: bind device telemetry to stored identity
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

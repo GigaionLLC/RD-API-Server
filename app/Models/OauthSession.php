@@ -16,11 +16,14 @@ use Illuminate\Support\Carbon;
  * with serde, which is stricter than the array-cast round-trip would preserve.
  *
  * @property string|null $auth_body
+ * @property int $delivery_count
+ * @property Carbon|null $delivered_at
  * @property Carbon $expires_at
  */
 #[Fillable([
     'code', 'op', 'rustdesk_id', 'uuid', 'nonce', 'code_verifier',
-    'device_os', 'device_type', 'device_name', 'auth_body', 'expires_at',
+    'device_os', 'device_type', 'device_name', 'auth_body', 'delivery_count',
+    'delivered_at', 'expires_at',
 ])]
 class OauthSession extends Model
 {
@@ -40,6 +43,8 @@ class OauthSession extends Model
     {
         return [
             'expires_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            'delivery_count' => 'integer',
         ];
     }
 

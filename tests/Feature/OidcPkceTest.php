@@ -92,7 +92,7 @@ class OidcPkceTest extends TestCase
         });
 
         // The client poll now receives the auth body (not the pending error).
-        $body = $oauth->pollResult($code);
+        $body = $oauth->pollResult($code, 'dev', 'uuid');
         $this->assertStringContainsString('access_token', $body);
         $this->assertStringNotContainsString('No authed oidc is found', $body);
     }
@@ -123,13 +123,23 @@ class OidcPkceTest extends TestCase
         $this->assertTrue(app()->make(OauthService::class)->handleCallback($code, 'auth-code')['ok']);
 
         // ...client poll handled by a freshly-resolved instance.
-        $body = app()->make(OauthService::class)->pollResult($code);
+        $body = app()->make(OauthService::class)->pollResult($code, 'dev', 'uuid');
         $this->assertStringContainsString('access_token', $body);
 
-        // Idempotent: a re-poll still returns the token (not consumed on first read), so a
-        // client retry can't lose it. The row is pruned on expiry, not on delivery.
-        $this->assertStringContainsString('access_token', app()->make(OauthService::class)->pollResult($code));
-        $this->assertDatabaseHas('oauth_sessions', ['code' => $code]);
+        // One short retry is allowed for a dropped response; subsequent polls cannot replay it.
+        $this->assertStringContainsString(
+            'access_token',
+            app()->make(OauthService::class)->pollResult($code, 'dev', 'uuid')
+        );
+        $this->assertStringContainsString(
+            'No authed oidc is found',
+            app()->make(OauthService::class)->pollResult($code, 'dev', 'uuid')
+        );
+        $this->assertDatabaseHas('oauth_sessions', [
+            'code' => $code,
+            'delivery_count' => 2,
+            'auth_body' => null,
+        ]);
     }
 
     public function test_auth_query_returns_token_at_top_level_and_in_body(): void
@@ -165,6 +175,46 @@ class OidcPkceTest extends TestCase
         $this->assertStringContainsString('No authed oidc is found', $res->json('body')); // and body
     }
 
+    public function test_auth_query_rejects_a_stolen_poll_code_from_another_device(): void
+    {
+        $this->fakeOidc();
+        $this->provider(true);
+        $oauth = app(OauthService::class);
+
+        [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
+        $this->assertTrue($oauth->handleCallback($code, 'auth-code')['ok']);
+
+        $this->getJson("/api/oidc/auth-query?code={$code}&id=attacker&uuid=wrong")
+            ->assertOk()
+            ->assertJsonPath('error', 'No authed oidc is found');
+
+        $this->assertDatabaseHas('oauth_sessions', [
+            'code' => $code,
+            'delivery_count' => 0,
+        ]);
+
+        $this->getJson("/api/oidc/auth-query?code={$code}&id=dev&uuid=uuid")
+            ->assertOk()
+            ->assertJsonPath('access_token', fn ($token) => is_string($token) && $token !== '');
+    }
+
+    public function test_device_flow_requires_a_bounded_id_and_uuid(): void
+    {
+        $this->provider(true);
+        $oauth = app(OauthService::class);
+
+        foreach ([
+            ['', 'uuid'],
+            ['dev', ''],
+            [str_repeat('a', 256), 'uuid'],
+            ['dev', str_repeat('b', 256)],
+        ] as [$id, $uuid]) {
+            $this->assertSame(['', ''], $oauth->beginAuth('keycloak', $id, $uuid, []));
+        }
+
+        $this->assertDatabaseCount('oauth_sessions', 0);
+    }
+
     public function test_provider_without_pkce_still_completes(): void
     {
         $this->fakeOidc();
@@ -173,7 +223,7 @@ class OidcPkceTest extends TestCase
 
         [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
         $this->assertTrue($oauth->handleCallback($code, 'code')['ok']);
-        $this->assertStringContainsString('access_token', $oauth->pollResult($code));
+        $this->assertStringContainsString('access_token', $oauth->pollResult($code, 'dev', 'uuid'));
 
         $this->assertDatabaseHas('user_thirds', ['op' => 'keycloak', 'open_id' => 'kc-1']);
         $this->assertNotNull(User::where('username', 'u')->first());

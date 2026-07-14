@@ -100,7 +100,11 @@ class OauthController extends Controller
     public function authQuery(Request $request): JsonResponse
     {
         $code = (string) $request->query('code', '');
-        $json = $this->oauth->pollResult($code);
+        $json = $this->oauth->pollResult(
+            $code,
+            (string) $request->query('id', ''),
+            (string) $request->query('uuid', ''),
+        );
 
         // Decode to OBJECTS (not assoc arrays) so an empty `info` stays `{}` and isn't
         // re-encoded as `[]` — the client's serde UserInfo expects an object, and `[]` would

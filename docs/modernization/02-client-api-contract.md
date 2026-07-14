@@ -125,6 +125,12 @@ name, preset device username, preset device name, preset note. These are produce
    While pending the server returns an error containing `"No authed oidc is found"`.
    On success it returns an **AuthBody** (below). All routes already exist in this repo.
 
+The poll code is a bearer-like secret and is never written to logs. A successful poll must also
+match the exact device `id` and `uuid` stored when the flow began. The AuthBody may be delivered
+twice within a 15-second retry window for a dropped response; it is then erased from the pending
+session and further polls return the normal pending error, limiting token replay without changing
+the client response shape.
+
 ### 3b. AuthBody / UserPayload — the shape every login must return
 ```json
 {
