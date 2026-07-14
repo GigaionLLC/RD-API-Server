@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 08:42] - Security: prevent webhook server-side request forgery
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Services/{WebhookDestinationGuard,WebhookDnsResolver,WebhookService}.php`
+- `app/Http/Controllers/Admin/WebhookController.php`
+- `config/rustdesk.php`, `.env.example`
+- `composer.json`, `composer.lock`
+- `tests/Feature/{WebhookDestinationSecurityTest,WebhookTest}.php`
+- `Wiki/core/15-security.md`, `docs/api/README.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Requires PHP `ext-curl`; adds optional `RUSTDESK_WEBHOOK_ALLOWED_PORTS` configuration (default `80,443`). No schema or inbound/RustDesk wire changes.
+**Summary:** Added send-time public-destination validation for every webhook attempt, rejected ambiguous/non-canonical IPs and non-public IPv4/IPv6/DNS answers, pinned cURL to the validated address, disabled redirects/proxies/connection reuse, and restricted transport protocols and ports. Blocked attempts are recorded as failed deliveries without reaching the HTTP transport, with retry, redirect, DNS-rebinding, and address-range regression coverage.
+
 ## [2026-07-14 08:38] - Security: separate alarm and recording deletion permissions
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

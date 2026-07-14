@@ -103,5 +103,9 @@ This folder ships ready-to-import artifacts covering both the admin API and the 
 - **Webhooks / notifications** — outbound, not part of this inbound API. Configure Slack /
   Telegram / generic JSON targets in the console under **Webhooks**; generic deliveries carry an
   `X-RustDesk-Signature: sha256=…` HMAC when a secret is set.
+  Destinations are restricted to HTTP(S) on configured public ports, resolved and validated on
+  every attempt, pinned to a public address, and never followed across redirects. The default
+  allowed ports are `80,443`; set `RUSTDESK_WEBHOOK_ALLOWED_PORTS` only for intentional public
+  custom ports.
 
 > Endpoints are additive — new resources/scopes are appended here and to `openapi.yaml`.

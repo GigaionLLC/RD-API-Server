@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,8 @@ class WebhookService
 {
     /** How long to wait on a single webhook endpoint before giving up. */
     private const TIMEOUT_SECONDS = 4;
+
+    public function __construct(private readonly WebhookDestinationGuard $destinationGuard) {}
 
     /**
      * Fan a server event out to every enabled webhook subscribed to it.
@@ -124,18 +127,26 @@ class WebhookService
     {
         $summary = $this->summarize($event, $payload);
 
+        // Resolve and pin immediately before every attempt. This protects automatic retries and
+        // records a normal failed delivery when DNS changes to a private/reserved destination.
+        $destination = $this->destinationGuard->resolve($hook->url);
+        $request = Http::timeout(self::TIMEOUT_SECONDS)
+            ->connectTimeout(self::TIMEOUT_SECONDS)
+            ->withoutRedirecting()
+            ->withOptions($this->destinationGuard->requestOptions($destination));
+
         return match ($hook->type) {
-            Webhook::TYPE_SLACK => Http::timeout(self::TIMEOUT_SECONDS)
+            Webhook::TYPE_SLACK => $request
                 ->asJson()
                 ->post($hook->url, ['text' => $summary]),
-            Webhook::TYPE_TELEGRAM => Http::timeout(self::TIMEOUT_SECONDS)
+            Webhook::TYPE_TELEGRAM => $request
                 ->asJson()
                 ->post($hook->url, [
                     'chat_id' => $hook->secret,
                     'text' => $summary,
                     'disable_web_page_preview' => true,
                 ]),
-            default => $this->postGeneric($hook, $event, $summary, $payload),
+            default => $this->postGeneric($request, $hook, $event, $summary, $payload),
         };
     }
 
@@ -144,8 +155,13 @@ class WebhookService
      *
      * @param  array<string, mixed>  $payload
      */
-    private function postGeneric(Webhook $hook, string $event, string $summary, array $payload): Response
-    {
+    private function postGeneric(
+        PendingRequest $request,
+        Webhook $hook,
+        string $event,
+        string $summary,
+        array $payload
+    ): Response {
         $body = (string) json_encode([
             'event' => $event,
             'summary' => $summary,
@@ -162,7 +178,7 @@ class WebhookService
             $headers['X-RustDesk-Signature'] = 'sha256='.hash_hmac('sha256', $body, (string) $hook->secret);
         }
 
-        return Http::timeout(self::TIMEOUT_SECONDS)
+        return $request
             ->withHeaders($headers)
             ->withBody($body, 'application/json')
             ->post($hook->url);

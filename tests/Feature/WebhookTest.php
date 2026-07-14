@@ -6,10 +6,12 @@ use App\Models\Device;
 use App\Models\User;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
+use App\Services\WebhookDnsResolver;
 use App\Services\WebhookService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /**
@@ -19,6 +21,17 @@ use Tests\TestCase;
 class WebhookTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Tests must not depend on external DNS. These documentation hosts represent a public
+        // destination; dedicated SSRF tests exercise private and mixed DNS answers.
+        $this->mock(WebhookDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->andReturn(['8.8.8.8']);
+        });
+    }
 
     private function admin(): User
     {

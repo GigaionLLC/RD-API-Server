@@ -137,7 +137,7 @@ class WebhookController extends Controller
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(array_keys(Webhook::TYPES))],
-            'url' => ['required', 'url', 'max:2048'],
+            'url' => ['required', 'url:http,https', 'max:2048'],
             'secret' => ['nullable', 'string', 'max:255'],
             'events' => ['required', 'array', 'min:1'],
             'events.*' => [Rule::in(array_keys(Webhook::EVENTS))],

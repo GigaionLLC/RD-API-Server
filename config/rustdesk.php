@@ -56,4 +56,13 @@ return [
     // Delete audit rows (connection / file / login logs + alarms) older than this many days.
     // 0 = keep forever. Pruned by the scheduled `audit:prune` command.
     'audit_retention_days' => (int) env('RUSTDESK_AUDIT_RETENTION_DAYS', 0),
+
+    // Outbound webhooks are restricted to standard web ports by default. Add a public custom
+    // HTTP(S) port here only when a deployment intentionally needs it.
+    'webhooks' => [
+        'allowed_ports' => array_map(
+            'intval',
+            explode(',', (string) env('RUSTDESK_WEBHOOK_ALLOWED_PORTS', '80,443'))
+        ),
+    ],
 ];
