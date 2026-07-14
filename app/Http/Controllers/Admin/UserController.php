@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminRole;
 use App\Models\Group;
 use App\Models\User;
+use App\Services\AdminScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,8 @@ use Illuminate\View\View;
  */
 class UserController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     /**
      * GET /admin/users/search?q= — live picker results (id + username) for the searchable
      * combobox, capped, so user pickers stay usable with many accounts.
@@ -25,7 +28,7 @@ class UserController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $users = User::query()
+        $users = $this->scope->scopeUsers(User::query(), $request->user(), 'users.view')
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('username', 'like', "%{$q}%")
                 ->orWhere('email', 'like', "%{$q}%")))
@@ -43,18 +46,21 @@ class UserController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $users = User::query()
+        $actor = $request->user();
+        $users = $this->scope->scopeUsers(User::query(), $actor, 'users.view')
             ->withExists('adminRoles')
             ->when($q !== '', function ($query) use ($q) {
-                $query->where('username', 'like', "%{$q}%")
+                $query->where(fn ($search) => $search
+                    ->where('username', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
-                    ->orWhere('display_name', 'like', "%{$q}%");
+                    ->orWhere('display_name', 'like', "%{$q}%"));
             })
             ->orderBy('username')
             ->paginate(20)
             ->appends($request->query());
 
-        $groups = Group::orderBy('name')->get(['id', 'name']);
+        $groups = $this->scope->scopeUserGroups(Group::query(), $actor, 'users.edit')
+            ->orderBy('name')->get(['id', 'name']);
 
         $canEdit = $request->user()->hasPermission('users.edit');
         $canManageAdminAccess = (bool) $request->user()->is_admin;
@@ -76,14 +82,17 @@ class UserController extends Controller
         ]);
 
         $ids = array_map('intval', $data['ids']);
-        if (! $request->user()->is_admin && User::query()
+        $actor = $request->user();
+        $this->scope->authorizeUserIds($actor, array_values($ids), 'users.edit');
+
+        if (! $actor->is_admin && User::query()
             ->whereIn('id', $ids)
             ->where(fn ($query) => $query->where('is_admin', true)->orWhereHas('adminRoles'))
             ->exists()) {
             abort(403, 'Only a full administrator may bulk-update privileged accounts.');
         }
 
-        $self = (int) $request->user()->id;
+        $self = (int) $actor->id;
         $protect = static fn (array $list): array => array_values(array_filter($list, fn (int $id): bool => $id !== $self));
 
         switch ($data['action']) {
@@ -104,6 +113,11 @@ class UserController extends Controller
                 if ($value !== null && ! Group::whereKey($value)->exists()) {
                     return back()->withErrors(['value' => 'The selected group no longer exists.']);
                 }
+                if ($value === null) {
+                    $this->scope->authorizeUnrestricted($actor, 'users.edit');
+                } else {
+                    $this->scope->authorizeUserGroup($actor, (int) $value, 'users.edit');
+                }
                 $count = User::whereIn('id', $ids)->update(['group_id' => $value]);
                 $msg = "Updated the group on {$count} user(s).";
                 break;
@@ -115,7 +129,8 @@ class UserController extends Controller
     public function create(Request $request): View
     {
         $user = new User(['status' => User::STATUS_NORMAL, 'login_verify' => User::LOGIN_VERIFY_OFF]);
-        $groups = Group::orderBy('name')->get(['id', 'name']);
+        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'users.edit')
+            ->orderBy('name')->get(['id', 'name']);
         $canManageAdminAccess = (bool) $request->user()->is_admin;
 
         return view('admin.users.create', compact('user', 'groups', 'canManageAdminAccess'));
@@ -140,6 +155,13 @@ class UserController extends Controller
         $data['is_admin'] = $canManageAdminAccess && (bool) ($data['is_admin'] ?? false);
         $data['force_sso'] = (bool) ($data['force_sso'] ?? false);
 
+        if (! $this->scope->isUnrestricted($request->user(), 'users.edit')) {
+            if (($data['group_id'] ?? null) === null) {
+                abort(403, 'Scoped user managers must create users inside their assigned groups.');
+            }
+            $this->scope->authorizeUserGroup($request->user(), (int) $data['group_id'], 'users.edit');
+        }
+
         User::create($data);
 
         return redirect()
@@ -149,9 +171,11 @@ class UserController extends Controller
 
     public function edit(Request $request, User $user): View
     {
+        $this->scope->authorizeUser($request->user(), $user, 'users.view');
         $this->authorizePrivilegedAccountManagement($request, $user);
 
-        $groups = Group::orderBy('name')->get(['id', 'name']);
+        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'users.edit')
+            ->orderBy('name')->get(['id', 'name']);
         $canEdit = $request->user()->hasPermission('users.edit');
         $canManageAdminAccess = (bool) $request->user()->is_admin;
         $adminRoles = $canManageAdminAccess
@@ -173,6 +197,7 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
+        $this->scope->authorizeUser($request->user(), $user, 'users.edit');
         $this->authorizePrivilegedAccountManagement($request, $user);
         $canManageAdminAccess = (bool) $request->user()->is_admin;
 
@@ -191,6 +216,13 @@ class UserController extends Controller
         $data['force_sso'] = (bool) ($data['force_sso'] ?? false);
         $data['group_id'] = $data['group_id'] ?? null;
         unset($data['admin_role_ids']);
+
+        if (! $this->scope->isUnrestricted($request->user(), 'users.edit')) {
+            if ($data['group_id'] === null) {
+                abort(403, 'Scoped user managers cannot move users outside their assigned groups.');
+            }
+            $this->scope->authorizeUserGroup($request->user(), (int) $data['group_id'], 'users.edit');
+        }
 
         if ($canManageAdminAccess) {
             $data['is_admin'] = (bool) ($data['is_admin'] ?? false);
@@ -229,6 +261,7 @@ class UserController extends Controller
 
     public function resetPassword(Request $request, User $user): JsonResponse
     {
+        $this->scope->authorizeUser($request->user(), $user, 'users.edit');
         $this->authorizePrivilegedAccountManagement($request, $user);
 
         $data = $request->validate([
@@ -242,6 +275,7 @@ class UserController extends Controller
 
     public function destroy(Request $request, User $user): RedirectResponse
     {
+        $this->scope->authorizeUser($request->user(), $user, 'users.edit');
         $this->authorizePrivilegedAccountManagement($request, $user);
 
         if ($user->id === $request->user()->id) {

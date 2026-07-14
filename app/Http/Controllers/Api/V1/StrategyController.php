@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Strategy;
+use App\Services\AdminScopeService;
 use App\Services\ClientConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,11 +16,13 @@ use Illuminate\Validation\ValidationException;
  */
 class StrategyController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function index(Request $request): JsonResponse
     {
         $perPage = min(100, max(1, (int) $request->query('per_page', 50)));
 
-        $strategies = Strategy::query()
+        $strategies = $this->scope->scopeStrategies(Strategy::query(), $request->user(), 'strategies.view')
             ->withCount('assignments')
             ->orderBy('name')
             ->paginate($perPage, ['id', 'name', 'note', 'enabled', 'options', 'modified_at']);
@@ -32,6 +35,7 @@ class StrategyController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->scope->authorizeUnrestricted($request->user(), 'strategies.edit');
         $data = $this->validateStrategy($request, creating: true);
 
         $strategy = Strategy::create([
@@ -51,6 +55,7 @@ class StrategyController extends Controller
      */
     public function update(Request $request, Strategy $strategy): JsonResponse
     {
+        $this->scope->authorizeStrategy($request->user(), (int) $strategy->id, 'strategies.edit');
         $data = $this->validateStrategy($request, creating: false);
 
         $strategy->fill(array_filter([

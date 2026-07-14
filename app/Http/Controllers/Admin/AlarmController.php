@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Alarm;
+use App\Services\AdminScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -13,11 +14,17 @@ use Illuminate\View\View;
  */
 class AlarmController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function index(Request $request): View
     {
         $type = trim((string) $request->query('type', ''));
 
-        $alarms = Alarm::query()
+        $alarms = $this->scope->scopeDeviceLinkedRecords(
+            Alarm::query(),
+            $request->user(),
+            'alarms.view',
+        )
             ->with('device:id,rustdesk_id,hostname,alias')
             ->when($type !== '', fn ($query) => $query->where('type', $type))
             ->orderByDesc('created_at')
@@ -25,13 +32,23 @@ class AlarmController extends Controller
             ->appends($request->query());
 
         // Distinct types for the filter dropdown.
-        $types = Alarm::query()->distinct()->orderBy('type')->pluck('type');
+        $types = $this->scope->scopeDeviceLinkedRecords(
+            Alarm::query(),
+            $request->user(),
+            'alarms.view',
+        )->distinct()->orderBy('type')->pluck('type');
 
         return view('admin.alarms.index', compact('alarms', 'type', 'types'));
     }
 
-    public function destroy(Alarm $alarm): RedirectResponse
+    public function destroy(Request $request, Alarm $alarm): RedirectResponse
     {
+        $this->scope->authorizeDeviceLinkedRecord(
+            $request->user(),
+            $alarm->device_id === null ? null : (int) $alarm->device_id,
+            (string) $alarm->peer_id,
+            'alarms.edit',
+        );
         $alarm->delete();
 
         return redirect()

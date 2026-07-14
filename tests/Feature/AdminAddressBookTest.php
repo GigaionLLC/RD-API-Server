@@ -6,6 +6,7 @@ use App\Models\AddressBook;
 use App\Models\AddressBookCollaborator;
 use App\Models\AddressBookPeer;
 use App\Models\AdminRole;
+use App\Models\Group;
 use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -265,10 +266,12 @@ class AdminAddressBookTest extends TestCase
 
     public function test_view_only_admin_sees_address_book_data_without_mutation_controls(): void
     {
+        $group = Group::create(['name' => 'Address book scope', 'type' => Group::TYPE_DEFAULT]);
+        $this->owner->forceFill(['group_id' => $group->id])->save();
         $role = AdminRole::create([
             'name' => 'Address book viewer',
-            'type' => AdminRole::TYPE_INDIVIDUAL,
-            'scope' => [],
+            'type' => AdminRole::TYPE_GROUP,
+            'scope' => [$group->id],
             'perms' => ['address_books.view'],
         ]);
         $viewer = User::create([

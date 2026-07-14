@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DeviceGroup;
 use App\Models\DeviceGroupAccess;
 use App\Models\Group;
+use App\Services\AdminScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,18 +17,29 @@ use Illuminate\View\View;
  */
 class DeviceGroupController extends Controller
 {
-    public function index(): View
+    public function __construct(private readonly AdminScopeService $scope) {}
+
+    public function index(Request $request): View
     {
-        $deviceGroups = DeviceGroup::withCount('devices')->orderBy('name')->paginate(20);
+        $deviceGroups = $this->scope->scopeDeviceGroups(
+            DeviceGroup::query()->withCount('devices'),
+            $request->user(),
+            'device_groups.view',
+        )->orderBy('name')->paginate(20);
         // The current default (may be on another page) so the UI can name it in the
         // replace-confirmation.
-        $defaultGroup = DeviceGroup::where('is_default', true)->first(['id', 'name']);
+        $defaultGroup = $this->scope->scopeDeviceGroups(
+            DeviceGroup::query()->where('is_default', true),
+            $request->user(),
+            'device_groups.view',
+        )->first(['id', 'name']);
 
         return view('admin.device_groups.index', compact('deviceGroups', 'defaultGroup'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $this->scope->authorizeUnrestricted($request->user(), 'device_groups.edit');
         $deviceGroup = new DeviceGroup;
 
         return view('admin.device_groups.create', compact('deviceGroup'));
@@ -35,6 +47,7 @@ class DeviceGroupController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->scope->authorizeUnrestricted($request->user(), 'device_groups.edit');
         $group = DeviceGroup::create($this->validateGroup($request));
 
         // Convenience: if there's no default yet, the first group created becomes the default
@@ -48,10 +61,13 @@ class DeviceGroupController extends Controller
             ->with('status', $group->is_default ? 'Device group created and set as default.' : 'Device group created.');
     }
 
-    public function edit(DeviceGroup $deviceGroup): View
+    public function edit(Request $request, DeviceGroup $deviceGroup): View
     {
+        $this->scope->authorizeDeviceGroup($request->user(), (int) $deviceGroup->id, 'device_groups.view');
+
         // User groups that can be granted access to this device group (Access Control Layer 1).
-        $userGroups = Group::query()->orderBy('name')->get();
+        $userGroups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'device_groups.edit')
+            ->orderBy('name')->get();
 
         // Currently granted user-group ids.
         $accessGroupIds = DeviceGroupAccess::query()
@@ -65,6 +81,7 @@ class DeviceGroupController extends Controller
 
     public function update(Request $request, DeviceGroup $deviceGroup): JsonResponse
     {
+        $this->scope->authorizeDeviceGroup($request->user(), (int) $deviceGroup->id, 'device_groups.edit');
         $deviceGroup->fill($this->validateGroup($request))->save();
 
         $this->syncAccess($request, $deviceGroup);
@@ -85,10 +102,19 @@ class DeviceGroupController extends Controller
         ), static fn (int $id): bool => $id > 0));
         $ids = array_unique($ids);
 
-        DeviceGroupAccess::query()->where('device_group_id', $deviceGroup->id)->delete();
+        foreach ($ids as $groupId) {
+            $this->scope->authorizeUserGroup($request->user(), (int) $groupId, 'device_groups.edit');
+        }
+
+        $deleteQuery = DeviceGroupAccess::query()->where('device_group_id', $deviceGroup->id);
+        $allowedGroupIds = $this->scope->userGroupIds($request->user(), 'device_groups.edit');
+        if ($allowedGroupIds !== null) {
+            $deleteQuery->whereIn('group_id', $allowedGroupIds);
+        }
+        $deleteQuery->delete();
 
         foreach ($ids as $groupId) {
-            DeviceGroupAccess::create([
+            DeviceGroupAccess::firstOrCreate([
                 'group_id' => $groupId,
                 'device_group_id' => $deviceGroup->id,
             ]);
@@ -100,8 +126,9 @@ class DeviceGroupController extends Controller
      * previous default (at most one is default at a time); toggling the current default off
      * leaves no default.
      */
-    public function setDefault(DeviceGroup $deviceGroup): RedirectResponse
+    public function setDefault(Request $request, DeviceGroup $deviceGroup): RedirectResponse
     {
+        $this->scope->authorizeUnrestricted($request->user(), 'device_groups.edit');
         $makeDefault = ! $deviceGroup->is_default;
 
         DeviceGroup::query()->where('is_default', true)->update(['is_default' => false]);
@@ -117,8 +144,9 @@ class DeviceGroupController extends Controller
                 : 'Default device group cleared.');
     }
 
-    public function destroy(DeviceGroup $deviceGroup): RedirectResponse
+    public function destroy(Request $request, DeviceGroup $deviceGroup): RedirectResponse
     {
+        $this->scope->authorizeDeviceGroup($request->user(), (int) $deviceGroup->id, 'device_groups.edit');
         $deviceGroup->delete();
 
         return redirect()

@@ -8,6 +8,7 @@ use App\Models\DeviceGroup;
 use App\Models\Strategy;
 use App\Models\StrategyAssignment;
 use App\Models\User;
+use App\Services\AdminScopeService;
 use App\Services\ClientConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -22,9 +23,15 @@ use Illuminate\View\View;
  */
 class StrategyController extends Controller
 {
-    public function index(): View
+    public function __construct(private readonly AdminScopeService $scope) {}
+
+    public function index(Request $request): View
     {
-        $strategies = Strategy::withCount('assignments')->orderBy('name')->paginate(20);
+        $strategies = $this->scope->scopeStrategies(
+            Strategy::query()->withCount('assignments'),
+            $request->user(),
+            'strategies.view',
+        )->orderBy('name')->paginate(20);
 
         return view('admin.strategies.index', compact('strategies'));
     }
@@ -33,8 +40,9 @@ class StrategyController extends Controller
      * Toggle a strategy as the default fallback. At most one strategy is default at a time;
      * it applies to any device with no device/user/device-group assignment.
      */
-    public function setDefault(Strategy $strategy): RedirectResponse
+    public function setDefault(Request $request, Strategy $strategy): RedirectResponse
     {
+        $this->scope->authorizeUnrestricted($request->user(), 'strategies.edit');
         $makeDefault = ! $strategy->is_default;
 
         Strategy::query()->where('is_default', true)->update(['is_default' => false]);
@@ -48,8 +56,9 @@ class StrategyController extends Controller
             ->with('status', $makeDefault ? "“{$strategy->name}” is now the default strategy." : 'Default strategy cleared.');
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $this->scope->authorizeUnrestricted($request->user(), 'strategies.edit');
         $strategy = new Strategy(['enabled' => true, 'options' => []]);
 
         return view('admin.strategies.create', compact('strategy'));
@@ -57,6 +66,7 @@ class StrategyController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->scope->authorizeUnrestricted($request->user(), 'strategies.edit');
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:255'],
@@ -75,13 +85,18 @@ class StrategyController extends Controller
             ->with('status', 'Strategy created.');
     }
 
-    public function edit(Strategy $strategy): View
+    public function edit(Request $request, Strategy $strategy): View
     {
+        $this->scope->authorizeStrategy($request->user(), (int) $strategy->id, 'strategies.view');
         $strategy->load('assignments');
 
         // Device groups are few, so the picker stays a plain select; devices and users are
         // chosen with a searchable combobox (so we never load thousands of rows here).
-        $deviceGroups = DeviceGroup::orderBy('name')->get(['id', 'name']);
+        $deviceGroups = $this->scope->scopeDeviceGroups(
+            DeviceGroup::query(),
+            $request->user(),
+            'strategies.edit',
+        )->orderBy('name')->get(['id', 'name']);
 
         // Readable labels for the EXISTING assignments only — look up just the referenced ids.
         $byType = $strategy->assignments->groupBy('target_type');
@@ -118,6 +133,7 @@ class StrategyController extends Controller
 
     public function update(Request $request, Strategy $strategy): JsonResponse
     {
+        $this->scope->authorizeStrategy($request->user(), (int) $strategy->id, 'strategies.edit');
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:255'],
@@ -188,6 +204,7 @@ class StrategyController extends Controller
 
     public function storeAssignment(Request $request, Strategy $strategy): RedirectResponse
     {
+        $this->scope->authorizeStrategy($request->user(), (int) $strategy->id, 'strategies.edit');
         $data = $request->validate([
             'target_type' => ['required', Rule::in([
                 StrategyAssignment::TARGET_DEVICE,
@@ -196,6 +213,27 @@ class StrategyController extends Controller
             ])],
             'target_id' => ['required', 'integer'],
         ]);
+
+        if ($data['target_type'] === StrategyAssignment::TARGET_DEVICE) {
+            $this->scope->authorizeDevice(
+                $request->user(),
+                Device::findOrFail($data['target_id']),
+                'strategies.edit',
+            );
+        } elseif ($data['target_type'] === StrategyAssignment::TARGET_USER) {
+            $this->scope->authorizeUser(
+                $request->user(),
+                User::findOrFail($data['target_id']),
+                'strategies.edit',
+            );
+        } else {
+            DeviceGroup::findOrFail($data['target_id']);
+            $this->scope->authorizeDeviceGroup(
+                $request->user(),
+                (int) $data['target_id'],
+                'strategies.edit',
+            );
+        }
 
         $strategy->assignments()->firstOrCreate([
             'target_type' => $data['target_type'],
@@ -209,9 +247,10 @@ class StrategyController extends Controller
             ->with('status', 'Assignment added.');
     }
 
-    public function destroyAssignment(StrategyAssignment $assignment): RedirectResponse
+    public function destroyAssignment(Request $request, StrategyAssignment $assignment): RedirectResponse
     {
         $strategyId = $assignment->strategy_id;
+        $this->scope->authorizeStrategy($request->user(), (int) $strategyId, 'strategies.edit');
         $assignment->delete();
 
         Strategy::whereKey($strategyId)->update(['modified_at' => time()]);
@@ -221,8 +260,9 @@ class StrategyController extends Controller
             ->with('status', 'Assignment removed.');
     }
 
-    public function destroy(Strategy $strategy): RedirectResponse
+    public function destroy(Request $request, Strategy $strategy): RedirectResponse
     {
+        $this->scope->authorizeStrategy($request->user(), (int) $strategy->id, 'strategies.edit');
         $strategy->assignments()->delete();
         $strategy->delete();
 

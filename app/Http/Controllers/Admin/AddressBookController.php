@@ -9,6 +9,7 @@ use App\Models\AddressBookCollaborator;
 use App\Models\AddressBookPeer;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\AdminScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -25,9 +26,15 @@ class AddressBookController extends Controller
 {
     use ExportsCsv;
 
-    public function index(): View
+    public function __construct(private readonly AdminScopeService $scope) {}
+
+    public function index(Request $request): View
     {
-        $addressBooks = AddressBook::query()
+        $addressBooks = $this->scope->scopeUserOwnedRecords(
+            AddressBook::query(),
+            $request->user(),
+            'address_books.view',
+        )
             ->with('user:id,username')
             ->withCount(['peers', 'tags'])
             ->orderBy('name')
@@ -36,8 +43,9 @@ class AddressBookController extends Controller
         return view('admin.address_books.index', compact('addressBooks'));
     }
 
-    public function show(AddressBook $addressBook): View
+    public function show(Request $request, AddressBook $addressBook): View
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.view');
         $addressBook->load('user:id,username', 'tags', 'collaborators.user:id,username');
 
         // Sibling books owned by the same user, for the client-style book switcher.
@@ -62,8 +70,9 @@ class AddressBookController extends Controller
      * Export a book's peers as CSV (columns: id, alias, note, tags) — the same shape `import`
      * accepts, so an export round-trips.
      */
-    public function exportPeers(AddressBook $addressBook): StreamedResponse
+    public function exportPeers(Request $request, AddressBook $addressBook): StreamedResponse
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.view');
         $query = AddressBookPeer::where('address_book_id', $addressBook->id)->orderBy('rustdesk_id');
 
         return $this->streamCsv('address-book-'.$addressBook->id, ['id', 'alias', 'note', 'tags'], $query,
@@ -78,6 +87,7 @@ class AddressBookController extends Controller
      */
     public function importPeers(Request $request, AddressBook $addressBook): RedirectResponse
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
         $this->validateForModal(
             $request,
             'import',
@@ -150,6 +160,7 @@ class AddressBookController extends Controller
      */
     public function updateSharing(Request $request, AddressBook $addressBook): RedirectResponse
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
         $data = $this->validateForModal(
             $request,
             'sharing',
@@ -178,6 +189,7 @@ class AddressBookController extends Controller
      */
     public function storeCollaborator(Request $request, AddressBook $addressBook): RedirectResponse
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
         $modalState = ['id' => 'shareModal', 'section' => 'collaborator'];
         $data = $this->validateForModal(
             $request,
@@ -199,6 +211,8 @@ class AddressBookController extends Controller
                 ->with('address_book_modal', $modalState);
         }
 
+        $this->scope->authorizeUserId($request->user(), (int) $data['user_id'], 'address_books.edit');
+
         AddressBookCollaborator::updateOrCreate(
             ['address_book_id' => $addressBook->id, 'user_id' => $data['user_id']],
             ['rule' => $data['rule']],
@@ -216,8 +230,9 @@ class AddressBookController extends Controller
             ->with('status', "Shared with {$username}.");
     }
 
-    public function destroyCollaborator(AddressBookCollaborator $collaborator): RedirectResponse
+    public function destroyCollaborator(Request $request, AddressBookCollaborator $collaborator): RedirectResponse
     {
+        $this->authorizeBook($request, $collaborator->addressBook()->firstOrFail(), 'address_books.edit');
         $bookId = $collaborator->address_book_id;
         $collaborator->delete();
 
@@ -230,6 +245,7 @@ class AddressBookController extends Controller
 
     public function storePeer(Request $request, AddressBook $addressBook): RedirectResponse
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
         $modalState = ['id' => 'peerModal', 'mode' => 'add'];
         $data = $this->validatePeer(
             $request,
@@ -269,6 +285,7 @@ class AddressBookController extends Controller
 
     public function updatePeer(Request $request, AddressBookPeer $peer): RedirectResponse
     {
+        $this->authorizeBook($request, $peer->addressBook()->firstOrFail(), 'address_books.edit');
         $data = $this->validatePeer(
             $request,
             ['id' => 'peerModal', 'mode' => 'edit', 'record_id' => $peer->getKey()],
@@ -282,8 +299,9 @@ class AddressBookController extends Controller
             ->with('status', "Updated {$peer->rustdesk_id}.");
     }
 
-    public function destroyPeer(AddressBookPeer $peer): RedirectResponse
+    public function destroyPeer(Request $request, AddressBookPeer $peer): RedirectResponse
     {
+        $this->authorizeBook($request, $peer->addressBook()->firstOrFail(), 'address_books.edit');
         $bookId = $peer->address_book_id;
         $peer->delete();
 
@@ -296,6 +314,7 @@ class AddressBookController extends Controller
 
     public function storeTag(Request $request, AddressBook $addressBook): RedirectResponse
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
         $data = $this->validateForModal(
             $request,
             'tag',
@@ -319,6 +338,7 @@ class AddressBookController extends Controller
 
     public function updateTag(Request $request, Tag $tag): RedirectResponse
     {
+        $this->authorizeBook($request, $tag->addressBook()->firstOrFail(), 'address_books.edit');
         $data = $this->validateForModal(
             $request,
             'tag',
@@ -354,8 +374,9 @@ class AddressBookController extends Controller
             ->with('status', 'Tag updated.');
     }
 
-    public function destroyTag(Tag $tag): RedirectResponse
+    public function destroyTag(Request $request, Tag $tag): RedirectResponse
     {
+        $this->authorizeBook($request, $tag->addressBook()->firstOrFail(), 'address_books.edit');
         $bookId = $tag->address_book_id;
 
         // Strip the tag from any peers that carry it, then delete it.
@@ -375,8 +396,9 @@ class AddressBookController extends Controller
             ->with('status', 'Tag removed.');
     }
 
-    public function destroy(AddressBook $addressBook): RedirectResponse
+    public function destroy(Request $request, AddressBook $addressBook): RedirectResponse
     {
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
         $addressBook->peers()->delete();
         $addressBook->tags()->delete();
         $addressBook->delete();
@@ -387,6 +409,11 @@ class AddressBookController extends Controller
     }
 
     // --- Helpers ------------------------------------------------------------------------
+
+    private function authorizeBook(Request $request, AddressBook $addressBook, string $permission): void
+    {
+        $this->scope->authorizeUserId($request->user(), (int) $addressBook->user_id, $permission);
+    }
 
     /**
      * @return array<string, mixed>

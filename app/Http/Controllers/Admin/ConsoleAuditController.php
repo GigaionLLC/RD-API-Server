@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConsoleAudit;
+use App\Services\AdminScopeService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -12,17 +13,24 @@ use Illuminate\View\View;
  */
 class ConsoleAuditController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
 
-        $logs = ConsoleAudit::query()
+        $logs = $this->scope->scopeUserOwnedRecords(
+            ConsoleAudit::query(),
+            $request->user(),
+            'audit.view',
+        )
             ->with('user:id,username')
             ->when($q !== '', function ($query) use ($q) {
-                $query->where('path', 'like', "%{$q}%")
+                $query->where(fn ($search) => $search
+                    ->where('path', 'like', "%{$q}%")
                     ->orWhere('route_name', 'like', "%{$q}%")
                     ->orWhere('method', 'like', "%{$q}%")
-                    ->orWhere('ip', 'like', "%{$q}%");
+                    ->orWhere('ip', 'like', "%{$q}%"));
             })
             ->orderByDesc('created_at')
             ->paginate(30)

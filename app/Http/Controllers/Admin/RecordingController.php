@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Recording;
+use App\Services\AdminScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,16 +18,23 @@ class RecordingController extends Controller
     /** Directory (under storage/app) where recording files live. */
     private const STORAGE_DIR = 'recordings';
 
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
 
-        $recordings = Recording::query()
+        $recordings = $this->scope->scopePeerRecords(
+            Recording::query(),
+            $request->user(),
+            'recordings.view',
+        )
             ->when($q !== '', function ($query) use ($q) {
-                $query->where('peer_id', 'like', "%{$q}%")
+                $query->where(fn ($search) => $search
+                    ->where('peer_id', 'like', "%{$q}%")
                     ->orWhere('from_peer', 'like', "%{$q}%")
-                    ->orWhere('filename', 'like', "%{$q}%");
+                    ->orWhere('filename', 'like', "%{$q}%"));
             })
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->orderByDesc('started_at')
@@ -36,8 +44,9 @@ class RecordingController extends Controller
         return view('admin.recordings.index', compact('recordings', 'q', 'status'));
     }
 
-    public function download(Recording $recording): StreamedResponse
+    public function download(Request $request, Recording $recording): StreamedResponse
     {
+        $this->scope->authorizePeerId($request->user(), (string) $recording->peer_id, 'recordings.view');
         $fullPath = $this->resolvePath($recording);
 
         abort_if($fullPath === null || ! is_file($fullPath), 404, 'Recording file not found.');
@@ -51,8 +60,9 @@ class RecordingController extends Controller
         }, basename($recording->filename));
     }
 
-    public function destroy(Recording $recording): RedirectResponse
+    public function destroy(Request $request, Recording $recording): RedirectResponse
     {
+        $this->scope->authorizePeerId($request->user(), (string) $recording->peer_id, 'recordings.edit');
         $fullPath = $this->resolvePath($recording);
 
         if ($fullPath !== null && is_file($fullPath)) {

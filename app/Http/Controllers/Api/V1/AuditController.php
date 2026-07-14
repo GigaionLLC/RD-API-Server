@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditConn;
+use App\Services\AdminScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,11 +13,13 @@ use Illuminate\Http\Request;
  */
 class AuditController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function connections(Request $request): JsonResponse
     {
         $perPage = min(100, max(1, (int) $request->query('per_page', 50)));
 
-        $conns = AuditConn::query()
+        $conns = $this->scope->scopePeerRecords(AuditConn::query(), $request->user(), 'audit.view')
             ->when($request->query('peer_id'), fn ($q, $id) => $q->where('peer_id', $id))
             ->orderByDesc('id')
             ->paginate($perPage);

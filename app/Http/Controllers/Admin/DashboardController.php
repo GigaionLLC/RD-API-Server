@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditConn;
 use App\Models\Device;
 use App\Models\User;
+use App\Services\AdminScopeService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -16,18 +18,24 @@ use Illuminate\View\View;
  */
 class DashboardController extends Controller
 {
-    public function index(): View
+    public function __construct(private readonly AdminScopeService $scope) {}
+
+    public function index(Request $request): View
     {
-        $deviceCount = Device::count();
-        $onlineCount = Device::where('is_online', true)->count();
-        $userCount = User::count();
+        $actor = $request->user();
+        $deviceCount = $this->scope->scopeDevices(Device::query(), $actor, 'dashboard.view')->count();
+        $onlineCount = $this->scope->scopeDevices(Device::query(), $actor, 'dashboard.view')
+            ->where('is_online', true)->count();
+        $userCount = $this->scope->scopeUsers(User::query(), $actor, 'dashboard.view')->count();
 
         $since = Carbon::now()->subHours(24);
-        $sessions24h = AuditConn::where('action', AuditConn::ACTION_NEW)
+        $sessions24h = $this->scope->scopePeerRecords(AuditConn::query(), $actor, 'dashboard.view')
+            ->where('action', AuditConn::ACTION_NEW)
             ->where('created_at', '>=', $since)
             ->count();
         // Prior 24h (24–48h ago) for a trend delta on the Sessions card.
-        $sessionsPrev24h = AuditConn::where('action', AuditConn::ACTION_NEW)
+        $sessionsPrev24h = $this->scope->scopePeerRecords(AuditConn::query(), $actor, 'dashboard.view')
+            ->where('action', AuditConn::ACTION_NEW)
             ->whereBetween('created_at', [Carbon::now()->subHours(48), $since])
             ->count();
 
@@ -38,7 +46,8 @@ class DashboardController extends Controller
             ['label' => 'Sessions (24h)', 'value' => number_format($sessions24h), 'icon' => 'ri-exchange-line', 'tone' => 'danger', 'trend' => $this->trend($sessions24h, $sessionsPrev24h)],
         ];
 
-        $recentDevices = Device::orderByDesc('last_online_at')
+        $recentDevices = $this->scope->scopeDevices(Device::query(), $actor, 'dashboard.view')
+            ->orderByDesc('last_online_at')
             ->limit(8)
             ->get()
             ->map(fn (Device $d) => [
@@ -54,7 +63,8 @@ class DashboardController extends Controller
         $days = 14;
         $start = Carbon::today()->subDays($days - 1);
 
-        $counts = AuditConn::where('action', AuditConn::ACTION_NEW)
+        $counts = $this->scope->scopePeerRecords(AuditConn::query(), $actor, 'dashboard.view')
+            ->where('action', AuditConn::ACTION_NEW)
             ->where('created_at', '>=', $start)
             ->select(DB::raw('DATE(created_at) as d'), DB::raw('COUNT(*) as c'))
             ->groupBy('d')
@@ -62,7 +72,8 @@ class DashboardController extends Controller
             ->all();
 
         // New devices per day over the same window (by first-seen / created_at).
-        $deviceCounts = Device::where('created_at', '>=', $start)
+        $deviceCounts = $this->scope->scopeDevices(Device::query(), $actor, 'dashboard.view')
+            ->where('created_at', '>=', $start)
             ->select(DB::raw('DATE(created_at) as d'), DB::raw('COUNT(*) as c'))
             ->groupBy('d')
             ->pluck('c', 'd')

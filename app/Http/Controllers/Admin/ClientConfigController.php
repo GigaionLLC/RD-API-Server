@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Strategy;
+use App\Services\AdminScopeService;
 use App\Services\ClientConfigService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,8 @@ use InvalidArgumentException;
  */
 class ClientConfigController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function index(Request $request, ClientConfigService $config): Response
     {
         // Keep non-sensitive GET deep links working, but deliberately ignore unlock_pin even
@@ -88,9 +91,19 @@ class ClientConfigController extends Controller
 
         // Optional: turn a Strategy's options into a paste-ready install script
         // (`rustdesk --option <key> <value>` per option, + the unlock PIN when set).
-        $strategies = Strategy::orderBy('name')->get(['id', 'name']);
+        $strategies = $this->scope->scopeStrategies(
+            Strategy::query(),
+            $request->user(),
+            'deploy.view',
+        )->orderBy('name')->get(['id', 'name']);
         $strategyId = (int) ($input['strategy'] ?? 0);
-        $selectedStrategy = $strategyId > 0 ? Strategy::find($strategyId) : null;
+        $selectedStrategy = null;
+        if ($strategyId > 0) {
+            $selectedStrategy = Strategy::find($strategyId);
+            if ($selectedStrategy !== null) {
+                $this->scope->authorizeStrategy($request->user(), $strategyId, 'deploy.view');
+            }
+        }
         $installScript = null;
         $pinCommands = null;
         $scriptWarning = null;

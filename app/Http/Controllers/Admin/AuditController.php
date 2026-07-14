@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditConn;
 use App\Models\AuditFile;
 use App\Models\LoginLog;
+use App\Models\User;
+use App\Services\AdminScopeService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,12 +22,14 @@ class AuditController extends Controller
 {
     use ExportsCsv;
 
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function connections(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
         $action = $request->query('action');
 
-        $logs = $this->connectionsQuery($q, is_string($action) ? $action : null)
+        $logs = $this->connectionsQuery($request->user(), $q, is_string($action) ? $action : null)
             ->paginate(30)
             ->appends($request->query());
 
@@ -35,7 +39,11 @@ class AuditController extends Controller
     public function exportConnections(Request $request): StreamedResponse
     {
         $action = $request->query('action');
-        $query = $this->connectionsQuery(trim((string) $request->query('q', '')), is_string($action) ? $action : null);
+        $query = $this->connectionsQuery(
+            $request->user(),
+            trim((string) $request->query('q', '')),
+            is_string($action) ? $action : null,
+        );
 
         return $this->streamCsv('connection-audit', [
             'time', 'action', 'peer_id', 'from_peer', 'from_name', 'ip', 'session_id', 'conn_id',
@@ -51,14 +59,14 @@ class AuditController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $logs = $this->filesQuery($q)->paginate(30)->appends($request->query());
+        $logs = $this->filesQuery($request->user(), $q)->paginate(30)->appends($request->query());
 
         return view('admin.audit.files', compact('logs', 'q'));
     }
 
     public function exportFiles(Request $request): StreamedResponse
     {
-        $query = $this->filesQuery(trim((string) $request->query('q', '')));
+        $query = $this->filesQuery($request->user(), trim((string) $request->query('q', '')));
 
         return $this->streamCsv('file-audit', [
             'time', 'peer_id', 'from_peer', 'from_name', 'info', 'is_file', 'path', 'type', 'ip', 'num',
@@ -72,14 +80,14 @@ class AuditController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $logs = $this->loginsQuery($q)->paginate(30)->appends($request->query());
+        $logs = $this->loginsQuery($request->user(), $q)->paginate(30)->appends($request->query());
 
         return view('admin.audit.logins', compact('logs', 'q'));
     }
 
     public function exportLogins(Request $request): StreamedResponse
     {
-        $query = $this->loginsQuery(trim((string) $request->query('q', '')));
+        $query = $this->loginsQuery($request->user(), trim((string) $request->query('q', '')));
 
         return $this->streamCsv('login-audit', [
             'time', 'user', 'client', 'device_id', 'platform', 'ip',
@@ -93,9 +101,9 @@ class AuditController extends Controller
     /**
      * @return Builder<AuditConn>
      */
-    private function connectionsQuery(string $q, ?string $action): Builder
+    private function connectionsQuery(User $actor, string $q, ?string $action): Builder
     {
-        return AuditConn::query()
+        return $this->scope->scopePeerRecords(AuditConn::query(), $actor, 'audit.view')
             ->when($q !== '', fn (Builder $query) => $query->where(fn (Builder $w) => $w
                 ->where('peer_id', 'like', "%{$q}%")
                 ->orWhere('from_peer', 'like', "%{$q}%")
@@ -109,9 +117,9 @@ class AuditController extends Controller
     /**
      * @return Builder<AuditFile>
      */
-    private function filesQuery(string $q): Builder
+    private function filesQuery(User $actor, string $q): Builder
     {
-        return AuditFile::query()
+        return $this->scope->scopePeerRecords(AuditFile::query(), $actor, 'audit.view')
             ->when($q !== '', fn (Builder $query) => $query->where(fn (Builder $w) => $w
                 ->where('peer_id', 'like', "%{$q}%")
                 ->orWhere('from_peer', 'like', "%{$q}%")
@@ -124,9 +132,9 @@ class AuditController extends Controller
     /**
      * @return Builder<LoginLog>
      */
-    private function loginsQuery(string $q): Builder
+    private function loginsQuery(User $actor, string $q): Builder
     {
-        return LoginLog::query()
+        return $this->scope->scopeUserOwnedRecords(LoginLog::query(), $actor, 'audit.view')
             ->with('user:id,username')
             ->when($q !== '', fn (Builder $query) => $query->where(fn (Builder $w) => $w
                 ->where('client', 'like', "%{$q}%")

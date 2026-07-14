@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminRole;
 use App\Models\ApiKey;
+use App\Models\Group;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -47,6 +48,29 @@ class ApiKeyAuthorizationTest extends TestCase
             'is_admin' => true,
             'status' => User::STATUS_NORMAL,
         ]);
+    }
+
+    /**
+     * @param  list<string>  $permissions
+     */
+    private function groupDelegate(array $permissions, Group $group, string $name = 'group-delegate'): User
+    {
+        $role = AdminRole::create([
+            'name' => $name.' role',
+            'type' => AdminRole::TYPE_GROUP,
+            'scope' => [$group->id],
+            'perms' => $permissions,
+        ]);
+        $user = User::create([
+            'username' => $name,
+            'password' => 'secret12345',
+            'is_admin' => false,
+            'status' => User::STATUS_NORMAL,
+            'group_id' => $group->id,
+        ]);
+        $user->adminRoles()->attach($role);
+
+        return $user;
     }
 
     /**
@@ -206,13 +230,15 @@ class ApiKeyAuthorizationTest extends TestCase
 
     public function test_delegated_user_manager_can_still_manage_ordinary_accounts(): void
     {
-        $delegate = $this->delegate(['users.view', 'users.edit']);
+        $group = Group::create(['name' => 'Managed users', 'type' => Group::TYPE_DEFAULT]);
+        $delegate = $this->groupDelegate(['users.view', 'users.edit'], $group);
 
         $this->actingAs($delegate)->post(route('admin.users.store'), [
             'username' => 'managed-user',
             'password' => 'secret12345',
             'status' => User::STATUS_NORMAL,
             'login_verify' => User::LOGIN_VERIFY_OFF,
+            'group_id' => $group->id,
         ])->assertRedirect(route('admin.users.index'));
 
         $managed = User::where('username', 'managed-user')->firstOrFail();
@@ -222,6 +248,7 @@ class ApiKeyAuthorizationTest extends TestCase
             'status' => User::STATUS_NORMAL,
             'force_sso' => false,
             'login_verify' => User::LOGIN_VERIFY_OFF,
+            'group_id' => $group->id,
         ])->assertOk();
         $this->assertSame('Managed User', $managed->refresh()->display_name);
 
@@ -250,7 +277,8 @@ class ApiKeyAuthorizationTest extends TestCase
 
     public function test_delegated_user_manager_cannot_promote_or_assign_roles(): void
     {
-        $delegate = $this->delegate(['users.view', 'users.edit']);
+        $group = Group::create(['name' => 'Promotion boundary', 'type' => Group::TYPE_DEFAULT]);
+        $delegate = $this->groupDelegate(['users.view', 'users.edit'], $group, 'promotion-delegate');
         $higherRole = AdminRole::create([
             'name' => 'Higher privilege',
             'type' => AdminRole::TYPE_GLOBAL,
@@ -262,6 +290,7 @@ class ApiKeyAuthorizationTest extends TestCase
             'username' => 'promotion-target',
             'password' => 'secret12345',
             'status' => User::STATUS_NORMAL,
+            'group_id' => $group->id,
         ]);
         $response = $this->actingAs($delegate)->put(route('admin.users.update', $ordinary), [
             'is_admin' => true,

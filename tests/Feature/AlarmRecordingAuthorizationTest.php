@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminRole;
 use App\Models\Alarm;
+use App\Models\Device;
 use App\Models\Recording;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,6 +21,7 @@ class AlarmRecordingAuthorizationTest extends TestCase
             'alarms.view',
             'recordings.view',
         ]);
+        $this->registerActivityPeers($delegate);
         $alarm = $this->createAlarm();
         $recording = $this->createRecording();
 
@@ -60,6 +62,7 @@ class AlarmRecordingAuthorizationTest extends TestCase
             'recordings.view',
             'recordings.edit',
         ]);
+        $this->registerActivityPeers($delegate);
         $alarm = $this->createAlarm();
         $recording = $this->createRecording();
 
@@ -135,5 +138,16 @@ class AlarmRecordingAuthorizationTest extends TestCase
             'filename' => 'missing-authorization-test-'.Str::uuid().'.webm',
             'status' => 'complete',
         ]);
+    }
+
+    private function registerActivityPeers(User $owner): void
+    {
+        foreach (['alarm-peer', 'recording-peer'] as $peerId) {
+            Device::create([
+                'rustdesk_id' => $peerId,
+                'uuid' => 'uuid-'.$peerId,
+                'user_id' => $owner->id,
+            ]);
+        }
     }
 }

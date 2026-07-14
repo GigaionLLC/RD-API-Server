@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditConn;
 use App\Models\Device;
+use App\Models\User;
+use App\Services\AdminScopeService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -19,18 +22,11 @@ use Illuminate\View\View;
  */
 class SessionController extends Controller
 {
-    public function index(): View
+    public function __construct(private readonly AdminScopeService $scope) {}
+
+    public function index(Request $request): View
     {
-        $sessions = AuditConn::query()
-            ->where('action', AuditConn::ACTION_NEW)
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('audit_conns as c2')
-                    ->whereColumn('c2.peer_id', 'audit_conns.peer_id')
-                    ->whereColumn('c2.conn_id', 'audit_conns.conn_id')
-                    ->where('c2.action', AuditConn::ACTION_CLOSE)
-                    ->whereColumn('c2.id', '>', 'audit_conns.id');
-            })
+        $sessions = $this->activeSessionsQuery($request->user(), 'sessions.view')
             ->orderByDesc('id')
             ->paginate(20);
 
@@ -48,11 +44,31 @@ class SessionController extends Controller
             'conn_id' => ['required', 'integer'],
         ]);
 
+        abort_unless($this->activeSessionsQuery($request->user(), 'sessions.edit')
+            ->where('peer_id', $data['peer_id'])
+            ->where('conn_id', $data['conn_id'])
+            ->exists(), 403, 'This session is outside your administrative scope or is no longer active.');
+
         $key = 'rd:disconnect:'.$data['peer_id'];
         $queued = (array) Cache::get($key, []);
         $queued[] = (int) $data['conn_id'];
         Cache::put($key, array_values(array_unique($queued)), now()->addMinutes(5));
 
         return back()->with('status', 'Disconnect requested — it will apply on the device\'s next heartbeat.');
+    }
+
+    /** @return Builder<AuditConn> */
+    private function activeSessionsQuery(User $actor, string $permission): Builder
+    {
+        return $this->scope->scopePeerRecords(AuditConn::query(), $actor, $permission)
+            ->where('action', AuditConn::ACTION_NEW)
+            ->whereNotExists(function ($query): void {
+                $query->select(DB::raw(1))
+                    ->from('audit_conns as c2')
+                    ->whereColumn('c2.peer_id', 'audit_conns.peer_id')
+                    ->whereColumn('c2.conn_id', 'audit_conns.conn_id')
+                    ->where('c2.action', AuditConn::ACTION_CLOSE)
+                    ->whereColumn('c2.id', '>', 'audit_conns.id');
+            });
     }
 }

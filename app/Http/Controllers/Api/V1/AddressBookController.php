@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\AddressBook;
 use App\Models\AddressBookPeer;
+use App\Services\AdminScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,10 +15,15 @@ use Illuminate\Http\Request;
  */
 class AddressBookController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function index(Request $request): JsonResponse
     {
-        $books = AddressBook::query()
-            ->where('user_id', $request->user()->id)
+        $books = $this->scope->scopeUserOwnedRecords(
+            AddressBook::query(),
+            $request->user(),
+            'address_books.view',
+        )
             ->withCount(['peers', 'tags'])
             ->orderBy('name')
             ->get(['id', 'name', 'is_shared']);
@@ -31,6 +37,11 @@ class AddressBookController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->scope->authorizeUserId(
+            $request->user(),
+            (int) $request->user()->id,
+            'address_books.edit',
+        );
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:255'],
@@ -53,7 +64,7 @@ class AddressBookController extends Controller
      */
     public function destroy(Request $request, AddressBook $addressBook): JsonResponse
     {
-        $this->authorizeBook($request, $addressBook);
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
 
         $addressBook->peers()->delete();
         $addressBook->tags()->delete();
@@ -64,7 +75,7 @@ class AddressBookController extends Controller
 
     public function peers(Request $request, AddressBook $addressBook): JsonResponse
     {
-        $this->authorizeBook($request, $addressBook);
+        $this->authorizeBook($request, $addressBook, 'address_books.view');
 
         $peers = $addressBook->peers()
             ->orderBy('rustdesk_id')
@@ -76,7 +87,7 @@ class AddressBookController extends Controller
 
     public function storePeer(Request $request, AddressBook $addressBook): JsonResponse
     {
-        $this->authorizeBook($request, $addressBook);
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
 
         $data = $request->validate([
             'id' => ['required', 'string', 'max:255'],
@@ -108,7 +119,7 @@ class AddressBookController extends Controller
 
     public function destroyPeer(Request $request, AddressBook $addressBook, AddressBookPeer $peer): JsonResponse
     {
-        $this->authorizeBook($request, $addressBook);
+        $this->authorizeBook($request, $addressBook, 'address_books.edit');
 
         abort_if($peer->address_book_id !== $addressBook->id, 404);
         $peer->delete();
@@ -116,8 +127,8 @@ class AddressBookController extends Controller
         return response()->json(['data' => true]);
     }
 
-    private function authorizeBook(Request $request, AddressBook $book): void
+    private function authorizeBook(Request $request, AddressBook $book, string $permission): void
     {
-        abort_if($book->user_id !== $request->user()->id, 403, 'Not your address book');
+        $this->scope->authorizeUserId($request->user(), (int) $book->user_id, $permission);
     }
 }
