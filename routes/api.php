@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\SystemController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\StrategyController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Middleware\AuthorizeRecordingUpload;
+use App\Http\Middleware\ThrottleRecordingUploads;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,7 +53,8 @@ Route::post('/audit/file', [AuditController::class, 'file']);
 Route::post('/audit/alarm', [AuditController::class, 'alarm']);
 
 // Session recording chunked upload (contract §5).
-Route::post('/record', [RecordController::class, 'store']);
+Route::post('/record', [RecordController::class, 'store'])
+    ->middleware([ThrottleRecordingUploads::class, AuthorizeRecordingUpload::class]);
 
 // Device deployment / CLI enrollment (contract §7). Deploy-token authenticated internally.
 Route::post('/devices/deploy', [DevicesController::class, 'deploy']);

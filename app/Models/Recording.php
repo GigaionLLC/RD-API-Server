@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 #[Fillable([
     'peer_id', 'from_peer', 'conn_id', 'filename', 'path', 'size', 'status',
-    'started_at', 'finished_at',
+    'source_ip', 'started_at', 'finished_at',
 ])]
 class Recording extends Model
 {

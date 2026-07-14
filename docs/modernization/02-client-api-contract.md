@@ -198,8 +198,26 @@ the client response shape.
 | abort | `?type=remove&file=<name>` | empty |
 
 Response: `{}` on success, `{ "error": "<msg>" }` on failure (any error aborts the upload).
-There is **no such route today** (gap #6). Note the in‑session **"Recording Session"**
-permission is a separate Control‑Role concept (catalog §5).
+Note the in‑session **"Recording Session"** permission is a separate Control‑Role concept
+(catalog §5).
+
+The stock uploader sends no account token or device identity. The API therefore keeps this
+route disabled by default (`RUSTDESK_RECORDING_UPLOAD_ENABLED=false`) and still requires one
+explicit authorization path when enabled:
+
+- source IP/CIDR allowlisting supports the unmodified stock client; or
+- a 32+ character secret in `Authorization: Bearer` / `X-Recording-Token` supports a custom
+  client or a trusted proxy that strips inbound copies before injecting the header.
+
+The source address that starts an upload owns its remaining phases. `new` uses exclusive
+creation and never truncates or reuses a filename; `part` requires an exact body length and the
+current end-of-file offset; `tail` can only patch offset zero with at most 1024 bytes; and
+`remove` can delete only an unfinished upload from the same source. Finished recordings cannot
+be removed through the client route. Per-source request/active-upload limits and finite defaults
+of 8 MiB/chunk, 2 GiB/file, 10 GiB total, and 5,000 tracked files bound storage consumption.
+Every rejection, including HTTP 403/413/429, retains the required JSON `error` key so the client
+aborts instead of mistaking a rejected chunk for success. Deployment settings are documented in
+`.env.example` and `config/recordings.php`.
 
 ---
 
@@ -337,5 +355,5 @@ client's Cargo build feature, **not** the `/api/devices/cli` endpoint.)
 | `/api/sysinfo_ver` | POST | no | ✅ |
 | `/api/ab*` | GET/POST/PUT/DELETE | yes | ✅ |
 | `/api/audit/conn` · `/api/audit/file` | POST | no | ✅ |
-| `/api/record` | POST | (token) | ❌ |
+| `/api/record` | POST | explicit IP/CIDR or upload token; disabled by default | ✅ |
 | `/api/devices/deploy` · `/api/devices/cli` | POST | token | ❌ |

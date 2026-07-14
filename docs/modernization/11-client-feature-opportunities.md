@@ -228,9 +228,13 @@ the whole upload (`:106-114`). The endpoint is unauthenticated by token here —
 metadata, or add a token. The tail-rewrite (header written last) means the server must **patch the file
 header at `offset 0` after the body** to produce a playable file.
 
-**Server implements:** a `/api/record` ingestion endpoint (append chunks to per-file storage, apply the tail
-header), a recordings table (device, peer, operator, start/stop, size, path), retention/quota, and a
-**playback UI**. This is one of the most-requested Pro features; no OSS server has it.
+**Server implements:** a fail-closed `/api/record` ingestion endpoint (append chunks to per-file storage,
+apply the tail header), a recordings table, bounded storage, and a **playback UI**. Because the stock
+uploader sends no account token, uploads are disabled by default and must be authorized through an
+explicit source-IP/CIDR allowlist; a dedicated secret header is also available to trusted proxies/custom
+clients. Active uploads are source-bound and append-only, filenames are created exclusively, abort cannot
+delete completed recordings, and finite chunk/file/global/file-count limits plus per-source throttles
+contain storage abuse. This is one of the most-requested Pro features; no OSS server has it.
 
 ---
 
@@ -373,8 +377,9 @@ Low priority, but a differentiator once the inventory (#1/#10) exists.
 - **Dependency order.** #1 (strategy/heartbeat) and the sysinfo inventory are the foundation; #8, #9, #10,
   #11 build on them. #2 (deploy/assign) + #6 (config generator) form the "rollout" track. #3/#4 form the
   "account security" track. #5 (recording) and #7 (shared AB) are standalone flagship features.
-- **Token model.** #2 needs a revocable bearer **deploy-token** system; #5's `/api/record` currently
-  authenticates only by `api-server` origin — decide whether to add a token there too.
+- **Token model.** #2 uses revocable bearer **deploy tokens**. The stock recording uploader sends no
+  bearer, so #5 remains fail-closed until an operator explicitly allowlists its source network; trusted
+  proxies/custom clients can instead use the dedicated recording-upload header secret.
 - **Soft vs hard settings.** Reiterating #1's nuance: heartbeat-pushed options are *soft* (user-changeable
   unless baked at install). Make the admin UI distinguish "policy (soft)" from "enforced (requires custom
   client)" so expectations match reality (`config.rs:76-82`, `src/ui/index.tis:325 is_option_fixed`).

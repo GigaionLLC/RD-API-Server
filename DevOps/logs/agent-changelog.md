@@ -3,6 +3,20 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 10:08] - Security: harden recording uploads
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Api/RecordController.php`, `app/Services/RecordingService.php`
+- `app/Http/Middleware/{AuthorizeRecordingUpload,ThrottleRecordingUploads}.php`
+- `app/Models/Recording.php`, `config/recordings.php`, `routes/api.php`
+- `database/migrations/2026_07_14_100002_bind_recording_uploads_to_source_ip.php`
+- `tests/Feature/RecordingUploadSecurityTest.php`
+- `.env.example`, `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `QUICKSTART.md`, `docs/modernization/{02-client-api-contract,11-client-feature-opportunities,16-response-contract}.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds nullable `recordings.source_ip`. `/api/record` is disabled by default and requires an explicit source IP/CIDR or 32+ character upload token when enabled; accepted stock-client response shapes remain `{}` / `{error}`.
+**Summary:** Replaced anonymous unbounded recording writes with a fail-closed upload boundary, per-source ownership and throttling, exclusive filename creation, sequential exact-length writes, protected completed recordings, and finite chunk/file/storage/file-count/active-upload quotas. Malformed and all-address CIDRs fail closed. Fifteen focused tests / 110 assertions, Pint, targeted PHPStan, route-order checks, and all Compose validations passed.
+
 ## [2026-07-14 10:02] - Security: authorize audit session notes
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

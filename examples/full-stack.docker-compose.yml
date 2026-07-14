@@ -82,6 +82,9 @@ services:
       - RUSTDESK_API_SERVER=https://api.your-domain.com
       # Public key — from ./data/hbbs/id_ed25519.pub after hbbs first starts:
       - RUSTDESK_KEY=CHANGE_ME_public_key
+      # Recording upload is disabled by default. Stock clients need an explicit trusted CIDR:
+      # - RUSTDESK_RECORDING_UPLOAD_ENABLED=true
+      # - RUSTDESK_RECORDING_UPLOAD_ALLOWED_IPS=CHANGE_ME_device_network_cidr
       # Optional SMTP (2FA email codes, invitations, alarms):
       # - MAIL_MAILER=smtp
       # - MAIL_HOST=smtp.example.com

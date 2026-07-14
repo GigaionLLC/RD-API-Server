@@ -83,6 +83,23 @@ RUSTDESK_REQUIRE_DEPLOYMENT=false
 RUSTDESK_AUDIT_RETENTION_DAYS=0
 ```
 
+Session-recording uploads are deliberately off by default because the stock RustDesk uploader
+does not send an account token. To accept stock clients, enable the route and allow only the
+literal device source addresses or trusted network CIDRs that should upload:
+
+```env
+RUSTDESK_RECORDING_UPLOAD_ENABLED=true
+RUSTDESK_RECORDING_UPLOAD_ALLOWED_IPS=192.0.2.0/24,2001:db8:1234::/48
+```
+
+Never use an all-address CIDR on an Internet-facing API. Behind a reverse proxy, set
+`TRUSTED_PROXIES` to that proxy's exact address/CIDR so source binding and rate limits see the
+real client address. A trusted proxy or custom client can instead send a random 32+ character
+`RUSTDESK_RECORDING_UPLOAD_TOKEN` through `Authorization: Bearer` or
+`X-Recording-Token`; a proxy must strip any inbound copy before injecting that header. Default
+limits are 8 MiB per chunk, 2 GiB per file, 10 GiB total, 5,000 files, four active uploads per
+source, and 600 requests per source/minute; each has a matching setting in `.env.example`.
+
 **Webhooks** (Slack / Telegram / generic) are configured in the console under **Webhooks** — no
 env needed. Failed deliveries retry automatically if the scheduler cron is running; add it to
 keep retries flowing:
