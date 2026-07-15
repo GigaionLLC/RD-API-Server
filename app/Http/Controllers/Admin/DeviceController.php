@@ -184,9 +184,10 @@ class DeviceController extends Controller
 
         // Owner is chosen via a searchable combobox, so only the current owner is loaded here.
         $device->load('user:id,username');
-        $deviceGroups = $this->scope->scopeDeviceGroups(DeviceGroup::query(), $actor, 'devices.edit')
+        $scopePermission = $actor->hasPermission('devices.edit') ? 'devices.edit' : 'devices.view';
+        $deviceGroups = $this->scope->scopeDeviceGroups(DeviceGroup::query(), $actor, $scopePermission)
             ->orderBy('name')->get(['id', 'name']);
-        $strategies = $this->scope->scopeStrategies(Strategy::query(), $actor, 'devices.edit')
+        $strategies = $this->scope->scopeStrategies(Strategy::query(), $actor, $scopePermission)
             ->orderBy('name')->get(['id', 'name']);
 
         return view('admin.devices.edit', compact('device', 'deviceGroups', 'strategies'));

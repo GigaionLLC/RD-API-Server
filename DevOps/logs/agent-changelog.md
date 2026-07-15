@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 21:36] - Web: preserve scoped read-only context
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Admin/DeviceController.php`, `app/Http/Controllers/Admin/DeviceGroupController.php`
+- `app/Http/Controllers/Admin/GroupController.php`, `app/Http/Controllers/Admin/StrategyController.php`
+- `tests/Feature/AdminReadOnlyUiTest.php`, `tests/Feature/AdminResourceScopeTest.php`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Scoped view-only delegates now retain the readable labels for current group, device-group, and strategy relationships without receiving edit controls or crossing their resource boundary. Regression fixtures now exercise valid in-scope relationships, MariaDB UUID values, and independent authenticated browser sessions. Nine focused MariaDB tests / 141 assertions, Pint, targeted PHPStan, and diff checks passed in Docker.
+
 ## [2026-07-14 20:37] - Security: encrypt authenticator secrets at rest
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

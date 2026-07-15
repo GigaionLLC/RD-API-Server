@@ -65,8 +65,12 @@ class DeviceGroupController extends Controller
     {
         $this->scope->authorizeDeviceGroup($request->user(), (int) $deviceGroup->id, 'device_groups.view');
 
-        // User groups that can be granted access to this device group (Access Control Layer 1).
-        $userGroups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'device_groups.edit')
+        // Editors receive only their editable boundary; view-only delegates receive their
+        // readable boundary so existing mappings remain understandable without widening it.
+        $scopePermission = $request->user()->hasPermission('device_groups.edit')
+            ? 'device_groups.edit'
+            : 'device_groups.view';
+        $userGroups = $this->scope->scopeUserGroups(Group::query(), $request->user(), $scopePermission)
             ->orderBy('name')->get();
 
         // Currently granted user-group ids.

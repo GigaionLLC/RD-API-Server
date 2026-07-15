@@ -156,14 +156,14 @@ class AdminResourceScopeTest extends TestCase
         ]);
 
         AuditConn::create([
-            'guid' => 'inside-guid',
+            'guid' => '00000000-0000-4000-8000-000000000010',
             'action' => AuditConn::ACTION_NEW,
             'conn_id' => 10,
             'peer_id' => $insideDevice->rustdesk_id,
             'from_peer' => 'controller-a',
         ]);
         AuditConn::create([
-            'guid' => 'outside-guid',
+            'guid' => '00000000-0000-4000-8000-000000000020',
             'action' => AuditConn::ACTION_NEW,
             'conn_id' => 20,
             'peer_id' => $outsideDevice->rustdesk_id,
@@ -287,6 +287,7 @@ class AdminResourceScopeTest extends TestCase
             'scope' => [],
             'perms' => [],
         ]));
+        $this->flushSession();
         $this->actingAs($global)->get(route('admin.devices.index'))
             ->assertOk()->assertSee($ownDevice->hostname)->assertSee($otherDevice->hostname);
         $this->actingAs($global)

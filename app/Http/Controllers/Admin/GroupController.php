@@ -59,8 +59,12 @@ class GroupController extends Controller
     {
         $this->scope->authorizeUserGroup($request->user(), (int) $group->id, 'groups.view');
 
-        // Other user groups available as access targets (Access Control Layer 1).
-        $allGroups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'groups.edit')
+        // Editors receive only their editable boundary; view-only delegates receive their
+        // readable boundary so existing mappings remain understandable without widening it.
+        $scopePermission = $request->user()->hasPermission('groups.edit')
+            ? 'groups.edit'
+            : 'groups.view';
+        $allGroups = $this->scope->scopeUserGroups(Group::query(), $request->user(), $scopePermission)
             ->where('id', '!=', $group->id)
             ->orderBy('name')
             ->get();

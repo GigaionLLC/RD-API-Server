@@ -92,10 +92,13 @@ class StrategyController extends Controller
 
         // Device groups are few, so the picker stays a plain select; devices and users are
         // chosen with a searchable combobox (so we never load thousands of rows here).
+        $scopePermission = $request->user()->hasPermission('strategies.edit')
+            ? 'strategies.edit'
+            : 'strategies.view';
         $deviceGroups = $this->scope->scopeDeviceGroups(
             DeviceGroup::query(),
             $request->user(),
-            'strategies.edit',
+            $scopePermission,
         )->orderBy('name')->get(['id', 'name']);
 
         // Readable labels for the EXISTING assignments only — look up just the referenced ids.

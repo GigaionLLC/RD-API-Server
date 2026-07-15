@@ -10,6 +10,7 @@ use App\Models\DeviceGroupAccess;
 use App\Models\Group;
 use App\Models\OauthProvider;
 use App\Models\Strategy;
+use App\Models\StrategyAssignment;
 use App\Models\User;
 use App\Models\UserGroupAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,12 +20,13 @@ class AdminReadOnlyUiTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function viewer(): User
+    /** @param list<int> $scopeGroupIds */
+    private function viewer(Group $membershipGroup, array $scopeGroupIds): User
     {
         $role = AdminRole::create([
             'name' => 'Console viewer',
-            'type' => AdminRole::TYPE_INDIVIDUAL,
-            'scope' => [],
+            'type' => AdminRole::TYPE_GROUP,
+            'scope' => $scopeGroupIds,
             'perms' => [
                 'devices.view',
                 'groups.view',
@@ -40,6 +42,7 @@ class AdminReadOnlyUiTest extends TestCase
             'password' => 'secret12345',
             'is_admin' => false,
             'status' => User::STATUS_NORMAL,
+            'group_id' => $membershipGroup->id,
         ]);
         $viewer->adminRoles()->attach($role);
 
@@ -48,11 +51,28 @@ class AdminReadOnlyUiTest extends TestCase
 
     public function test_read_only_indexes_hide_mutation_controls(): void
     {
-        $viewer = $this->viewer();
-        $device = Device::create(['rustdesk_id' => 'readonly-device', 'uuid' => 'readonly-device']);
         $group = Group::create(['name' => 'Read-only users', 'type' => Group::TYPE_DEFAULT]);
+        $viewer = $this->viewer($group, [$group->id]);
         $deviceGroup = DeviceGroup::create(['name' => 'Read-only fleet']);
+        $device = Device::create([
+            'rustdesk_id' => 'readonly-device',
+            'uuid' => 'readonly-device',
+            'user_id' => $viewer->id,
+            'group_id' => $group->id,
+            'device_group_id' => $deviceGroup->id,
+        ]);
         $strategy = Strategy::create(['name' => 'Read-only policy', 'enabled' => true, 'options' => []]);
+        StrategyAssignment::create([
+            'strategy_id' => $strategy->id,
+            'target_type' => StrategyAssignment::TARGET_DEVICE,
+            'target_id' => $device->id,
+        ]);
+        StrategyAssignment::create([
+            'strategy_id' => $strategy->id,
+            'target_type' => StrategyAssignment::TARGET_DEVICE_GROUP,
+            'target_id' => $deviceGroup->id,
+        ]);
+        $device->update(['strategy_id' => $strategy->id]);
         $provider = OauthProvider::create([
             'op' => 'readonly-oidc',
             'type' => 'oidc',
@@ -105,11 +125,17 @@ class AdminReadOnlyUiTest extends TestCase
 
     public function test_read_only_detail_pages_disable_forms_and_keep_navigation_available(): void
     {
-        $viewer = $this->viewer();
-        $device = Device::create(['rustdesk_id' => 'readonly-device', 'uuid' => 'readonly-device']);
         $group = Group::create(['name' => 'Read-only users', 'type' => Group::TYPE_DEFAULT]);
         $accessibleGroup = Group::create(['name' => 'Mapped user group', 'type' => Group::TYPE_DEFAULT]);
+        $viewer = $this->viewer($group, [$group->id, $accessibleGroup->id]);
         $deviceGroup = DeviceGroup::create(['name' => 'Read-only fleet']);
+        $device = Device::create([
+            'rustdesk_id' => 'readonly-device',
+            'uuid' => 'readonly-device',
+            'user_id' => $viewer->id,
+            'group_id' => $group->id,
+            'device_group_id' => $deviceGroup->id,
+        ]);
         UserGroupAccess::create([
             'group_id' => $group->id,
             'can_access_group_id' => $accessibleGroup->id,
@@ -119,6 +145,17 @@ class AdminReadOnlyUiTest extends TestCase
             'device_group_id' => $deviceGroup->id,
         ]);
         $strategy = Strategy::create(['name' => 'Read-only policy', 'enabled' => true, 'options' => ['enable-audio' => 'N']]);
+        StrategyAssignment::create([
+            'strategy_id' => $strategy->id,
+            'target_type' => StrategyAssignment::TARGET_DEVICE,
+            'target_id' => $device->id,
+        ]);
+        StrategyAssignment::create([
+            'strategy_id' => $strategy->id,
+            'target_type' => StrategyAssignment::TARGET_DEVICE_GROUP,
+            'target_id' => $deviceGroup->id,
+        ]);
+        $device->update(['strategy_id' => $strategy->id]);
         $provider = OauthProvider::create([
             'op' => 'readonly-oidc',
             'type' => 'oidc',
@@ -128,8 +165,15 @@ class AdminReadOnlyUiTest extends TestCase
             'enabled' => true,
         ]);
 
+        $this->actingAs($viewer)->get(route('admin.devices.edit', $device))
+            ->assertOk()
+            ->assertSee('view-only access')
+            ->assertSee('Read-only fleet')
+            ->assertSee('Read-only policy')
+            ->assertSee('disabled', false)
+            ->assertDontSee('rd-btn--save', false);
+
         foreach ([
-            route('admin.devices.edit', $device),
             route('admin.groups.edit', $group),
             route('admin.device-groups.edit', $deviceGroup),
             route('admin.settings.index'),
@@ -146,6 +190,7 @@ class AdminReadOnlyUiTest extends TestCase
             ->assertOk()
             ->assertSee('view-only access')
             ->assertSee('role="tab"', false)
+            ->assertSee('Read-only fleet')
             ->assertSee('disabled', false)
             ->assertDontSee('rd-btn--save', false)
             ->assertDontSee('action="'.route('admin.strategies.assignments.store', $strategy).'"', false);
