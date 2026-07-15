@@ -54,6 +54,7 @@ class User extends Authenticatable
             'is_admin' => 'boolean',
             'force_sso' => 'boolean',
             'two_factor_enabled' => 'boolean',
+            'two_factor_secret' => 'encrypted',
             'email_alarm_notification' => 'boolean',
             'status' => 'integer',
             'two_factor_recovery_codes' => 'array',

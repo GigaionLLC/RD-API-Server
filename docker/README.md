@@ -63,6 +63,35 @@ needed by tests and screenshot fixtures. That fallback is never accepted by a pr
 After bootstrap the entrypoint removes `ADMIN_PASS` from the Apache process environment; the
 stored administrator password remains a one-way hash in the database.
 
+## Application encryption key
+
+The runtime entrypoint uses an explicit `APP_KEY` when one is supplied. Otherwise it reads
+`storage/app/.appkey`, generating that file only on the first start. The root Compose files keep
+`storage/` persistent, so the generated key normally survives container replacement.
+
+Treat the application database and encryption key as one recoverable unit. Authenticator secrets
+are encrypted with this key, and recovery-code digests are keyed by it. Back up the database
+together with either `storage/app/.appkey` or the secret-store value used for `APP_KEY`; restoring
+the database with a missing or different key makes existing authenticator secrets unreadable and
+existing recovery codes unverifiable. Never copy `.appkey` into source control, logs, tickets, or
+an image layer. In a multi-replica deployment, provide the same explicit `APP_KEY` to every API
+replica instead of allowing each replica to generate its own key.
+
+For a controlled rotation, take a database-and-key backup, set the new key as `APP_KEY`, and put
+the old key in the comma-separated `APP_PREVIOUS_KEYS` value on every replica before restarting
+them. Laravel can then decrypt values written under either key while new encrypted values use the
+new key; recovery-code verification also checks the previous keys. Keep the old key available
+until all authenticator enrollments and recovery-code sets created under it have been replaced
+and any old encrypted sessions have expired. Recovery-code digests are one-way and cannot be
+bulk-rekeyed. If an explicit `APP_KEY` overrides a generated `.appkey`, do not later remove the
+environment value and silently fall back to the older file.
+
+The release that introduces encrypted authenticator secrets requires a maintenance deployment:
+stop or quiesce every old API replica, back up the database and key, run the migration with one
+upgraded instance, and then start only upgraded replicas. Do not use a mixed-version rolling
+deployment for this migration. An old replica can write plaintext after the migration while an
+upgraded replica expects encrypted values.
+
 ## Updating a pin
 
 1. Select a supported, stable release from the upstream project's official release page. Update

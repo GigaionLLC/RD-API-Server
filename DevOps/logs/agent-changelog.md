@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 20:37] - Security: encrypt authenticator secrets at rest
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Support/TotpSecretFormat.php`, `app/Models/User.php`
+- `app/Http/Controllers/Admin/TwoFactorController.php`
+- `database/migrations/2026_07_14_100007_encrypt_two_factor_secrets.php`
+- `tests/Feature/AdminTwoFactorTest.php`, `tests/Feature/TotpSecretEncryptionTest.php`, `tests/Feature/TotpSecretMigrationTest.php`
+- `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `README.md`, `docker/README.md`, `Wiki/core/15-security.md`, `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** `users.two_factor_secret` becomes nullable `TEXT`; existing Base32 seeds are encrypted idempotently with the application key. The model and HTTP/API shapes are unchanged. Rollback decrypts only with the current or configured previous keys and aborts on unknown/corrupt values.
+**Summary:** TOTP seeds now use the framework's encrypted model cast, enrollment candidates are explicitly encrypted inside database-backed sessions, valid in-flight plaintext sessions upgrade once, and corrupt values fail closed. Migration preflight prevents partial rewrites, setup/recovery responses are private/no-store, runtime Compose surfaces forward current/previous application keys, and deployment documentation covers coupled database/key backups, rotation, replicas, and maintenance migration. Twenty-seven focused MariaDB tests / 270 assertions, migration up/down/reapply, Pint, targeted PHPStan, all Compose validations, and diff checks passed in Docker.
+
 ## [2026-07-14 12:28] - Security: protect recovery codes at rest
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

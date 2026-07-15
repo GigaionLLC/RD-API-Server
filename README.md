@@ -114,6 +114,9 @@ services:
     environment:
       APP_ENV: production
       APP_URL: https://api.your-domain.com
+      # Leave APP_KEY empty for the persistent generated key. Replicas must share explicit keys.
+      APP_KEY: "${APP_KEY:-}"
+      APP_PREVIOUS_KEYS: "${APP_PREVIOUS_KEYS:-}"
       TRUSTED_PROXIES: CHANGE_ME_proxy_ip_or_cidr  # omit when clients connect directly
       ADMIN_USER: admin
       ADMIN_PASS: "${ADMIN_PASS:-}"          # required only while creating the first admin

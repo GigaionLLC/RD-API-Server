@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\TwoFactorService;
 use App\Support\AccountPasswordPolicy;
+use App\Support\TotpSecretFormat;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
@@ -41,13 +44,13 @@ class TwoFactorController extends Controller
 
     // --- Self-service management (authenticated) ----------------------------------------
 
-    public function show(Request $request): View
+    public function show(Request $request): Response
     {
         /** @var User $user */
         $user = $request->user();
 
-        $setupSecret = $request->session()->get(self::SETUP_KEY);
-        $uri = is_string($setupSecret)
+        $setupSecret = $this->setupSecret($request);
+        $uri = $setupSecret !== null
             ? $this->twoFactor->provisioningUri($setupSecret, (string) $user->username)
             : null;
 
@@ -55,12 +58,12 @@ class TwoFactorController extends Controller
         // rendered once in a no-store response and never persisted in the session.
         $request->session()->forget('2fa.recovery_codes');
 
-        return view('admin.two_factor.show', [
+        return response()->view('admin.two_factor.show', [
             'enabled' => (bool) $user->two_factor_enabled,
-            'setupSecret' => is_string($setupSecret) ? $setupSecret : null,
+            'setupSecret' => $setupSecret,
             'setupUri' => $uri,
             'recoveryCodes' => null,
-        ]);
+        ])->withHeaders(self::sensitiveResponseHeaders());
     }
 
     public function enable(Request $request): RedirectResponse
@@ -72,8 +75,12 @@ class TwoFactorController extends Controller
             return redirect()->route('admin.2fa.show');
         }
 
-        // Stash a candidate secret in the session; it only becomes the user's once a code confirms it.
-        $request->session()->put(self::SETUP_KEY, $this->twoFactor->generateSecret());
+        // It only becomes the user's secret after a valid code confirms it. Encrypt it explicitly
+        // because the default database session driver does not encrypt the full session payload.
+        $request->session()->put(
+            self::SETUP_KEY,
+            Crypt::encryptString($this->twoFactor->generateSecret()),
+        );
 
         return redirect()->route('admin.2fa.show');
     }
@@ -84,9 +91,9 @@ class TwoFactorController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        $secret = $request->session()->get(self::SETUP_KEY);
+        $secret = $this->setupSecret($request);
 
-        if (! is_string($secret) || ! $this->twoFactor->verifyCode($secret, (string) $request->input('code'))) {
+        if ($secret === null || ! $this->twoFactor->verifyCode($secret, (string) $request->input('code'))) {
             return back()->withErrors(['code' => 'That code is incorrect or expired. Try again.']);
         }
 
@@ -108,12 +115,7 @@ class TwoFactorController extends Controller
             'setupSecret' => null,
             'setupUri' => null,
             'recoveryCodes' => $recovery,
-        ])->withHeaders([
-            'Cache-Control' => 'no-store, private',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-            'Referrer-Policy' => 'no-referrer',
-        ]);
+        ])->withHeaders(self::sensitiveResponseHeaders());
     }
 
     public function disable(Request $request): RedirectResponse
@@ -274,5 +276,54 @@ class TwoFactorController extends Controller
             self::PENDING_PASSWORD,
             self::PENDING_EXPIRES_AT,
         ]);
+    }
+
+    /**
+     * Decrypt the candidate enrollment secret. A valid plaintext value from an in-flight
+     * pre-upgrade session is accepted once and immediately replaced with ciphertext.
+     */
+    private function setupSecret(Request $request): ?string
+    {
+        $stored = $request->session()->get(self::SETUP_KEY);
+        if (! is_string($stored)) {
+            $request->session()->forget(self::SETUP_KEY);
+
+            return null;
+        }
+
+        try {
+            $secret = Crypt::decryptString($stored);
+        } catch (DecryptException) {
+            if (! TotpSecretFormat::isValid($stored)) {
+                $request->session()->forget(self::SETUP_KEY);
+
+                return null;
+            }
+
+            $request->session()->put(self::SETUP_KEY, Crypt::encryptString($stored));
+
+            return $stored;
+        }
+
+        if (! TotpSecretFormat::isValid($secret)) {
+            $request->session()->forget(self::SETUP_KEY);
+
+            return null;
+        }
+
+        return $secret;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function sensitiveResponseHeaders(): array
+    {
+        return [
+            'Cache-Control' => 'no-store, private',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'Referrer-Policy' => 'no-referrer',
+        ];
     }
 }

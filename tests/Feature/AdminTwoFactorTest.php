@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\TwoFactorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -29,6 +30,18 @@ class AdminTwoFactorTest extends TestCase
         return app(TwoFactorService::class)->currentCode($secret);
     }
 
+    private function setupSecret(): string
+    {
+        $stored = session('2fa.setup_secret');
+        $this->assertIsString($stored);
+
+        $secret = Crypt::decryptString($stored);
+        $this->assertNotSame($secret, $stored);
+        $this->assertStringNotContainsString($secret, $stored);
+
+        return $secret;
+    }
+
     private function assertPendingChallengeCleared(): void
     {
         $this->assertFalse(session()->has('2fa.user'));
@@ -43,8 +56,7 @@ class AdminTwoFactorTest extends TestCase
 
         // Start enrollment — a candidate secret is stashed in the session.
         $this->actingAs($admin)->post(route('admin.2fa.enable'))->assertRedirect(route('admin.2fa.show'));
-        $secret = session('2fa.setup_secret');
-        $this->assertIsString($secret);
+        $secret = $this->setupSecret();
 
         // Confirm with a live code → 2FA becomes enabled and recovery codes are issued once.
         $response = $this->actingAs($admin)
@@ -64,7 +76,15 @@ class AdminTwoFactorTest extends TestCase
         $this->assertSame($secret, $admin->two_factor_secret);
         $this->assertSame(User::LOGIN_VERIFY_TOTP, $admin->login_verify);
         $this->assertCount(8, (array) $admin->two_factor_recovery_codes);
+        $this->assertArrayNotHasKey('two_factor_secret', $admin->toArray());
         $this->assertArrayNotHasKey('two_factor_recovery_codes', $admin->toArray());
+
+        $rawSecret = (string) DB::table('users')
+            ->where('id', $admin->id)
+            ->value('two_factor_secret');
+        $this->assertNotSame($secret, $rawSecret);
+        $this->assertStringNotContainsString($secret, $rawSecret);
+        $this->assertSame($secret, Crypt::decryptString($rawSecret));
 
         $rawCodes = (string) DB::table('users')
             ->where('id', $admin->id)
@@ -83,6 +103,45 @@ class AdminTwoFactorTest extends TestCase
             ->post(route('admin.2fa.confirm'), ['code' => '000000'])
             ->assertSessionHasErrors('code');
 
+        $this->assertFalse((bool) $admin->fresh()->two_factor_enabled);
+    }
+
+    public function test_setup_page_upgrades_a_valid_legacy_plaintext_session_secret(): void
+    {
+        $admin = $this->admin();
+        $secret = app(TwoFactorService::class)->generateSecret();
+
+        $this->actingAs($admin)
+            ->withSession(['2fa.setup_secret' => $secret])
+            ->get(route('admin.2fa.show'))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertSee($secret);
+
+        $this->assertSame($secret, $this->setupSecret());
+
+        $this->actingAs($admin)
+            ->post(route('admin.2fa.confirm'), ['code' => $this->code($secret)])
+            ->assertOk();
+
+        $this->assertSame($secret, $admin->fresh()->two_factor_secret);
+    }
+
+    public function test_setup_page_rejects_and_clears_a_corrupt_session_secret(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->withSession(['2fa.setup_secret' => 'not-valid-ciphertext!'])
+            ->get(route('admin.2fa.show'))
+            ->assertOk()
+            ->assertDontSee('Setup key')
+            ->assertSessionMissing('2fa.setup_secret');
+
+        $this->actingAs($admin)
+            ->post(route('admin.2fa.confirm'), ['code' => '123456'])
+            ->assertSessionHasErrors('code');
         $this->assertFalse((bool) $admin->fresh()->two_factor_enabled);
     }
 
@@ -245,14 +304,18 @@ class AdminTwoFactorTest extends TestCase
         $admin = $this->admin();
 
         // Disabled state.
-        $this->actingAs($admin)->get(route('admin.2fa.show'))->assertOk()->assertSee('Enable two-factor');
+        $this->actingAs($admin)->get(route('admin.2fa.show'))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertSee('Enable two-factor');
 
         // Setup state shows the manual key.
         $this->actingAs($admin)->post(route('admin.2fa.enable'));
         $this->actingAs($admin)->get(route('admin.2fa.show'))->assertOk()->assertSee('Setup key');
 
         // Enabled state offers the disable form.
-        $secret = session('2fa.setup_secret');
+        $secret = $this->setupSecret();
         $this->actingAs($admin)->post(route('admin.2fa.confirm'), ['code' => $this->code($secret)]);
         $this->actingAs($admin->fresh())->get(route('admin.2fa.show'))->assertOk()->assertSee('Disable');
 

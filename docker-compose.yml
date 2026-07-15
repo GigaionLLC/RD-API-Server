@@ -36,6 +36,10 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       APP_URL: "${APP_URL:-http://localhost:21114}"
+      # Leave APP_KEY empty to use the persistent storage/app/.appkey. When an explicit key is
+      # supplied, keep it stable and retain rotated keys in the comma-separated previous list.
+      APP_KEY: "${APP_KEY:-}"
+      APP_PREVIOUS_KEYS: "${APP_PREVIOUS_KEYS:-}"
       HASH_VERIFY: "${HASH_VERIFY:-false}"
       ARGON_MEMORY: "${ARGON_MEMORY:-65536}"
       ARGON_THREADS: "${ARGON_THREADS:-1}"

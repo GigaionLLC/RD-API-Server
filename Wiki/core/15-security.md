@@ -179,3 +179,22 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   lock if encountered during a rolling transition. Rolling back the one-way digest migration
   invalidates affected recovery lists; the authenticator remains usable and new recovery codes
   require re-enrollment.
+
+## Authenticator Secret and Application-Key Boundary
+
+- Authenticator seeds are encrypted before they are stored in `users.two_factor_secret`.
+  Enrollment candidates are also encrypted inside the database-backed session; setup and
+  recovery responses are private/no-store and suppress referrer disclosure. A database or session
+  disclosure without the application key therefore does not reveal a usable seed.
+- The runtime uses an explicit `APP_KEY` when configured; otherwise it generates and persists one
+  at `storage/app/.appkey`. The database and that key are one backup unit. Restoring the database
+  without the matching key makes existing authenticator secrets unreadable and keyed recovery
+  codes unverifiable. Every API replica must use the same current and previous keys.
+- Key rotation sets a new `APP_KEY` and retains the old key in the comma-separated
+  `APP_PREVIOUS_KEYS` setting. Previous keys must remain until authenticator enrollments and
+  recovery-code sets created under them have been replaced and old encrypted sessions have
+  expired; one-way recovery-code digests cannot be bulk-rekeyed.
+- Deploy the plaintext-to-encrypted authenticator migration in a maintenance window. Quiesce all
+  old replicas, back up the database and key, run the migration on one upgraded instance, and
+  start only upgraded replicas. A mixed-version rolling deployment is unsafe because an old
+  replica can write plaintext after the upgraded code begins requiring ciphertext.
