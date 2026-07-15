@@ -78,7 +78,8 @@ services:
       - ADMIN_USER=admin
       - "ADMIN_PASS=${ADMIN_PASS:-}"
       # Database:
-      - DB_CONNECTION=mysql
+      - DB_CONNECTION=mariadb
+      - "DB_URL=${DB_URL:-}"
       - DB_HOST=rustdesk-db
       - DB_PORT=3306
       - DB_DATABASE=rustdesk_api

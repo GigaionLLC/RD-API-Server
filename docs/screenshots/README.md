@@ -91,12 +91,15 @@ overwrite documentation images. From the repository root, use the Docker toolcha
 explicitly:
 
 ```bash
-docker run --rm -e CAPTURE_SCREENSHOTS=1 -v "$PWD":/app -w /app \
-  rustdesk-api-php-toolchain bash docker/demo-shots.sh
+docker compose -f docker/compose.toolchain.yml --profile screenshots run --rm \
+  -e CAPTURE_SCREENSHOTS=1 screenshots bash docker/demo-shots.sh
 ```
 
-The script backs up the normal SQLite file, migrates and seeds fictional data, starts the
-application, captures the canonical desktop-dark gallery, and restores the previous database.
-The capture definition is
+The profile starts a dedicated `screenshot-db` MariaDB service on tmpfs and forces the
+`rustdesk_api_screenshots` database. The `screenshots` runner migrates and seeds only that
+isolated database. On a clean checkout it validates that destructive target before installing any
+missing dependencies from the Composer and npm lock files, then starts the application and
+captures the canonical desktop-dark gallery. It never backs up, restores, or modifies the
+persistent development database. The capture definition is
 [`e2e/screenshots.spec.ts`](../../e2e/screenshots.spec.ts); it remains skipped unless
 `CAPTURE_SCREENSHOTS=1` is present and is not part of the normal CI gate.

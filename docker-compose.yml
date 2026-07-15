@@ -6,11 +6,7 @@
 # Pulls the published image and runs on http://localhost:21114 (admin at /admin), backed by
 # MariaDB.
 #
-# Why MariaDB by default (not SQLite): SQLite is single-writer — every heartbeat, sysinfo
-# push, connection/audit write, and login takes a database-wide lock, so throughput collapses
-# once many machines report in concurrently. MariaDB/MySQL handles concurrent writes and scales
-# with your fleet. Use MariaDB for any real deployment; SQLite is fine only for small setups
-# (roughly < 50 devices) or evaluation — see "Prefer SQLite?" at the bottom to switch.
+# MariaDB is the sole supported database and is included in this stack.
 #
 # Before first run, set these (shell env or a .env file next to this compose file):
 #   ADMIN_PASS   - unique first-run admin password (required, at least 12 characters)
@@ -53,13 +49,17 @@ services:
       ADMIN_USER: "${ADMIN_USER:-admin}"
       ADMIN_PASS: "${ADMIN_PASS:-}"
 
-      # Database — MariaDB by default (matches the `db` service below). CHANGE DB_PASSWORD.
-      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      # Database — MariaDB only (matches the `db` service below). CHANGE DB_PASSWORD.
+      DB_CONNECTION: "${DB_CONNECTION:-mariadb}"
+      DB_URL: "${DB_URL:-}"
       DB_HOST: "${DB_HOST:-db}"
       DB_PORT: "${DB_PORT:-3306}"
       DB_DATABASE: "${DB_DATABASE:-rustdesk_api}"
       DB_USERNAME: "${DB_USERNAME:-rustdesk}"
       DB_PASSWORD: "${DB_PASSWORD:-rustdesk}"
+      DB_SOCKET: "${DB_SOCKET:-}"
+      DB_CONNECT_TIMEOUT: "${DB_CONNECT_TIMEOUT:-5}"
+      MYSQL_ATTR_SSL_CA: "${MYSQL_ATTR_SSL_CA:-}"
 
       # RustDesk server endpoints handed to clients (set these to your hbbs/hbbr).
       RUSTDESK_ID_SERVER: "${RUSTDESK_ID_SERVER:-}"
@@ -137,9 +137,3 @@ services:
 volumes:
   rustdesk-data:
   rustdesk-db:
-
-# --- Prefer SQLite for a small setup (< ~50 devices) or a quick evaluation? ---
-# SQLite needs no database container. To use it instead:
-#   1. set DB_CONNECTION=sqlite (env, or change the default above)
-#   2. delete the `db` service, the `depends_on:` block above, and the `rustdesk-db` volume
-# All data then lives in the rustdesk-data volume (storage/app/database.sqlite).

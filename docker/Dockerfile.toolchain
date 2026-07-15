@@ -20,15 +20,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Runtime/tooling system packages (DB clients, git, unzip).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git unzip zip curl ca-certificates gnupg \
-        default-mysql-client sqlite3 \
+        default-mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions via mlocati/php-extension-installer — reliably resolves the required
 # system libs and configure flags across PHP versions (avoids the manual gd/intl build
-# breakage seen with docker-php-ext-install on PHP 8.5).
+# breakage seen with docker-php-ext-install on PHP 8.5). The upstream PHP image's statically
+# compiled SQLite symbols are inert; no SQLite client/tooling is installed or supported.
 COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions \
-        pdo_mysql pdo_sqlite mbstring intl gmp bcmath zip gd opcache sockets ldap
+        pdo_mysql mbstring intl gmp bcmath zip gd opcache sockets ldap
 
 # Composer from the verified release image above.
 COPY --from=composer /usr/bin/composer /usr/bin/composer

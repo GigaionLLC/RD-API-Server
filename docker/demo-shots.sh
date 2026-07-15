@@ -1,44 +1,109 @@
 #!/usr/bin/env bash
 # Boot the app with DemoShowcaseSeeder data and capture the admin-console screenshots used in
-# the README + docs/screenshots/ gallery. Run inside the toolchain image:
-#   docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash docker/demo-shots.sh
+# the README + docs/screenshots/ gallery. Run from the repository root:
+#   docker compose -f docker/compose.toolchain.yml --profile screenshots run --rm \
+#     -e CAPTURE_SCREENSHOTS=1 screenshots bash docker/demo-shots.sh
 #
-# Uses the app's DEFAULT sqlite database so the CLI (seed) and `php artisan serve` (which does
-# not forward shell-exported env to its child) read the same DB. The existing
-# database/database.sqlite is backed up and restored, so your dev data is untouched.
-set -e
+# The Compose profile provides a dedicated tmpfs-backed MariaDB instance. This script refuses
+# any other host/database before running migrate:fresh, so development data cannot be selected.
+set -euo pipefail
+
+cd /app
 
 # This is an explicit development fixture workflow. A clean checkout may not have a .env file,
 # so opt into the local-only seed credential instead of inheriting Laravel's production default.
 export APP_ENV="${APP_ENV:-local}"
 
-DB=/app/database/database.sqlite
-BAK=/app/database/database.sqlite.demobak
+if [ "${CAPTURE_SCREENSHOTS:-}" != "1" ]; then
+  echo "Refusing screenshot capture: set CAPTURE_SCREENSHOTS=1 explicitly." >&2
+  exit 1
+fi
 
-echo "== back up existing db =="
-test -f "$DB" && cp "$DB" "$BAK" || true
+if [ "${DB_CONNECTION:-}" != "mariadb" ] \
+    || [ "${DB_HOST:-}" != "screenshot-db" ] \
+    || [ "${DB_PORT:-}" != "3306" ] \
+    || [ "${DB_DATABASE:-}" != "rustdesk_api_screenshots" ] \
+    || [ -n "${DB_SOCKET:-}" ] \
+    || [ -n "${DB_URL:-}" ]; then
+  echo "Refusing screenshot reset: use the dedicated Compose screenshots profile." >&2
+  exit 1
+fi
 
-restore() {
-  test -f "$BAK" && mv -f "$BAK" "$DB" || true
+if [ ! -f vendor/autoload.php ]; then
+  echo "== install locked PHP dependencies =="
+  composer install --no-interaction --prefer-dist --no-progress
+fi
+if [ ! -x node_modules/.bin/playwright ]; then
+  echo "== install locked browser-test dependencies =="
+  npm ci --ignore-scripts --no-audit --no-fund
+fi
+
+SERVER_PID=""
+cleanup() {
+  if [ -n "$SERVER_PID" ]; then
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
 }
-trap restore EXIT
+trap cleanup EXIT
 
 mkdir -p /app/docs/screenshots
-php artisan config:clear >/dev/null 2>&1 || true
+php artisan config:clear >/dev/null
 
-echo "== migrate + seed (default db) =="
+echo "== verify isolated MariaDB target =="
+php -r '
+    $host = getenv("DB_HOST");
+    $port = getenv("DB_PORT") ?: "3306";
+    $database = getenv("DB_DATABASE");
+    $username = getenv("DB_USERNAME");
+    $password = getenv("DB_PASSWORD");
+    $pdo = new PDO("mysql:host={$host};port={$port};dbname={$database};charset=utf8mb4", $username, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_TIMEOUT => 5,
+    ]);
+    $row = $pdo->query("SELECT DATABASE(), VERSION(), @@default_storage_engine")?->fetch(PDO::FETCH_NUM);
+    if (!is_array($row)
+        || ($row[0] ?? "") !== "rustdesk_api_screenshots"
+        || stripos((string) ($row[1] ?? ""), "MariaDB") === false
+        || strcasecmp((string) ($row[2] ?? ""), "InnoDB") !== 0) {
+        fwrite(STDERR, "Refusing screenshot reset: live target is not the isolated MariaDB/InnoDB screenshot database.\n");
+        exit(1);
+    }
+'
+
+echo "== migrate + seed isolated screenshot db =="
 php artisan migrate:fresh --seed --force
 php artisan db:seed --class="Database\\Seeders\\DemoShowcaseSeeder" --force
 
+php -r '
+    $pdo = new PDO(
+        "mysql:host=screenshot-db;port=3306;dbname=rustdesk_api_screenshots;charset=utf8mb4",
+        getenv("DB_USERNAME"),
+        getenv("DB_PASSWORD"),
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5],
+    );
+    $query = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = ? AND COALESCE(UPPER(ENGINE), ?) <> ?");
+    $query->execute(["rustdesk_api_screenshots", "BASE TABLE", "", "INNODB"]);
+    if ((int) $query->fetchColumn() !== 0) {
+        fwrite(STDERR, "Refusing screenshot capture: an application table is not InnoDB.\n");
+        exit(1);
+    }
+'
+
 echo "== start server =="
-php artisan serve --host=0.0.0.0 --port=8088 >/tmp/serve.log 2>&1 &
+# --no-reload preserves the guarded screenshot database environment in the child server.
+php artisan serve --no-reload --host=0.0.0.0 --port=8088 >/tmp/serve.log 2>&1 &
 SERVER_PID=$!
 
 echo "== wait for server =="
 n=0
 until curl -sf http://127.0.0.1:8088/admin/login >/dev/null 2>&1; do
   n=$((n+1))
-  test "$n" -gt 40 && { echo "server did not come up"; cat /tmp/serve.log; break; }
+  if [ "$n" -gt 40 ]; then
+    echo "server did not come up" >&2
+    cat /tmp/serve.log >&2
+    exit 1
+  fi
   sleep 1
 done
 echo "server up after ${n}s"
@@ -46,12 +111,9 @@ echo "server up after ${n}s"
 echo "== sanity: device count via API-less check =="
 php artisan tinker --execute="echo 'devices='.\App\Models\Device::count().' users='.\App\Models\User::count().' conns='.\App\Models\AuditConn::count().PHP_EOL;" || true
 
-echo "== ensure chromium =="
-npx playwright install chromium >/dev/null 2>&1 || true
-
 echo "== capture =="
-E2E_BASE_URL=http://127.0.0.1:8088 npx playwright test screenshots.spec.ts --reporter=line || true
+E2E_BASE_URL=http://127.0.0.1:8088 \
+  npx playwright test screenshots.spec.ts --project=desktop-dark --reporter=line
 
-kill "$SERVER_PID" 2>/dev/null || true
 echo "== done =="
 ls -la /app/docs/screenshots

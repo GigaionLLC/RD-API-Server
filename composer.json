@@ -9,6 +9,7 @@
         "php": "^8.5",
         "ext-curl": "*",
         "ext-ldap": "*",
+        "ext-pdo_mysql": "*",
         "endroid/qr-code": "^6.1",
         "laravel/framework": "^13.8",
         "laravel/socialite": "^5.0",
@@ -40,6 +41,7 @@
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan config:clear",
             "@php artisan key:generate",
             "@php artisan migrate --force",
             "npm install --ignore-scripts",
@@ -68,7 +70,6 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
         "pre-package-uninstall": [

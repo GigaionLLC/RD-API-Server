@@ -12,24 +12,38 @@ docker build -f docker/Dockerfile.toolchain -t rustdesk-api-php-toolchain .
 # dev stack (app + MariaDB + Mailpit)
 docker compose -f docker/compose.toolchain.yml up -d
 docker compose -f docker/compose.toolchain.yml run --rm app composer install
+docker compose -f docker/compose.toolchain.yml run --rm app npm ci --ignore-scripts --no-audit --no-fund
 docker compose -f docker/compose.toolchain.yml run --rm app php artisan migrate --seed
 ```
 
 ## Quality gates (CI runs these on every push)
 
 ```bash
-docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash -lc \
-  'npm ci --ignore-scripts --no-audit --no-fund && npm run check:vendor && npm run lint:js && \
-   ./vendor/bin/pint --test && ./vendor/bin/phpstan analyse --memory-limit=1G && php artisan test'
+docker compose -f docker/compose.toolchain.yml run --rm app bash -lc \
+  'npm run check:vendor && npm run lint:js && \
+   ./vendor/bin/pint --test && ./vendor/bin/phpstan analyse --memory-limit=1G'
+
+docker compose -f docker/compose.toolchain.yml --profile test run --rm test php artisan test
+
+docker compose -f docker/compose.toolchain.yml --profile e2e run --rm e2e bash docker/e2e.sh
 ```
+
+The standalone lint/static-analysis command expects the locked dependencies installed in the
+Toolchain section. The `e2e` runner is also safe on a clean checkout: it first rejects any target
+other than its dedicated disposable database, then installs missing PHP or browser dependencies
+from `composer.lock` / `package-lock.json` before running. It never updates either lock file.
 
 - **Pint** — code style (`./vendor/bin/pint` to auto-fix).
 - **PHPStan** — level 5 static analysis (needs `--memory-limit=1G`).
-- **PHPUnit** — `php artisan test` (uses SQLite `:memory:`).
+- **PHPUnit** — the `test` service above targets only the guarded `rustdesk_api_testing`
+  database on the tmpfs-backed `test-db` MariaDB service.
 - **ESLint** — browser code in `public/assets/js` and Node-based build scripts in `scripts`.
 - **Vendor integrity** — `npm run check:vendor` rebuilds the local admin assets in memory and
   verifies their complete inventory and byte content against the checked-in distribution.
-- **Playwright** — end-to-end (`npx playwright test`), against a running server.
+- **Playwright** — the `e2e` profile runs the full browser matrix against a guarded application
+  and tmpfs-backed `e2e-db`, both using the exact database `rustdesk_api_e2e`. CI creates the same
+  isolated schema on its job-scoped MariaDB service; never target the persistent development
+  database with browser fixtures.
 
 ## Test the runtime image locally
 
@@ -52,14 +66,41 @@ php artisan rustdesk:user <name> --admin
 printf '%s\n' "$RUSTDESK_USER_PASSWORD" | php artisan rustdesk:user <name> --admin --password-stdin
 
 # regenerate the admin-console screenshots in docs/screenshots/ (seeds fictional demo data)
-docker run --rm -v "$PWD":/app -w /app rustdesk-api-php-toolchain bash docker/demo-shots.sh
+docker compose -f docker/compose.toolchain.yml --profile screenshots run --rm \
+  -e CAPTURE_SCREENSHOTS=1 screenshots bash docker/demo-shots.sh
 ```
 
 ## Database
 
-Development and production default to **MySQL/MariaDB** (the toolchain stack ships MariaDB).
-Tests run on SQLite `:memory:`. SQLite is an optional target for small setups — see the
-"Prefer SQLite?" note in `docker-compose.yml` and `.env.example`.
+MariaDB with InnoDB is the only supported database in development, tests, CI, screenshots, and
+production. Use `DB_CONNECTION=mariadb`; the required PHP extension and PDO protocol retain the
+upstream names `pdo_mysql` and `mysql:`.
+
+The current `.env.example` leaves `DB_HOST` commented so `docker-compose.yml` and
+`docker-compose.dev.yml` can select the internal `db` service. An older copied `.env` containing
+`DB_HOST=127.0.0.1` must remove that line or change it to `db` before either Compose stack starts;
+inside the app container, loopback does not reach the database container. `DB_HOST` and `DB_PORT`
+remain the normal interface for an external MariaDB endpoint reachable from the container. A host
+override does not remove the bundled `db` service or the app's `depends_on`; a genuinely
+external-only development topology needs a custom Compose definition/override that removes or
+replaces both.
+
+The ordinary `app` service uses the persistent development database `rustdesk_api`. Never run
+PHPUnit from that service. The `--profile test` command starts a separate tmpfs-backed `test-db`
+service and a guarded `test` runner that forces the exact database name
+`rustdesk_api_testing`. The test bootstrap verifies both the database name and the live MariaDB
+server before any refresh migration can run, so an inherited `.env` value cannot erase the
+development schema.
+
+The `e2e` profile applies the same separation to browser tests: its `e2e` runner resets only
+`rustdesk_api_e2e` on the tmpfs-backed `e2e-db` service, verifies the live MariaDB/InnoDB target,
+installs missing locked dependencies, starts the application, and runs the complete Playwright
+project matrix.
+
+Screenshot capture is isolated again: the `screenshots` profile uses `screenshot-db`, database
+`rustdesk_api_screenshots`, and tmpfs storage. After rejecting any other configured target, its
+runner installs missing locked dependencies. It never backs up, restores, or migrates the
+persistent development database.
 
 ## Docs map
 
@@ -68,4 +109,6 @@ Tests run on SQLite `:memory:`. SQLite is an optional target for small setups �
 - **[docs/modernization/](modernization/)** — research → plan → status, incl. the
   [client API contract](modernization/02-client-api-contract.md)
 - **[docs/screenshots/](screenshots/)** — admin-console gallery
+- **[SQLite-to-MariaDB boundary](sqlite-to-mariadb.md)** — manual upgrade requirements for
+  installations created with the retired database path
 - **[DevOps/logs/agent-changelog.md](../DevOps/logs/agent-changelog.md)** — change log

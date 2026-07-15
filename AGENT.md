@@ -39,8 +39,9 @@ not invent CSS classes or hardcode colors. No Vue — Blade + jQuery only.
 
 ### 4. 🗄️ Touching the API/DB? Verify the contract & schema first.
 Client-facing JSON keys and routes are **fixed by the RustDesk client** — never rename them
-(see the contract doc). Schema lives in `database/migrations/` (PHP) with the Go `model/`
-package as the reference.
+(see the contract doc). The application supports **MariaDB with InnoDB only**; the connection,
+test-isolation, and migration rules live in [Wiki/database/database-index.md](Wiki/database/database-index.md).
+Schema lives in `database/migrations/` (PHP) with the Go `model/` package as the reference.
 
 ## 🔎 Task lookup
 
@@ -48,7 +49,7 @@ package as the reference.
 |------|------------|-----------------|
 | Implement a client `/api/*` endpoint | [Client API contract](docs/modernization/02-client-api-contract.md) | `app/Http/Controllers/Api/`, `routes/api.php` |
 | Build/edit an admin screen | [Design System](Wiki/core/06-design-system.md) | `resources/views/admin/`, `public/assets/` |
-| Add/alter a DB table | [Port status](docs/modernization/09-port-status.md) | `database/migrations/`, `app/Models/` |
+| Add/alter a DB table | [Database architecture](Wiki/database/database-index.md) + [Port status](docs/modernization/09-port-status.md) | `database/migrations/`, `app/Models/` |
 | Add a feature (mail/2FA/strategy/…) | [Gap analysis](docs/modernization/04-gap-analysis.md) + [Roadmap](docs/modernization/05-roadmap-and-implementation.md) | `app/Services/` |
 | Borrow from other OSS servers | [Reference impls](docs/modernization/06-reference-implementations.md) | the cited files |
 | Check roadmap / parked items | [Backlog Index](DevOps/backlog/backlog-index.md) | specific backlog plan |
@@ -65,6 +66,10 @@ package as the reference.
 5. **Verify in Docker.** The host lacks Composer/Node; use the toolchain image / dev stack.
    A change isn't "done" until it runs green there (lint + tests + E2E where relevant).
 6. **Plan multi-step work** under `DevOps/plans/` using the [template](DevOps/plans/template-plan.md).
+7. **MariaDB/InnoDB is the only supported database.** Runtime, migrations, PHPUnit, browser
+   tests, and screenshot fixtures must use isolated MariaDB schemas. Never point a test runner
+   at the persistent development or production database. Existing SQLite installations must
+   follow [the manual migration boundary](docs/sqlite-to-mariadb.md) before upgrading.
 
 ## ✅ Mandatory wrap-up protocol
 When a task/feature is complete (or the user says "wrap up", "ship it", "we're done", etc.):
@@ -91,6 +96,8 @@ docker build -f docker/Dockerfile.toolchain -t rustdesk-api-php-toolchain .
 docker compose -f docker/compose.toolchain.yml up -d
 docker compose -f docker/compose.toolchain.yml run --rm app composer install
 docker compose -f docker/compose.toolchain.yml run --rm app php artisan migrate
+docker compose -f docker/compose.toolchain.yml --profile test run --rm test php artisan test
+docker compose -f docker/compose.toolchain.yml --profile e2e run --rm e2e bash docker/e2e.sh
 ```
-Stack: Laravel 13 (PHP 8.5) · Blade + jQuery + Bootstrap 5 · MariaDB/SQLite · Mailpit (SMTP
+Stack: Laravel 13 (PHP 8.5) · Blade + jQuery + Bootstrap 5 · MariaDB/InnoDB · Mailpit (SMTP
 testing) · Playwright (E2E) · Pint/PHPStan/ESLint (gates).

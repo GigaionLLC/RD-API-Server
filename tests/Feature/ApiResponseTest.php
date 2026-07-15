@@ -77,12 +77,29 @@ class ApiResponseTest extends TestCase
             ->postJson('/api/ab/peer/add/personal', ['id' => '555', 'forceAlwaysRelay' => 'true'])
             ->assertOk();
 
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/ab/peer/add/personal', ['id' => '556', 'forceAlwaysRelay' => 'false'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('address_book_peers', [
+            'rustdesk_id' => '555',
+            'force_always_relay' => 1,
+        ]);
+        $this->assertDatabaseHas('address_book_peers', [
+            'rustdesk_id' => '556',
+            'force_always_relay' => 0,
+        ]);
+
         $res = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/ab/peers');
         $res->assertOk();
 
         $peer = collect($res->json('data'))->firstWhere('id', '555');
         // Client does `json['forceAlwaysRelay'] == 'true'` — must be the string, not a bool.
         $this->assertSame('true', $peer['forceAlwaysRelay']);
+        $this->assertSame(
+            'false',
+            collect($res->json('data'))->firstWhere('id', '556')['forceAlwaysRelay'],
+        );
     }
 
     public function test_audit_active_guid_then_note_roundtrip(): void

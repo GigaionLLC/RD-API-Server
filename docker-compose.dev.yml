@@ -38,13 +38,17 @@ services:
       ADMIN_USER: "${ADMIN_USER:-admin}"
       ADMIN_PASS: "${ADMIN_PASS:-}"
 
-      # Database — MariaDB by default (matches the `db` service below).
-      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      # Database — MariaDB only (matches the `db` service below).
+      DB_CONNECTION: "${DB_CONNECTION:-mariadb}"
+      DB_URL: "${DB_URL:-}"
       DB_HOST: "${DB_HOST:-db}"
       DB_PORT: "${DB_PORT:-3306}"
       DB_DATABASE: "${DB_DATABASE:-rustdesk_api}"
       DB_USERNAME: "${DB_USERNAME:-rustdesk}"
       DB_PASSWORD: "${DB_PASSWORD:-rustdesk}"
+      DB_SOCKET: "${DB_SOCKET:-}"
+      DB_CONNECT_TIMEOUT: "${DB_CONNECT_TIMEOUT:-5}"
+      MYSQL_ATTR_SSL_CA: "${MYSQL_ATTR_SSL_CA:-}"
 
       # RustDesk server endpoints handed to clients (set these to your hbbs/hbbr).
       RUSTDESK_ID_SERVER: "${RUSTDESK_ID_SERVER:-}"
@@ -122,6 +126,3 @@ services:
 volumes:
   rustdesk-data:
   rustdesk-db:
-
-# --- Prefer SQLite for a small setup (< ~50 devices)? Set DB_CONNECTION=sqlite and remove
-#     the `db` service, the `depends_on:` block, and the `rustdesk-db` volume. ---

@@ -9,12 +9,36 @@ jobs:
   php:
     name: PHP gates + tests
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+        env:
+          MARIADB_ROOT_PASSWORD: rustdesk_test_root
+          MARIADB_DATABASE: rustdesk_api_testing
+          MARIADB_USER: rustdesk_test
+          MARIADB_PASSWORD: rustdesk_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=2s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: rustdesk_api_testing
+      DB_USERNAME: rustdesk_test
+      DB_PASSWORD: rustdesk_test
+      DB_SOCKET: ""
+      DB_URL: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.5'
-          extensions: pdo_sqlite, mbstring, intl, gmp, bcmath, zip, gd, sockets
+          extensions: pdo_mysql, mbstring, intl, gmp, bcmath, zip, gd, sockets, ldap
           coverage: none
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
@@ -26,6 +50,28 @@ jobs:
         run: ./vendor/bin/phpstan analyse --memory-limit=512M
       - name: PHPUnit
         run: php artisan test
+      - name: Verify InnoDB schema
+        run: |
+          php <<'PHP'
+          <?php
+
+          $pdo = new PDO(
+              'mysql:host=127.0.0.1;port=3306;dbname=rustdesk_api_testing;charset=utf8mb4',
+              getenv('DB_USERNAME') ?: '',
+              getenv('DB_PASSWORD') ?: '',
+              [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5],
+          );
+          $query = $pdo->prepare(
+              'SELECT COUNT(*) FROM information_schema.TABLES '
+              .'WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = ? AND COALESCE(UPPER(ENGINE), ?) <> ?'
+          );
+          $query->execute(['rustdesk_api_testing', 'BASE TABLE', '', 'INNODB']);
+
+          if ((int) $query->fetchColumn() !== 0) {
+              fwrite(STDERR, "Every application table must use InnoDB.\n");
+              exit(1);
+          }
+          PHP
 
   js:
     name: JS lint + vendor integrity
@@ -47,20 +93,107 @@ jobs:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     needs: php
+    services:
+      mariadb:
+        image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+        env:
+          MARIADB_ROOT_PASSWORD: rustdesk_e2e_root
+          MARIADB_DATABASE: rustdesk_api_e2e
+          MARIADB_USER: rustdesk_e2e
+          MARIADB_PASSWORD: rustdesk_e2e
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=2s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: rustdesk_api_e2e
+      DB_USERNAME: rustdesk_e2e
+      DB_PASSWORD: rustdesk_e2e
+      DB_SOCKET: ""
+      DB_URL: ""
+      CACHE_STORE: array
+      MAIL_MAILER: array
+      SESSION_DRIVER: database
+      RUSTDESK_REQUIRE_DEPLOYMENT: "false"
+      RUSTDESK_AUTO_REGISTER: "true"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.5'
-          extensions: pdo_sqlite, mbstring, intl, gmp, bcmath, zip, gd, sockets
+          extensions: pdo_mysql, mbstring, intl, gmp, bcmath, zip, gd, sockets, ldap
       - run: composer install --no-interaction --prefer-dist
       - name: Prepare app
         run: |
           cp .env.example .env
           php artisan key:generate
-          touch database/database.sqlite
-          php artisan migrate --force
+          php <<'PHP'
+          <?php
+
+          try {
+              $host = getenv('DB_HOST') ?: '';
+              $port = getenv('DB_PORT') ?: '';
+              $database = getenv('DB_DATABASE') ?: '';
+
+              if ($host !== '127.0.0.1' || $port !== '3306' || $database !== 'rustdesk_api_e2e') {
+                  throw new RuntimeException('Unsafe configured target.');
+              }
+
+              $pdo = new PDO(
+                  "mysql:host={$host};port={$port};dbname={$database};charset=utf8mb4",
+                  getenv('DB_USERNAME') ?: '',
+                  getenv('DB_PASSWORD') ?: '',
+                  [
+                      PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                      PDO::ATTR_TIMEOUT => 5,
+                  ],
+              );
+              $server = $pdo->query(
+                  'SELECT DATABASE() AS database_name, VERSION() AS server_version, '
+                  .'@@default_storage_engine AS default_storage_engine'
+              )->fetch(PDO::FETCH_ASSOC);
+
+              if (! is_array($server)
+                  || ($server['database_name'] ?? '') !== 'rustdesk_api_e2e'
+                  || ! str_contains(strtolower((string) ($server['server_version'] ?? '')), 'mariadb')
+                  || strtolower((string) ($server['default_storage_engine'] ?? '')) !== 'innodb') {
+                  throw new RuntimeException('Unsafe live target.');
+              }
+          } catch (Throwable) {
+              fwrite(STDERR, "E2E database safety probe failed; migrations were not run.\n");
+              exit(1);
+          }
+
+          fwrite(STDOUT, "Verified isolated MariaDB/InnoDB E2E database.\n");
+          PHP
+          php artisan migrate:fresh --force
           php artisan db:seed --force
+          php <<'PHP'
+          <?php
+
+          $pdo = new PDO(
+              'mysql:host=127.0.0.1;port=3306;dbname=rustdesk_api_e2e;charset=utf8mb4',
+              getenv('DB_USERNAME') ?: '',
+              getenv('DB_PASSWORD') ?: '',
+              [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5],
+          );
+          $query = $pdo->prepare(
+              'SELECT COUNT(*) FROM information_schema.TABLES '
+              .'WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = ? AND COALESCE(UPPER(ENGINE), ?) <> ?'
+          );
+          $query->execute(['rustdesk_api_e2e', 'BASE TABLE', '', 'INNODB']);
+
+          if ((int) $query->fetchColumn() !== 0) {
+              fwrite(STDERR, "Every application table must use InnoDB.\n");
+              exit(1);
+          }
+          PHP
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.18.0'
@@ -70,9 +203,18 @@ jobs:
       - name: Serve app
         # PHP_CLI_SERVER_WORKERS lets the built-in server handle concurrent requests
         # (Playwright runs specs in parallel; a single worker would serialise/stall them).
-        run: PHP_CLI_SERVER_WORKERS=8 php artisan serve --host=127.0.0.1 --port=8088 &
+        # --no-reload preserves the job's isolated MariaDB environment in the child server.
+        run: PHP_CLI_SERVER_WORKERS=8 php artisan serve --no-reload --host=127.0.0.1 --port=8088 &
       - name: Wait for app
-        run: for i in $(seq 1 30); do curl -sf http://127.0.0.1:8088/api/version && break; sleep 2; done
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8088/admin/login; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Application did not become ready within 60 seconds." >&2
+          exit 1
       - name: Run E2E
         run: npx playwright test
         env:

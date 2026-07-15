@@ -1,5 +1,5 @@
-# Production runtime image for rustdesk-api (PHP 8.5 + Apache, single container).
-# Built for a one-command `docker compose up`. SQLite by default — no external DB needed.
+# Production application image for rustdesk-api (PHP 8.5 + Apache), paired with MariaDB.
+# Built for a one-command `docker compose up`; MariaDB is required.
 #
 # Build:  docker build -f docker/Dockerfile.runtime -t rustdesk-api:latest .
 
@@ -13,7 +13,9 @@ FROM php:8.5.8-cli-bookworm@sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a5b0b
 
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_mysql pdo_sqlite mbstring intl gmp bcmath zip gd opcache sockets ldap
+# MariaDB uses PDO's MySQL-compatible driver. The upstream PHP image's statically compiled
+# SQLite symbols are inert because the application exposes and accepts only MariaDB.
+RUN install-php-extensions pdo_mysql mbstring intl gmp bcmath zip gd opcache sockets ldap
 
 WORKDIR /app
 COPY . /app
@@ -23,7 +25,7 @@ RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoload
 FROM php:8.5.8-apache-bookworm@sha256:76f447018df51801eb0587bdced331709c2d7ac4e0bb8b9cb00bd4f93dd85d1c AS runtime
 
 COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_mysql pdo_sqlite mbstring intl gmp bcmath zip gd opcache ldap \
+RUN install-php-extensions pdo_mysql mbstring intl gmp bcmath zip gd opcache ldap \
     && a2enmod rewrite
 
 # Production PHP ini + Apache vhost (docroot -> public/).

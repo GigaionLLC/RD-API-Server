@@ -6,6 +6,10 @@
 #   docker compose -f docker/compose.toolchain.yml up -d
 #   docker compose -f docker/compose.toolchain.yml run --rm app composer install
 #   docker compose -f docker/compose.toolchain.yml run --rm app php artisan migrate
+#   docker compose -f docker/compose.toolchain.yml --profile test run --rm test
+#   docker compose -f docker/compose.toolchain.yml --profile e2e run --rm e2e
+#   docker compose -f docker/compose.toolchain.yml --profile screenshots run --rm \
+#     -e CAPTURE_SCREENSHOTS=1 screenshots bash docker/demo-shots.sh
 name: rustdesk-api-php
 
 services:
@@ -21,7 +25,7 @@ services:
       - "8080:8080"   # Laravel dev server (client API + admin)
     environment:
       APP_ENV: local
-      DB_CONNECTION: mysql
+      DB_CONNECTION: mariadb
       DB_HOST: db
       DB_PORT: "3306"
       DB_DATABASE: rustdesk_api
@@ -31,11 +35,112 @@ services:
       MAIL_HOST: mail
       MAIL_PORT: "1025"
     depends_on:
-      - db
-      - mail
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
     # Default to an idle shell; start the server explicitly when needed:
     #   docker compose -f docker/compose.toolchain.yml run --rm --service-ports app \
     #     php artisan serve --host=0.0.0.0 --port=8080
+    command: ["sleep", "infinity"]
+
+  # PHPUnit runs against a separate, ephemeral schema. Never point this service at `db`:
+  # RefreshDatabase intentionally runs migrate:fresh and would destroy the development schema.
+  test:
+    profiles: ["test"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.toolchain
+    image: rustdesk-api-php-toolchain
+    working_dir: /app
+    volumes:
+      - ../:/app
+    environment:
+      APP_ENV: testing
+      APP_KEY: "base64:dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHQ="
+      DB_CONNECTION: mariadb
+      DB_HOST: test-db
+      DB_PORT: "3306"
+      DB_DATABASE: rustdesk_api_testing
+      DB_USERNAME: rustdesk_test
+      DB_PASSWORD: rustdesk_test
+      DB_SOCKET: ""
+      DB_URL: ""
+    depends_on:
+      test-db:
+        condition: service_healthy
+    command: ["php", "artisan", "test"]
+
+  # The full local Playwright matrix gets a third isolated schema so it cannot collide with
+  # PHPUnit or documentation screenshot capture.
+  e2e:
+    profiles: ["e2e"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.toolchain
+    image: rustdesk-api-php-toolchain
+    working_dir: /app
+    volumes:
+      - ../:/app
+    environment:
+      APP_ENV: local
+      APP_KEY: "base64:dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHQ="
+      APP_URL: http://127.0.0.1:8088
+      DB_CONNECTION: mariadb
+      DB_HOST: e2e-db
+      DB_PORT: "3306"
+      DB_DATABASE: rustdesk_api_e2e
+      DB_USERNAME: rustdesk_e2e
+      DB_PASSWORD: rustdesk_e2e
+      DB_SOCKET: ""
+      DB_URL: ""
+      ADMIN_USER: admin
+      ADMIN_PASS: "${E2E_ADMIN_PASS:-E2EOnly-8462-Local!}"
+      E2E_ADMIN_USER: admin
+      E2E_ADMIN_PASS: "${E2E_ADMIN_PASS:-E2EOnly-8462-Local!}"
+      CACHE_STORE: array
+      MAIL_MAILER: array
+      SESSION_DRIVER: database
+      RUSTDESK_REQUIRE_DEPLOYMENT: "false"
+      RUSTDESK_AUTO_REGISTER: "true"
+    depends_on:
+      e2e-db:
+        condition: service_healthy
+    command: ["bash", "docker/e2e.sh"]
+
+  # Documentation screenshots use their own disposable database so capture can never reset
+  # the development or PHPUnit schema.
+  screenshots:
+    profiles: ["screenshots"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.toolchain
+    image: rustdesk-api-php-toolchain
+    working_dir: /app
+    volumes:
+      - ../:/app
+    environment:
+      APP_ENV: local
+      APP_KEY: "base64:dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHQ="
+      APP_URL: http://127.0.0.1:8088
+      DB_CONNECTION: mariadb
+      DB_HOST: screenshot-db
+      DB_PORT: "3306"
+      DB_DATABASE: rustdesk_api_screenshots
+      DB_USERNAME: rustdesk_screenshots
+      DB_PASSWORD: rustdesk_screenshots
+      DB_SOCKET: ""
+      DB_URL: ""
+      ADMIN_USER: admin
+      ADMIN_PASS: "${SCREENSHOT_ADMIN_PASS:-PreviewOnly-8462-Local!}"
+      E2E_ADMIN_USER: admin
+      E2E_ADMIN_PASS: "${SCREENSHOT_ADMIN_PASS:-PreviewOnly-8462-Local!}"
+      CACHE_STORE: array
+      MAIL_MAILER: array
+      SESSION_DRIVER: database
+    depends_on:
+      screenshot-db:
+        condition: service_healthy
     command: ["sleep", "infinity"]
 
   db:
@@ -49,6 +154,63 @@ services:
       - "3306:3306"
     volumes:
       - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  test-db:
+    profiles: ["test"]
+    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+    environment:
+      MARIADB_ROOT_PASSWORD: rustdesk_test_root
+      MARIADB_DATABASE: rustdesk_api_testing
+      MARIADB_USER: rustdesk_test
+      MARIADB_PASSWORD: rustdesk_test
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  e2e-db:
+    profiles: ["e2e"]
+    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+    environment:
+      MARIADB_ROOT_PASSWORD: rustdesk_e2e_root
+      MARIADB_DATABASE: rustdesk_api_e2e
+      MARIADB_USER: rustdesk_e2e
+      MARIADB_PASSWORD: rustdesk_e2e
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  screenshot-db:
+    profiles: ["screenshots"]
+    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+    environment:
+      MARIADB_ROOT_PASSWORD: rustdesk_screenshots_root
+      MARIADB_DATABASE: rustdesk_api_screenshots
+      MARIADB_USER: rustdesk_screenshots
+      MARIADB_PASSWORD: rustdesk_screenshots
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
 
   # Mailpit: catch-all SMTP for testing the mail subsystem (UI on :8025, SMTP on :1025)
   mail:

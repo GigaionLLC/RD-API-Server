@@ -8,6 +8,22 @@
 > status and remaining roadmap, see **[04-gap-analysis.md](04-gap-analysis.md)** (top section).
 > This file is kept for history only.
 
+## Current database support (2026-07-14)
+
+The current PHP application supports **MariaDB with InnoDB only**. Runtime, development,
+PHPUnit, CI, browser tests, and screenshot fixtures use MariaDB; destructive fixtures have
+dedicated tmpfs-backed schemas and cannot reuse the persistent development database. Other
+database engines are rejected before migrations.
+
+This is a breaking deployment boundary. Existing MariaDB operators with an explicit
+`DB_CONNECTION=mysql` setting first back up and pass the read-only
+[InnoDB engine audit](../../Wiki/database/database-index.md#upgrade-boundary), then rename it to
+`DB_CONNECTION=mariadb` without moving or rewriting compliant InnoDB data.
+An installation using the retired SQLite path must complete the
+[manual SQLite-to-MariaDB migration boundary](../sqlite-to-mariadb.md) on the last compatible
+release before upgrading, or remain on that release. No automated converter is included. The
+parity tables below describe the historical Go-to-PHP rewrite and are intentionally unchanged.
+
 ## Current admin UI status (2026-07-13)
 
 The historical table below predates the completed full-surface WebUI modernization. The

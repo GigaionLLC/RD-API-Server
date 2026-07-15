@@ -29,6 +29,51 @@ digests, application dependency locks, and exact standalone tool versions remain
 can still receive Debian security updates. Never replace the pinned official Node image with a
 downloaded repository setup script or execute a remote response through a shell.
 
+## Supported database
+
+RD-API-Server supports **MariaDB with InnoDB only**. Runtime startup, PHPUnit, browser tests,
+CI, and screenshot capture reject other database drivers before migrations run. Use
+`DB_CONNECTION=mariadb`. Names inherited from the MariaDB ecosystem remain intentional:
+`pdo_mysql` is the required PHP extension, PDO uses a `mysql:` DSN, and the official MariaDB
+image stores data under `/var/lib/mysql`.
+
+The current `.env.example` comments out `DB_HOST`. This lets Laravel default direct host-side
+commands to `127.0.0.1`, while the bundled root and development Compose files default their
+application containers to the internal `db` service. Existing copied `.env` files that still set
+`DB_HOST=127.0.0.1` must remove that line or change it to `db` before using bundled Compose.
+For an external MariaDB deployment, `DB_HOST` and `DB_PORT` remain the normal overrides and must
+name an endpoint reachable from the application container. The root/development Compose files
+still define the bundled `db` service and make the app depend on it, even when its host is
+overridden. An external-only topology requires a custom Compose definition/override that removes
+or replaces both that service and the app's `depends_on` entry.
+
+Runtime connections also accept `DB_SOCKET` for a Unix socket mounted into the container,
+`DB_CONNECT_TIMEOUT` for an integer connection timeout from 1 to 10 seconds, and
+`MYSQL_ATTR_SSL_CA` for a readable, mounted CA certificate. Leave these empty/defaulted for the
+bundled TCP-connected `db` service. Runtime readiness and InnoDB checks use the same transport,
+timeout, and CA settings as Laravel.
+
+`DB_URL` is intentionally unsupported and rejected before migrations. Operators upgrading a
+URL-only MariaDB configuration must expand it into discrete `DB_HOST`, `DB_PORT`, `DB_DATABASE`,
+`DB_USERNAME`, and `DB_PASSWORD` values, validate them on the old release, and unset `DB_URL`
+before starting this release.
+
+The project Dockerfiles install no SQLite package, connection, fallback, test target, or data
+path, and runtime startup rejects the SQLite driver before migrations. The pinned official PHP
+base images may nevertheless expose inert `pdo_sqlite`/`sqlite3` modules compiled by upstream;
+their appearance in `php -m` does not make SQLite a supported or exercised application path.
+
+This is a breaking boundary. An existing MariaDB deployment with an explicit
+`DB_CONNECTION=mysql` override must be backed up and pass the read-only
+[InnoDB engine audit](../Wiki/database/database-index.md#upgrade-boundary) before that value is
+renamed to `mariadb`. The setting change does not move compliant InnoDB data; MyISAM, Aria, or
+other tables require DBA-reviewed conversion first. An existing SQLite deployment must be
+converted while it is still running the last compatible release, before the MariaDB-only image
+is started. This repository does not ship an automated converter. Back up its database, storage,
+and application key together, then follow the
+[manual SQLite-to-MariaDB migration boundary](../docs/sqlite-to-mariadb.md), or remain on the last
+compatible release.
+
 ## GitHub Actions
 
 Every third-party `uses:` entry under `.github/workflows/` is pinned to a full commit SHA, with
@@ -131,6 +176,9 @@ upgraded replica expects encrypted values.
    docker compose config --quiet
    docker compose -f docker-compose.dev.yml config --quiet
    docker compose -f docker/compose.toolchain.yml config --quiet
+   docker compose -f docker/compose.toolchain.yml --profile test config --quiet
+   docker compose -f docker/compose.toolchain.yml --profile e2e config --quiet
+   docker compose -f docker/compose.toolchain.yml --profile screenshots config --quiet
    docker compose -f examples/full-stack.docker-compose.yml config --quiet
    ```
 

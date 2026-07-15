@@ -10,14 +10,26 @@ manager; do not copy the angle-bracket placeholders literally.
 ```env
 ADMIN_PASS=<unique-admin-password-at-least-12-characters>
 DB_PASSWORD=<unique-database-password-used-by-the-app-and-MariaDB>
+DB_CONNECTION=mariadb
 ```
 
 ```bash
 docker compose up -d
 ```
 
-The bundled `docker-compose.yml` starts the app behind **MariaDB** (the recommended database —
-SQLite is single-writer and bottlenecks as devices scale). All data persists in Docker volumes.
+The bundled `docker-compose.yml` starts the app with **MariaDB/InnoDB**, the only supported
+database. Application and database data persist in separate Docker volumes.
+
+The current `.env.example` intentionally leaves `DB_HOST` commented. With no host override,
+Laravel uses `127.0.0.1` for direct host-side commands while the bundled root/development Compose
+files select their internal service name, `db`. If an older copied `.env` contains
+`DB_HOST=127.0.0.1`, remove that line or change it to `DB_HOST=db` before starting Compose;
+container loopback is the application container itself. Leave `DB_PORT=3306` for the bundled
+database. For an external MariaDB server, set the conventional `DB_HOST` and `DB_PORT` values to
+an endpoint reachable from inside the application container. This changes the app's destination
+but does not remove the bundled `db` service or the app's dependency on it. For a truly
+external-only deployment, maintain a custom Compose definition/override that removes or replaces
+both the `db` service and the app's `depends_on` entry.
 
 - **Admin console:** http://localhost:21114/admin
 - **Client API base:** http://localhost:21114/api
@@ -61,12 +73,52 @@ MAIL_PASSWORD=secret
 MAIL_FROM_ADDRESS=no-reply@example.com
 ```
 
-## 4. Small setups: SQLite instead of MariaDB
+## 4. Database support and upgrades
 
-MariaDB is the default and recommended for any real fleet. For a small deployment
-(roughly **< 50 devices**) or a quick trial you can drop the database container and use SQLite:
-set `DB_CONNECTION=sqlite`, then remove the `db` service, the `depends_on:` block, and the
-`rustdesk-db` volume from `docker-compose.yml`. Data then lives in the `rustdesk-data` volume.
+MariaDB with InnoDB is required. SQLite, Oracle MySQL, PostgreSQL, and SQL Server are not
+supported runtime or test targets. The application deliberately rejects any other configured
+driver before it runs migrations.
+
+TCP connections use `DB_HOST` and `DB_PORT`. Advanced runtime deployments may instead set
+`DB_SOCKET` to a Unix socket mounted into the application container, set `DB_CONNECT_TIMEOUT` to
+an integer from 1 to 10 seconds, or set `MYSQL_ATTR_SSL_CA` to a readable, mounted CA certificate.
+The bundled `db` service uses TCP and needs none of those advanced overrides.
+
+`DB_URL` is intentionally rejected, even when it names MariaDB. Before upgrading a URL-only
+deployment, expand it into `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`,
+verify those discrete values against the old release, and then unset `DB_URL`. Keep credentials in
+the deployment's secret store rather than logging the URL while converting it.
+
+If an existing MariaDB deployment has `DB_CONNECTION=mysql` in its `.env` or Compose override,
+first back it up and run both read-only checks below while connected to the application database:
+
+```sql
+SELECT VERSION() AS server_version,
+       @@default_storage_engine AS default_storage_engine;
+```
+
+`server_version` must contain `MariaDB` and `default_storage_engine` must be `InnoDB`. Then verify
+that every existing base table also uses InnoDB:
+
+```sql
+SELECT TABLE_NAME, ENGINE
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_TYPE = 'BASE TABLE'
+  AND COALESCE(UPPER(ENGINE), '') <> 'INNODB';
+```
+
+No rows from the table query, together with the required server identity and default engine, means
+the supported boundary is satisfied. You may then change the value to `DB_CONNECTION=mariadb`;
+this selects Laravel's MariaDB connection without moving or rewriting the existing InnoDB data.
+If any check fails or the table query returns MyISAM, Aria, or another engine, do not upgrade yet:
+keep the backup and have a MariaDB DBA review, convert, and validate the deployment first.
+
+An installation still using SQLite must be moved to MariaDB on the last SQLite-compatible
+release before this release is started. There is no automated converter in this project. Back
+up the database, storage, and application key first, then follow the
+**[manual SQLite-to-MariaDB migration boundary](docs/sqlite-to-mariadb.md)**. Otherwise, remain
+on the last compatible release.
 
 ## 5. Optional settings
 

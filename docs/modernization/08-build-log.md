@@ -2,6 +2,45 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-14 - MariaDB-only database boundary (verified)
+
+- Standardized runtime, development, PHPUnit, CI, browser, and screenshot paths on
+  MariaDB/InnoDB. `DB_CONNECTION=mariadb` is now the application contract; existing MariaDB
+  installations using the former `mysql` connection name change only that setting after a backup
+  and a clean read-only InnoDB table-engine audit.
+- Removed the SQLite runtime/test compatibility target. Unsupported drivers are rejected before
+  migrations instead of receiving a best-effort execution path.
+- Added a cached-configuration and live-connection boundary inside Laravel as well as the
+  container preflight. Stale unsupported connection definitions and database-backed cache,
+  queue, or session selectors fail closed. The first query and every reconnect verify the exact
+  schema, MariaDB server identity, InnoDB default, and InnoDB-only existing table set; recovery
+  commands remain usable so operators can clear an obsolete cache.
+- Isolated destructive verification from developer data: PHPUnit uses guarded service `test`
+  with tmpfs-backed `test-db` and exact database `rustdesk_api_testing`; the full local Playwright
+  matrix uses `e2e`, tmpfs-backed `e2e-db`, and `rustdesk_api_e2e`; screenshot capture uses
+  `screenshots`, tmpfs-backed `screenshot-db`, and `rustdesk_api_screenshots`. Browser runners
+  reject any other target before installing missing locked dependencies.
+- Left `DB_HOST` unset in the example environment so bundled Compose selects its internal `db`
+  service while preserving conventional `DB_HOST` / `DB_PORT` overrides for external MariaDB.
+  Runtime TCP, mounted Unix-socket, connection-timeout, and CA-certificate settings share the
+  same readiness and migration checks. URL-only database configuration is rejected in favor of
+  explicit fields; external-only Compose topologies must replace the bundled `db` service and app
+  dependency as well as selecting the external host.
+- Required pre-upgrade audits to prove the live server is MariaDB, its default engine is InnoDB,
+  and every existing base table uses InnoDB before the connection-name boundary is crossed.
+- Documented the breaking boundary for existing SQLite installations. Conversion must be
+  completed manually on the last compatible release before upgrading; the project does not ship
+  an automated converter.
+- **Verified in Docker:** runtime and toolchain images built; a fresh production-style runtime
+  booted on MariaDB 11.8.8 with InnoDB and served `/api/version`; stale-cache recovery before key
+  generation passed; and unsupported connection names, `DB_URL`, invalid timeout values, and a
+  native Artisan target containing a MyISAM table all failed closed. PHPUnit passed 466 tests /
+  2,464 assertions; Pint passed 262 files; PHPStan passed 172 files with no errors; Composer and
+  production npm audits reported no advisories; JavaScript lint, 20-file vendor integrity, Blade
+  compilation, shell syntax, and all Compose renders passed. The Playwright matrix passed 68
+  tests with 12 intentional screenshot-mode skips, and the isolated screenshot workflow passed
+  its desktop-dark capture test against 14 devices, 5 users, and 63 connection records.
+
 ## 2026-07-14 - Generic OIDC outbound boundary (verified)
 
 - Added an OIDC-specific destination guard for issuer discovery and discovered authorization,

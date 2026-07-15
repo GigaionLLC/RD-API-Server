@@ -1,12 +1,16 @@
 # 06 · Reference Implementations — Other Open‑Source API Servers
 
-There is more than one open‑source RustDesk API server. Studying them saves us work: some
-have **already implemented features we list as gaps**. This doc compares them and says
-exactly what to borrow.
+> **Historical comparison:** this document records the external projects and retired Go baseline
+> studied while planning the now-completed PHP rewrite. “Gap,” “current,” and multi-database labels
+> below are frozen research observations, not present-day repository status. The active project is
+> Laravel + Blade/jQuery and supports MariaDB/InnoDB only.
+
+There is more than one open‑source RustDesk API server. Studying them saved implementation work:
+some had already implemented features that were gaps in the retired baseline.
 
 | Project | Path analyzed | Stack | Frontend | Client target | Posture |
 |---------|---------------|-------|----------|---------------|---------|
-| **lejianwen/rustdesk-api** (this repo) | `D:\git\rustdesk-api` | Go · **Gin** · **GORM** · SQLite/MySQL/PostgreSQL | `rustdesk-api-web` (Vue) | ~1.4.2 | **Broad** feature set, mature auth |
+| **lejianwen/rustdesk-api** (retired baseline) | External Go checkout used during research | Go · **Gin** · **GORM** · SQLite/MySQL/PostgreSQL | `rustdesk-api-web` (Vue) | ~1.4.2 | **Broad** feature set, mature auth |
 | **lantongxue/rustdesk-api-server-pro** | `D:\git\rustdesk-api-server-pro` | Go · **Iris MVC** · **XORM** · SQLite/MySQL | **soybean‑admin** (Vue3) | **1.4.6** | **Narrow but modern**, well‑tested |
 
 > Despite the `-pro` name, lantongxue's project is MIT‑licensed and open source (not the
@@ -15,15 +19,15 @@ exactly what to borrow.
 
 ## TL;DR strategic read
 
-lantongxue's server is a cleaner, newer‑client, better‑tested codebase that has **already
-built four things on our gap list** — SMTP/mail, 2FA + email codes, session management, and
-version‑capability gating — but it **lacks the breadth** this repo already has (OIDC, LDAP,
-groups, device groups, address‑book sharing rules, server commands, guest sharing). So:
+At planning time, lantongxue's server was a cleaner, newer‑client, better‑tested codebase that had
+already built four things on the gap list — SMTP/mail, 2FA + email codes, session management, and
+version‑capability gating — but it lacked the breadth of the retired baseline (OIDC, LDAP, groups,
+device groups, address‑book sharing rules, server commands, guest sharing). The conclusion was:
 
 - **Borrow its designs** for Mail, 2FA, AuthToken, and version‑capability (below).
-- **Keep this repo's breadth** (OIDC/LDAP/groups/sharing/server‑cmd) — don't regress it.
-- Neither implements the real **Strategy settings‑push** or **preset auto‑registration** —
-  those remain greenfield for us (gaps #1 and #6 in [04](04-gap-analysis.md)).
+- **Preserve the baseline breadth** (OIDC/LDAP/groups/sharing/server‑cmd) during the rewrite.
+- Neither implemented real **Strategy settings‑push** or **preset auto‑registration** at the
+  time; those were greenfield items (gaps #1 and #6 in [04](04-gap-analysis.md)).
 
 ---
 
@@ -86,16 +90,16 @@ groups, device groups, address‑book sharing rules, server commands, guest shar
 - **Go tests + a compatibility matrix** (`backend/test/compatibility`,
   `test/api/*_test.go`) and **Playwright E2E** (`soybean-admin/tests/e2e`) covering
   login/devices/users/audit. CI wires optional full‑stack E2E.
-- **soybean‑admin** Vue3 dashboard (statistics panel, i18n) — more modern than the current
+- **soybean‑admin** Vue3 dashboard (statistics panel, i18n) — more modern than the then-current
   `rustdesk-api-web`; worth evaluating for our admin UX refresh.
 - **Single‑binary** deploy (plan to embed the built `dist/` via `embed.FS`); Cobra CLI with
   `sync` (migrate), `user add … --admin`, `start`, and a `rustdesk` command group.
 
 ---
 
-## What it does NOT have (where this repo stays ahead)
+## What it did not have (historical baseline comparison)
 
-| Capability | lejianwen (this repo) | lantongxue |
+| Capability | Retired lejianwen Go baseline | lantongxue |
 |------------|:---------------------:|:----------:|
 | OIDC / OAuth providers | ✅ GitHub/Google/OIDC/Linux.do/WebAuth | ❌ `login-options` stubbed (returns empty) |
 | LDAP / AD | ✅ | ❌ |
@@ -108,14 +112,16 @@ groups, device groups, address‑book sharing rules, server commands, guest shar
 | Real Strategy settings‑push | ❌ | ❌ (capability flags only) |
 | Preset auto‑registration (`OPTION_PRESET_*`) | ❌ | ❌ |
 
+The multi-database row records the compared Go projects only. It does not imply current SQLite,
+Oracle MySQL, or PostgreSQL support in this Laravel repository.
+
 ---
 
 ## Net recommendation
 
-Treat lantongxue's repo as the **canonical reference** for implementing our **Mail (2.1)**,
+The planning-time recommendation was to treat lantongxue's repo as the **canonical reference** for implementing **Mail (2.1)**,
 **2FA/email‑verify (1.4/2.2)**, **AuthToken hygiene (Phase 0)**, and **version‑capability
-gating** work — its code is small, current to client 1.4.6, and tested. Keep building the
-**breadth + Strategy + presets + access‑control** features that neither open‑source server
-has, which is where a "better RustDesk API" is genuinely differentiated. Cross‑references:
+gating** work. Those recommendations are retained as design provenance; verify the current PHP
+implementation before using any referenced external code. Cross‑references:
 [04-gap-analysis.md](04-gap-analysis.md) for priorities,
 [05-roadmap-and-implementation.md](05-roadmap-and-implementation.md) for where each plugs in.

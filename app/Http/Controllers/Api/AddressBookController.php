@@ -476,7 +476,6 @@ class AddressBookController extends Controller
             'hostname' => 'hostname',
             'platform' => 'platform',
             'alias' => 'alias',
-            'forceAlwaysRelay' => 'force_always_relay',
             'rdpPort' => 'rdp_port',
             'rdpUsername' => 'rdp_username',
             'loginName' => 'login_name',
@@ -489,6 +488,16 @@ class AddressBookController extends Controller
             if (array_key_exists($in, $data)) {
                 $mapped[$col] = $data[$in];
             }
+        }
+
+        // RustDesk sends this boolean as the literal strings "true" and "false". Normalize
+        // it before persistence because MariaDB's strict mode rejects those strings for a
+        // TINYINT column (the response remains string-shaped for wire compatibility).
+        if (array_key_exists('forceAlwaysRelay', $data)) {
+            $mapped['force_always_relay'] = filter_var(
+                $data['forceAlwaysRelay'],
+                FILTER_VALIDATE_BOOL,
+            );
         }
 
         if (array_key_exists('tags', $data)) {

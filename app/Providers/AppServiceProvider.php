@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\MariaDbConnectionBoundary;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        MariaDbConnectionBoundary::enforce($this->app);
+        MariaDbConnectionBoundary::registerLiveGuard($this->app);
         $this->configureRateLimiting();
     }
 

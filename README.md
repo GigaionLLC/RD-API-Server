@@ -78,19 +78,31 @@ A quick look at the dark admin console — full set in the
 
 ## 🚀 Quick start (production · Docker + MariaDB)
 
-The bundled **[`docker-compose.yml`](docker-compose.yml)** runs the published image behind
-**MariaDB** — the recommended setup. Copy it (or the example below), then create a local `.env`
-file with a unique admin password (at least 12 characters), your DB password, and RustDesk
-endpoints. There is no production admin-password default.
+The bundled **[`docker-compose.yml`](docker-compose.yml)** runs the published image with
+**MariaDB/InnoDB**, the only supported database. Copy it (or the example below), then create a
+local `.env` file with a unique admin password (at least 12 characters), your DB password, and
+RustDesk endpoints. There is no production admin-password default.
 
 ```env
 ADMIN_PASS=<unique-admin-password-from-your-password-manager>
 DB_PASSWORD=<unique-database-password>
+DB_CONNECTION=mariadb
 RUSTDESK_ID_SERVER=id.your-domain.com:21116
 RUSTDESK_RELAY_SERVER=relay.your-domain.com:21117
 RUSTDESK_API_SERVER=https://api.your-domain.com
 RUSTDESK_KEY=<contents of id_ed25519.pub>
 ```
+
+Leave `DB_HOST` unset for the bundled stack: Compose then uses its internal `db` service. The
+current `.env.example` comments this setting deliberately. If an existing `.env` copied from an
+older release contains `DB_HOST=127.0.0.1`, remove it or change it to `db` before starting the
+bundled Compose stack; loopback inside the application container points back to that container,
+not MariaDB. `DB_HOST` and `DB_PORT` remain the supported overrides for an external MariaDB
+endpoint that is reachable from the application container. Those overrides only redirect the
+application: the bundled root/development Compose definitions still include a `db` service and
+make the app depend on it. A truly external-only topology therefore needs a reviewed custom
+Compose definition/override that removes or replaces both the bundled `db` service and the app's
+`depends_on` entry.
 
 Then start the stack:
 
@@ -120,7 +132,7 @@ services:
       TRUSTED_PROXIES: CHANGE_ME_proxy_ip_or_cidr  # omit when clients connect directly
       ADMIN_USER: admin
       ADMIN_PASS: "${ADMIN_PASS:-}"          # required only while creating the first admin
-      DB_CONNECTION: mysql
+      DB_CONNECTION: mariadb
       DB_HOST: db
       DB_DATABASE: rustdesk_api
       DB_USERNAME: rustdesk
@@ -171,15 +183,23 @@ wildcard, and do not expose the application port through a path that bypasses th
 its header. See **[QUICKSTART.md](QUICKSTART.md)** for all configuration (endpoints, SMTP,
 retention, metrics, updates).
 
-> **Database:** MariaDB is the default because SQLite is single‑writer — heartbeats, sysinfo,
-> and audit writes serialize on one lock, so it bottlenecks as devices scale. Use MariaDB for
-> any real fleet. For a small setup (roughly **< 50 devices**) or a quick trial, set
-> `DB_CONNECTION=sqlite` and drop the `db` service (see the note in `docker-compose.yml`).
+> **Breaking database boundary:** MariaDB with InnoDB is the only supported database. The
+> runtime and all verification paths reject other drivers. Existing MariaDB deployments that
+> explicitly set `DB_CONNECTION=mysql` must first back up and confirm every application table is
+> InnoDB, then change it to `DB_CONNECTION=mariadb`; this renames the Laravel connection only and
+> does not move or rewrite compliant InnoDB data. See the read-only engine audit in the
+> **[quick start](QUICKSTART.md#4-database-support-and-upgrades)**. Existing SQLite
+> deployments must complete a manual migration before upgrading or remain on the last compatible
+> release. The project does not provide an automated converter; follow the
+> **[SQLite-to-MariaDB migration boundary](docs/sqlite-to-mariadb.md)**.
+> `DB_URL` is also rejected: expand any URL-only MariaDB configuration into the discrete
+> `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` settings before upgrading,
+> then unset `DB_URL`.
 
 ## 🧱 Stack
 
 PHP 8.5 · Laravel 13 · Blade + jQuery + Bootstrap 5 (no SPA framework) · Eloquent ·
-**MySQL/MariaDB** (SQLite optional) · Apache (runtime image) · Mailpit (dev SMTP) · Playwright (E2E).
+**MariaDB/InnoDB** · Apache (runtime image) · Mailpit (dev SMTP) · Playwright (E2E).
 
 ## 🛠️ Development
 
@@ -191,6 +211,8 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 
 - **[QUICKSTART.md](QUICKSTART.md)** — deployment & configuration
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — build, test, lint, contribute
+- **[docs/sqlite-to-mariadb.md](docs/sqlite-to-mariadb.md)** — breaking upgrade boundary for
+  installations created with the retired SQLite path
 - **[docker/README.md](docker/README.md)** — pinned container inputs and their update process
 - **[AGENT.md](AGENT.md)** — the project's source‑of‑truth guide (architecture, conventions,
   task lookup); `CLAUDE.md` points here

@@ -37,7 +37,7 @@ rustdesk-api/                     (repo root becomes the Laravel app at parity)
 **Stack:** Laravel 13 (PHP 8.5) · Eloquent + migrations · Blade + jQuery 3 + Bootstrap 5 ·
 ApexCharts (charts) · Remix/Tabler icons (open‑source icon set) · Laravel Mail (SMTP) ·
 `pragmarx/google2fa` or `spomky-labs/otphp` (TOTP) · Sanctum‑style bearer tokens for the
-client API. Dev DB MariaDB (compose) and SQLite (lightweight local), both via migrations.
+client API. MariaDB with InnoDB is the sole runtime, development, and verification database.
 
 **Why Laravel:** routing, Eloquent, migrations, validation, Mail, queue/scheduler (the
 device‑offline job), Blade, and auth are batteries‑included — maximum leverage to reach
@@ -53,21 +53,26 @@ form‑row with inline save), and a small `app.js` (jQuery) for AJAX save + toas
 
 ## 3. Build / test environment (Docker)
 
-- `docker/Dockerfile.toolchain` — PHP 8.5 + ext (pdo_mysql, pdo_sqlite, intl, gmp, bcmath,
-  zip, gd, sockets, opcache) + Composer + Node 24 LTS + Playwright (Chromium) + mysql/sqlite
-  clients. Used for composer/artisan/phpunit/pint/phpstan/eslint and E2E.
-- `docker/compose.toolchain.yml` — `app` (toolchain) + `db` (MariaDB 11) + `mail` (Mailpit, SMTP
-  on 1025 / UI on 8025 to verify the mail subsystem). Kept separate from the legacy Go
-  `docker-compose.yaml`.
+- `docker/Dockerfile.toolchain` — PHP 8.5 + `pdo_mysql`, intl, gmp, bcmath, zip, gd, sockets,
+  and opcache + Composer + Node 24 LTS + Playwright (Chromium) + a MariaDB client. Used for
+  composer/artisan/phpunit/pint/phpstan/eslint and E2E.
+- `docker/compose.toolchain.yml` — `app` + persistent development `db` + `mail` (Mailpit), with
+  profile-gated `test`/`test-db`, `e2e`/`e2e-db`, and `screenshots`/`screenshot-db` pairs.
+  Verification databases use tmpfs and exact guarded names so they cannot refresh the
+  development schema. Browser and screenshot runners reject any other target before installing
+  missing dependencies from the locked Composer/npm inputs.
 - `docker/Dockerfile` (later) — slim multi‑stage **runtime** image (php‑fpm/nginx or
   FrankenPHP) serving the API + admin from a single container.
 
 **Quality gates (run in the toolchain image):**
 - `composer pint` (Laravel Pint) — PHP style.
 - `composer phpstan` (Larastan) — static analysis.
-- `php artisan test` (PHPUnit) — unit/feature.
+- `docker compose -f docker/compose.toolchain.yml --profile test run --rm test php artisan test`
+  (PHPUnit) — unit/feature on the isolated `rustdesk_api_testing` MariaDB database.
 - `npx eslint public/assets/js` — JS lint.
-- `npx playwright test` — full‑stack E2E against the dev stack.
+- `docker compose -f docker/compose.toolchain.yml --profile e2e run --rm e2e bash docker/e2e.sh`
+  — full‑stack E2E against the guarded, tmpfs-backed `rustdesk_api_e2e` MariaDB application; CI
+  uses a job-scoped database with the same name rather than the development schema.
 
 ## 4. Feature scope (from the gap analysis + reference repos)
 
@@ -105,6 +110,8 @@ main thread. Agents return diffs/changes for review, not silent commits.
   the user signs off on retiring it. Track parity in [09-port-status.md](09-port-status.md).
 - Preserve JSON keys, API paths, and DB column names the **client** depends on (English
   rename applies to PHP identifiers, not the wire contract the client speaks).
+- MariaDB/InnoDB is the only supported database. Runtime and destructive test paths reject other
+  engines before migrations, and fixtures never reuse the persistent development database.
 - Keep `docs/modernization/*` as the living spec.
 
 ## 7. Definition of done (per slice)

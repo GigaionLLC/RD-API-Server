@@ -4,12 +4,19 @@
 > features the RustDesk client already speaks and that **RustDesk Server Pro** offers —
 > using only what an open‑source API server can legitimately provide.
 
+> **Historical research set:** the modernization succeeded. The repository is now a single-stack
+> PHP 8.5 / Laravel 13 application with a Blade + jQuery admin console and MariaDB/InnoDB as its
+> only database. The Go/Gin/GORM application, Vue frontend, multi-database claims, and “missing”
+> feature labels below describe the retired pre-rewrite baseline; they are not current support or
+> implementation statements. Start with [AGENT.md](../../AGENT.md) and the
+> [current architecture index](../../Wiki/core/00-system-index.md) for active work.
+
 This folder is the working knowledge base for that effort. It was produced from a deep
 dive across three repositories plus the official Pro documentation:
 
 | Source | What we mined it for |
 |--------|----------------------|
-| `rustdesk-api` (this repo) | Current routes, models, services, auth, config — the baseline. |
+| Retired Go `rustdesk-api` baseline | Routes, models, services, auth, and config before the PHP rewrite. |
 | `rustdesk` (the client, Rust) | The **HTTP contract** the client actually speaks — the real spec we must satisfy. |
 | `rustdesk-server-pro` (install scripts) | How Pro is deployed (`hbbs`/`hbbr`, ports, license). The server itself is closed‑source. |
 | `rustdesk-api-server-pro` (lantongxue, MIT) | A second open‑source API server — reference implementation; already solves several of our gaps (see doc 06). |
@@ -18,7 +25,7 @@ dive across three repositories plus the official Pro documentation:
 ## Documents in this set
 
 1. **[01-architecture-and-current-state.md](01-architecture-and-current-state.md)** —
-   What `rustdesk-api` is today: architecture, every route, the data model, auth, config.
+   Frozen architecture inventory of the retired Go baseline used to plan the rewrite.
 2. **[02-client-api-contract.md](02-client-api-contract.md)** —
    The endpoints/JSON the **client** expects. This is the implementation spec; build to it.
 3. **[03-pro-feature-catalog.md](03-pro-feature-catalog.md)** —
@@ -28,21 +35,22 @@ dive across three repositories plus the official Pro documentation:
 5. **[05-roadmap-and-implementation.md](05-roadmap-and-implementation.md)** —
    Prioritized roadmap with concrete implementation notes mapped to this repo's files.
 6. **[06-reference-implementations.md](06-reference-implementations.md)** —
-   Other open‑source RustDesk API servers (esp. `lantongxue/rustdesk-api-server-pro`) and
-   exactly what to borrow — several of our gaps are already solved there.
+   Historical comparison with other open‑source RustDesk API servers and the design ideas
+   evaluated during the rewrite.
 
-## Executive summary
+## Historical executive summary (pre-rewrite)
 
-`rustdesk-api` is already a strong, multi‑DB (SQLite/MySQL/PostgreSQL), Gin/GORM
+At the time of the original research, `rustdesk-api` was a strong, multi‑DB
+(SQLite/MySQL/PostgreSQL), Gin/GORM
 re‑implementation of the RustDesk API server. It covers **login (password / OAuth /
 OIDC / LDAP), personal & shared address books, tags, groups, device groups, peer/device
 listing, connection & file audit logs, login logs, guest web‑client sharing, server
 commands to hbbs/hbbr, a web admin, and a web client.**
 
-The biggest opportunities — features the **client already supports** but the server does
-**not** implement — are:
+The biggest opportunities recorded then — features the **client already supported** but the
+retired Go baseline did **not** implement — were:
 
-| # | Capability | Status today | Why it matters |
+| # | Capability | Status in retired Go baseline | Why it matters |
 |---|------------|--------------|----------------|
 | 1 | **Strategy / Settings sync** (push client config via heartbeat) | ❌ absent | The single highest‑value Pro feature. Client is ready; server just never replies with `strategy`. |
 | 2 | **2FA (TOTP) + email login verification** | ❌ absent | Client sends/expects `tfa_type`, `secret`, `email_check`, device whitelist. |
@@ -60,8 +68,10 @@ See **[04-gap-analysis.md](04-gap-analysis.md)** for the full table and
 
 ## How to use this set
 
-- Implementing a feature? Start in **02** (what the client expects) → **04** (the gap) →
-  **05** (where it plugs into this repo).
-- Planning? Read this page + **04** + **05**.
+- Implementing client-facing behavior? Use **02** for the wire contract, then verify current
+  status and PHP locations through [AGENT.md](../../AGENT.md); do not follow old Go paths as an
+  implementation guide.
+- Planning? Treat **04–06** as historical design research and confirm every gap against the
+  [current port status](09-port-status.md) and architecture knowledge base first.
 - The line references in these docs (e.g. `http/controller/api/index.go:41`) were accurate
-  at the time of writing; verify before editing — the code moves.
+  in the retired Go checkout at the time of writing; those files are no longer in this repository.

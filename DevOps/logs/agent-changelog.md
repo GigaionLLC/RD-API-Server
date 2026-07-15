@@ -3,6 +3,42 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 23:10] - Build: require MariaDB
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.env.example`, `config/database.php`, `config/queue.php`, `composer.json`, `composer.lock`
+- `app/Support/MariaDbConnectionBoundary.php`, `app/Providers/AppServiceProvider.php`
+- `app/Http/Controllers/Api/AddressBookController.php`
+- `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `docker/Dockerfile.runtime`, `docker/Dockerfile.toolchain`, `docker/entrypoint.sh`
+- `docker/compose.toolchain.yml`, `docker/e2e.sh`, `docker/demo-shots.sh`
+- `.github/workflows/ci.yml`, `phpunit.xml`, `tests/TestCase.php`
+- `tests/Feature/ApiResponseTest.php`, `tests/Feature/EmailLoginChallengeSecurityTest.php`
+- `tests/Feature/EmailLoginChallengeMigrationTest.php`, `tests/Feature/MariaDbConnectionBoundaryTest.php`
+- `README.md`, `QUICKSTART.md`, `AGENT.md`, `CLAUDE.md`, `docker/README.md`
+- `docs/DEVELOPMENT.md`, `docs/sqlite-to-mariadb.md`, `docs/screenshots/README.md`
+- `Wiki/core/08-core-architecture.md`, `Wiki/database/database-index.md`
+- `docs/modernization/01-architecture-and-current-state.md`
+- `docs/modernization/06-reference-implementations.md`, `docs/modernization/07-rewrite-plan-php.md`
+- `docs/modernization/08-build-log.md`, `docs/modernization/09-port-status.md`
+- `docs/modernization/README.md`, `DevOps/archive-plans/mariadb-only-support.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** MariaDB with InnoDB is now the sole runtime and test database contract.
+Existing MariaDB deployments rename `DB_CONNECTION=mysql` to `mariadb` only after the documented
+server/default-engine/table-engine audit; existing SQLite deployments must migrate manually on
+the last compatible release before upgrading. `DB_URL` and every other driver are rejected. No
+schema or RustDesk wire-key/path change was introduced; `forceAlwaysRelay` still returns its
+required string shape after strict MariaDB boolean normalization.
+**Summary:** Removed the SQLite runtime/test target, packages, fallback configuration, and active
+support guidance. Added fail-closed cached-configuration and live first-query/reconnect guards for
+the exact schema, MariaDB identity, InnoDB default, and InnoDB-only table set. Isolated PHPUnit,
+E2E, and screenshot resets behind exact tmpfs-backed MariaDB schemas, mirrored those boundaries in
+CI, hardened container readiness/TLS/socket/runtime-user checks, and documented the breaking
+upgrade boundary. Verified 466 PHPUnit tests / 2,464 assertions, Pint across 262 files, PHPStan
+across 172 files, clean Composer/npm audits, JavaScript/vendor/Blade/shell/Compose checks, runtime
+image boot and negative boundaries, 68 Playwright passes / 12 intentional skips, and one dedicated
+screenshot capture pass. The work is an independent local commit on `main` and was not pushed.
+
 ## [2026-07-14 22:04] - Web: close responsive browser QA gaps
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

@@ -1,9 +1,13 @@
-# 01 · Architecture & Current State of `rustdesk-api`
+# 01 · Historical Architecture Snapshot — Retired Go Server
 
-A precise inventory of what this server is **today**. This is the baseline every gap and
-roadmap item is measured against.
+This is a frozen inventory of the Go/Gin/GORM server that existed before the completed PHP
+rewrite. Its Go paths, Vue frontend, and SQLite/MySQL/PostgreSQL support describe only that
+retired baseline; they are not present-day repository or database-support statements. The current
+application is PHP 8.5 / Laravel 13 with Blade + jQuery and MariaDB/InnoDB only. See
+[AGENT.md](../../AGENT.md) and the [current architecture index](../../Wiki/core/00-system-index.md)
+before changing code.
 
-## 1. Stack
+## 1. Historical stack
 
 - **Language/runtime:** Go 1.22
 - **HTTP:** Gin v1.9
@@ -113,7 +117,7 @@ show-swagger, token-expire, web-sso, disable-pwd-login), `admin`
 ## 6. The two handlers that matter most for the gap
 
 ### `Heartbeat` — `http/controller/api/index.go:41`
-Today it **only** updates `last_online_time`/`last_online_ip` (throttled to 30s) and
+In this snapshot it **only** updated `last_online_time`/`last_online_ip` (throttled to 30s) and
 returns `{}`. It does **not** read `conns`, and never returns `disconnect`, `modified_at`,
 `sysinfo`, or **`strategy`**. This is the exact spot where Settings‑sync, force‑disconnect,
 and live‑session tracking must be added — the client is already sending and awaiting them

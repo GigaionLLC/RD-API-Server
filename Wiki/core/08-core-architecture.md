@@ -9,12 +9,21 @@ description: "Documents the 'why' behind critical technical decisions."
 # 🧠 Core Architecture
 
 ## 🔄 Data Lifecycle
-*Trace how data flows from user action to backend sync.*
+
+HTTP and scheduled work flow through Laravel services and Eloquent into one MariaDB/InnoDB data
+layer. The supported connection and isolated development, test, and screenshot schemas are
+defined in the [Database Index](../database/database-index.md). Client-facing routes and JSON
+remain independent of physical schema refactors.
 
 ## ⚙️ Core Engines & Algorithms
 *Detailed breakdowns of key processes, state updates, or engines.*
 
 ## 🛡️ Guardrails & Safety
-- **Idempotency:** *How duplicate triggers are prevented.*
-- **Optimistic Updates:** *How UI behaves when requests are pending.*
-- **Soft Deletes:** *Data disposal rules.*
+- **Database fail-closed:** Runtime and destructive test paths validate MariaDB plus their exact
+  allowed database name before migrations. Unsupported engines never receive a best-effort run.
+- **Isolation:** PHPUnit and screenshot fixtures use separate tmpfs-backed MariaDB services;
+  neither may inherit or refresh the persistent development schema.
+- **Transactions:** One-time challenges, recovery-code consumption, and similar concurrency
+  boundaries use InnoDB row locks and transactions rather than process-local assumptions.
+- **Wire stability:** Database changes never rename the RustDesk client's fixed API paths or JSON
+  keys.
