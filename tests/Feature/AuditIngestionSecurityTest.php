@@ -216,5 +216,4 @@ class AuditIngestionSecurityTest extends TestCase
         $this->assertSame('scoped', $rowA->refresh()->note);
         $this->assertNull($rowB->refresh()->note);
     }
-
 }
