@@ -3,6 +3,15 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-14 22:04] - Web: close responsive browser QA gaps
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `resources/views/admin/partials/navbar.blade.php`
+- `e2e/gui.spec.ts`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Named the account menu independently of its responsive label, made the bulk-action focus assertion target the exact launcher, and replaced a timing-sensitive live-save response delay with an explicit test gate. The fixes preserve production behavior while making mobile accessibility and asynchronous form-state coverage deterministic.
+
 ## [2026-07-14 21:39] - Style: normalize audit-ingestion test layout
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

@@ -19,7 +19,8 @@
 
     <div class="dropdown">
         <button class="rd-btn rd-btn--ghost dropdown-toggle" type="button"
-                data-bs-toggle="dropdown" aria-expanded="false">
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-label="Account menu for {{ auth()->user()?->username ?? 'admin' }}">
             <i class="ri-account-circle-line" aria-hidden="true"></i>
             <span class="rd-user-label">{{ auth()->user()?->username ?? 'admin' }}</span>
         </button>

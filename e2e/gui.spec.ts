@@ -114,7 +114,7 @@ test('devices list reveals the bulk assignment workflow after selection', async 
     await expect(page.locator('#bulkCount')).toContainText('selected');
     await expect(page.locator('#bulkForm select[name="field"]')).toBeVisible();
 
-    const apply = page.getByRole('button', { name: 'Apply' });
+    const apply = page.getByRole('button', { name: 'Apply', exact: true });
     await apply.click();
     await expect(page.getByRole('dialog', { name: 'Apply bulk device change' })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -287,8 +287,13 @@ test('implicit form submission still requires the shared confirmation dialog', a
 });
 
 test('live forms retain their label and newer edits made while saving', async ({ page }) => {
+    let releaseSaveResponse = () => {};
+    const saveResponseGate = new Promise<void>((resolve) => {
+        releaseSaveResponse = resolve;
+    });
+
     await page.route('**/admin/settings/smtp', async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 350));
+        await saveResponseGate;
         await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
@@ -297,14 +302,16 @@ test('live forms retain their label and newer edits made while saving', async ({
     await uiReady(page);
 
     const form = page.locator('form[data-url$="/admin/settings/smtp"]');
-    const save = form.getByRole('button', { name: 'Save SMTP' });
+    const save = form.locator('button.rd-btn--save');
+    await expect(save).toHaveText('Save SMTP');
     await form.locator('#host').fill('smtp-before-save.example');
     await expect(save).toHaveAttribute('data-state', 'dirty');
 
     const response = page.waitForResponse((candidate) => candidate.url().endsWith('/admin/settings/smtp'));
-    await save.click();
+    await save.click({ noWaitAfter: true });
     await expect(save).toHaveAttribute('data-state', 'saving');
     await form.locator('#username').fill('edited-during-save');
+    releaseSaveResponse();
     await response;
 
     await expect(save).toHaveAttribute('data-state', 'dirty');
