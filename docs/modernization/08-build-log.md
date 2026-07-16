@@ -2,6 +2,26 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - WebUI review and security hardening complete (verified)
+
+- Completed the post-redesign functional, responsive, accessibility, authorization, hostile-input,
+  secret-handling, outbound-request, dependency, and release-integrity review. The remediation
+  preserves the server-rendered Blade + jQuery + Bootstrap architecture and the warm-mineral
+  dark/light design system.
+- Closed the reviewed privilege, XSS, command/PIN, webhook, destructive-permission, TOTP,
+  recovery-code, email-verification, and supply-chain boundaries in independently revertible
+  commits. No RustDesk client route, JSON key, or response shape changed.
+- Browser QA also exposed identity races in address-book setup. A nullable personal marker plus a
+  one-per-owner unique index now supplies durable personal-book identity, and a separate unique
+  `(address_book_id, rustdesk_id)` index supplies durable per-book peer identity. Late-collision
+  tests cover each established response mapping; they do not claim multi-transaction quota
+  coverage, and the separate `max_peers` check remains outside this invariant.
+- **Verified in Docker:** PHPUnit passed 532 tests / 3,018 assertions; Pint passed 275 files;
+  PHPStan reported no errors; and the 80-case Playwright matrix passed 68 tests with 12 intentional
+  screenshot-mode skips across desktop dark/light, tablet dark, and mobile dark. ESLint, the
+  20-file checked-in vendor integrity check, Blade compilation, all four Compose renders, strict
+  Composer validation, Composer audit, and npm audit also passed with no advisories.
+
 ## 2026-07-15 - Per-book peer identity invariant (verified)
 
 - Added a named MariaDB unique index on `(address_book_id, rustdesk_id)`. Its read-only preflight

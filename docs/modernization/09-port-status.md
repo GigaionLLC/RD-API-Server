@@ -51,7 +51,18 @@ named MariaDB CHECK. The migration aborts before DDL and reports affected accoun
 silently changing configured second-factor intent to password-only. Operators explicitly repair
 the address or policy before retrying with legacy writers quiesced.
 
-## Current admin UI status (2026-07-13)
+## Current address-book integrity status (2026-07-15)
+
+Personal address books now have an explicit nullable marker backed by a one-per-owner MariaDB
+unique index. Migration backfill preserves ordinary same-named books and dependent data, while
+read-only preflights reject ambiguous or incompatible historical state before DDL. A separate
+unique index on `(address_book_id, rustdesk_id)` prevents duplicate peer identity within one book;
+its preflight reports historical duplicate pairs instead of silently choosing between their
+credentials or metadata. Existing RustDesk routes, keys, status codes, and response shapes are
+unchanged. These constraints protect identity only; the separate `max_peers` quota check is not
+claimed as concurrency-durable.
+
+## Current admin UI status (2026-07-15)
 
 The historical table below predates the completed full-surface WebUI modernization. The
 current admin console is a server-rendered Blade + jQuery + Bootstrap 5 application with a
@@ -59,8 +70,10 @@ warm-mineral dark/light theme, locally vendored frontend assets, a responsive gr
 navigation shell, and shared accessible confirmation, toast, combobox, and chart behavior.
 Playwright now covers desktop dark, desktop light, tablet dark, and mobile dark projects, with
 axe scans for login and representative authenticated pages. This visual refresh does not
-change the database, client API, or RustDesk wire contract. Its final full Docker and
-four-project browser gates are still in progress at the time of this documentation sync.
+change the client API or RustDesk wire contract. The final Docker gates passed 532 PHPUnit tests /
+3,018 assertions, Pint across 275 files, PHPStan with no errors, JavaScript/vendor/Blade/Compose
+checks, and dependency audits with no advisories. The 80-case four-project Playwright matrix
+passed 68 tests with 12 intentional screenshot-mode skips.
 
 Tracks parity of the PHP rewrite against the legacy Go implementation and the client
 contract. Status: ⬜ not started · 🟦 in progress · ✅ done+verified.

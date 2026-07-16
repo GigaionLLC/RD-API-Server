@@ -3,6 +3,24 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 20:45] - Complete WebUI review remediation and security hardening
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `DevOps/archive-plans/webui-security-hardening.md`
+- `DevOps/plans/webui-security-hardening.md` (archived)
+- `DevOps/logs/agent-changelog.md`, `DevOps/logs/version-history.md`
+- `docs/modernization/08-build-log.md`, `docs/modernization/09-port-status.md`
+**Database/API Changes:** None in this documentation-only wrap-up. The separately committed and
+logged MariaDB constraints/indexes preserve all RustDesk client paths, JSON keys, status codes,
+and response shapes.
+**Summary:** Closed the full WebUI functional/accessibility and security review after independent
+commit-boundary and adversarial checks. The independently revertible series is the contents of
+the user-authorized completion push to `origin/main`; no deployment or formal release was made.
+Final Docker gates passed 532 PHPUnit tests / 3,018 assertions, Pint across 275 files, PHPStan with
+no errors, and 68 Playwright tests with 12 intentional screenshot-mode skips. ESLint, 20-file
+vendor integrity, Blade compilation, all Compose renders, strict Composer validation, Composer
+audit, and npm audit were also green. The user-owned untracked `AGENTS.md` remained untouched.
+
 ## [2026-07-15 20:30] - Fix: enforce peer identity within each address book
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

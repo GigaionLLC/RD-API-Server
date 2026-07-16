@@ -1,6 +1,7 @@
 # Version History & Policy
 
-This log records the formal releases, deployments, and the 3-level versioning strategy enforced across the [APP_NAME] environment.
+This log records formal releases, deployments, reviewed main-branch pushes, and the 3-level
+versioning strategy enforced across the [APP_NAME] environment.
 
 ## 📌 Versioning Strategy (3-Level System)
 
@@ -11,6 +12,12 @@ All versioning follows the semantic hierarchy configured within the `/Test-and-D
 3. **Level 3 (Patch)**: Automated deployment versions (e.g., `1.02.003` -> `1.02.004`). Adds `.001` to Level 3 versioning (allowing up to 999 level 3 versions), while preserving the minor level as-is. Automatically bumped on every routine code deployment or patch push if no major/minor bump is specified.
 
 ---
+
+## Main Branch Delivery Log
+
+| Date | Version Impact | Actor | Delivery |
+|---|---|---|---|
+| 2026-07-15 | Unchanged | OpenAI Codex / GPT-5 | User-authorized completion push to `origin/main` for the independently revertible WebUI modernization, MariaDB-only boundary, review remediation, and security hardening series. Final Docker gates passed 532 PHPUnit tests / 3,018 assertions and 68 Playwright tests with 12 intentional skips; static, packaging, and dependency-audit gates were green. No deployment or formal release was performed. |
 
 ## 📈 Release Log
 
