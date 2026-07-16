@@ -385,9 +385,7 @@ class AddressBookController extends Controller
      */
     private function personalBook(User $user): AddressBook
     {
-        return AddressBook::firstOrCreate(
-            ['user_id' => $user->id, 'name' => 'My address book'],
-        );
+        return AddressBook::personalFor($user);
     }
 
     /**

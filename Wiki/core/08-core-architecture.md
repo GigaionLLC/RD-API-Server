@@ -25,5 +25,8 @@ remain independent of physical schema refactors.
   neither may inherit or refresh the persistent development schema.
 - **Transactions:** One-time challenges, recovery-code consumption, and similar concurrency
   boundaries use InnoDB row locks and transactions rather than process-local assumptions.
+- **Personal collection identity:** A nullable marker plus MariaDB CHECK and unique index gives
+  each owner exactly zero-or-one personal address book without restricting ordinary books.
+  Concurrent first-use requests converge through the database constraint, not a name lookup.
 - **Wire stability:** Database changes never rename the RustDesk client's fixed API paths or JSON
   keys.

@@ -12,12 +12,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * An address book collection owned by a user. May be marked shared, in which case other users
  * are granted access through AddressBookCollaborator rows (read / read-write / full control).
  *
+ * @property bool|null $is_personal
  * @property bool $is_shared
  */
-#[Fillable(['user_id', 'name', 'is_shared', 'note', 'max_peers'])]
+#[Fillable(['user_id', 'is_personal', 'name', 'is_shared', 'note', 'max_peers'])]
 class AddressBook extends Model
 {
     use HasFactory;
+
+    public const PERSONAL_NAME = 'My address book';
 
     /**
      * @return array<string, string>
@@ -25,9 +28,22 @@ class AddressBook extends Model
     protected function casts(): array
     {
         return [
+            'is_personal' => 'boolean',
             'is_shared' => 'boolean',
             'max_peers' => 'integer',
         ];
+    }
+
+    /**
+     * Resolve the owner's durable personal collection. The database marker makes concurrent
+     * first-use inserts converge on the same row through Eloquent's create-or-first retry.
+     */
+    public static function personalFor(User $user): self
+    {
+        return self::query()->firstOrCreate(
+            ['user_id' => $user->id, 'is_personal' => true],
+            ['name' => self::PERSONAL_NAME],
+        );
     }
 
     /**

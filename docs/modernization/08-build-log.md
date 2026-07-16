@@ -2,6 +2,22 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - Personal address-book singleton invariant (verified)
+
+- Replaced the default book's name-based identity with an explicit nullable `is_personal` marker.
+  A named MariaDB CHECK permits only `NULL` for ordinary books or `1` for an owned personal book;
+  a named unique index permits unlimited ordinary books while enforcing one personal book per
+  owner. Eloquent's create-or-first retry now makes simultaneous first-use requests converge.
+- The migration preserves every legacy collection and its peers/tags. For each owner without a
+  marker, only the lowest-ID collation-equivalent `My address book` row is marked; other duplicate
+  names remain ordinary books. Existence guards and marker preflights make interrupted MariaDB DDL
+  safely retryable. Rollback removes only enforcement when the former name resolver would preserve
+  identity; ambiguous names or a custom marked name make its read-only preflight fail before DDL.
+- Personal client endpoints no longer mistake an ordinary same-named collection for the default,
+  and the showcase seeder uses the same durable identity. No RustDesk path, JSON key, or response
+  shape changed. Focused Docker suites passed 33 tests / 134 assertions; targeted Pint and PHPStan
+  checks were clean.
+
 ## 2026-07-15 - Email-verification address invariant (verified)
 
 - Required a valid address when admin user creation/editing selects email verification and

@@ -3,6 +3,33 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 20:05] - Fix: enforce one personal address book per owner
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Models/AddressBook.php`, `app/Http/Controllers/Api/AddressBookController.php`
+- `database/migrations/2026_07_15_100003_enforce_personal_address_book_singleton.php`
+- `database/seeders/DemoShowcaseSeeder.php`
+- `tests/Feature/PersonalAddressBookInvariantTest.php`
+- `tests/Feature/PersonalAddressBookStateMigrationTest.php`
+- `Wiki/core/08-core-architecture.md`, `docs/modernization/08-build-log.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds nullable `address_books.is_personal`, the named MariaDB CHECK
+`address_books_personal_marker_valid`, and unique index
+`address_books_one_personal_per_user`. Existing API paths, JSON keys, and response shapes remain
+unchanged. Rollback removes only the marker/index/CHECK and preserves every collection after a
+read-only compatibility preflight; it refuses ambiguous states before DDL.
+**Summary:** Made the default personal collection a durable database identity instead of a
+race-prone name lookup. Concurrent first-use requests now converge through Laravel's
+create-or-first retry and the unique index. Migration backfill marks only the lowest-ID legacy
+default-name match per owner, preserves every other book and all dependent data, validates any
+partially applied marker/schema state before proceeding, installs the column/CHECK/index in one
+ALTER on fresh databases, and safely resumes around MariaDB's auto-committing DDL. Rollback fails
+closed if the old name resolver would choose a different book. Ordinary same-named books can no
+longer hijack personal client requests, and the showcase seeder uses the same marker. Focused
+Docker suites passed 33 tests / 134 assertions;
+targeted Pint, PHPStan, and diff checks were clean. The commit remains local on `main` pending the
+remaining peer-identity hardening, final matrices, and authorized completion push.
+
 ## [2026-07-15 19:50] - Test: stabilize address-book browser validation
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

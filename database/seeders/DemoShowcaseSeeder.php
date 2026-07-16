@@ -294,8 +294,13 @@ class DemoShowcaseSeeder extends Seeder
     private function seedAddressBook(User $admin): void
     {
         $book = AddressBook::updateOrCreate(
-            ['user_id' => $admin->id, 'name' => 'My Address Book'],
-            ['is_shared' => false, 'note' => 'Primary devices', 'max_peers' => 0],
+            ['user_id' => $admin->id, 'is_personal' => true],
+            [
+                'name' => AddressBook::PERSONAL_NAME,
+                'is_shared' => false,
+                'note' => 'Primary devices',
+                'max_peers' => 0,
+            ],
         );
         $shared = AddressBook::updateOrCreate(
             ['user_id' => $admin->id, 'name' => 'Support — Shared'],
