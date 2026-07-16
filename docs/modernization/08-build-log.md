@@ -2,6 +2,20 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - GitHub Actions Node 24 runtime migration (verified)
+
+- Replaced every immutable `actions/checkout` and `actions/setup-node` reference in CI and image
+  publishing with the official v7.0.0 commits. Both exact action manifests declare Node 24; the
+  application's explicit Node 24.18.0 selection and npm cache configuration are unchanged.
+- Kept all workflow triggers, permissions, jobs, and release behavior intact. Also replaced the
+  readiness loop's unused counter with the shell-lint-safe placeholder without changing retries.
+- Local actionlint 1.7.12, exact-pin audit, ESLint, 20-file vendor integrity, and diff checks
+  passed. GitHub CI run `29470504915` passed PHP, JavaScript/vendor, and Playwright jobs, and
+  Docker Publish run `29470504901` published both architectures successfully in 39m36s. Complete
+  logs for both runs contain no Node 20 deprecation text.
+- Cancelled obsolete older publish run `29470043683` so it could not finish after the newer build
+  and overwrite the `latest` tag with stale content.
+
 ## 2026-07-15 - WebUI review and security hardening complete (verified)
 
 - Completed the post-redesign functional, responsive, accessibility, authorization, hostile-input,

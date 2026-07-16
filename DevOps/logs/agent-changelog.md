@@ -3,6 +3,23 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 21:45] - CI: migrate GitHub Actions to Node 24 runtimes
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.github/workflows/ci.yml`, `.github/workflows/docker-publish.yml`
+- `DevOps/archive-plans/github-actions-node24.md`
+- `DevOps/plans/github-actions-node24.md` (archived)
+- `DevOps/logs/agent-changelog.md`, `DevOps/logs/version-history.md`
+- `docs/modernization/08-build-log.md`
+**Database/API Changes:** None. Workflow triggers, permissions, project Node version, application
+behavior, database schema, and RustDesk client contract are unchanged.
+**Summary:** Replaced every checkout/setup-node Node 20 action with exact immutable v7.0.0 SHA
+pins whose manifests declare Node 24, and removed one pre-existing workflow shell-lint warning.
+Local actionlint, pin, ESLint, vendor-integrity, and diff checks passed. GitHub CI run
+`29470504915` and Docker Publish run `29470504901` both completed successfully with no Node 20
+deprecation text in their logs; the latter published both architectures in 39m36s. Obsolete
+publish run `29470043683` was cancelled to prevent a stale `latest`-tag overwrite.
+
 ## [2026-07-15 20:45] - Complete WebUI review remediation and security hardening
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
