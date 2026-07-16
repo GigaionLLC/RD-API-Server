@@ -67,6 +67,138 @@ class TrustedProxySecurityTest extends TestCase
         $this->assertSame('203.0.113.7', $key->refresh()->last_used_ip);
     }
 
+    public function test_trusted_https_proxy_generates_https_admin_assets(): void
+    {
+        config(['trustedproxy.proxies' => ['10.0.0.2']]);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->get('http://admin.example.test/admin/login', [
+                'X-Forwarded-Proto' => 'https',
+                'X-Forwarded-Port' => '443',
+            ])
+            ->assertOk()
+            ->assertSee(
+                'href="https://admin.example.test/assets/vendor/bootstrap/bootstrap.min.css"',
+                false
+            )
+            ->assertSee(
+                'src="https://admin.example.test/assets/vendor/jquery/jquery.min.js"',
+                false
+            )
+            ->assertDontSee('http://admin.example.test/assets/', false);
+    }
+
+    public function test_trusted_https_proxy_generates_https_auth_redirect(): void
+    {
+        config(['trustedproxy.proxies' => ['10.0.0.2']]);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->get('http://admin.example.test/admin', [
+                'X-Forwarded-Proto' => 'https',
+                'X-Forwarded-Port' => '443',
+            ])
+            ->assertRedirect()
+            ->assertHeader('Location', 'https://admin.example.test/admin/login');
+    }
+
+    public function test_trusted_https_proxy_marks_session_and_csrf_cookies_secure(): void
+    {
+        config([
+            'trustedproxy.proxies' => ['10.0.0.2'],
+            'session.secure' => null,
+        ]);
+
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->get('http://admin.example.test/admin/login', [
+                'X-Forwarded-Proto' => 'https',
+                'X-Forwarded-Port' => '443',
+            ])
+            ->assertOk();
+
+        $sessionCookie = $response->getCookie((string) config('session.cookie'), false);
+        $csrfCookie = $response->getCookie('XSRF-TOKEN', false);
+
+        $this->assertNotNull($sessionCookie);
+        $this->assertNotNull($csrfCookie);
+        $this->assertTrue($sessionCookie->isSecure());
+        $this->assertTrue($csrfCookie->isSecure());
+    }
+
+    public function test_untrusted_forwarded_proto_cannot_spoof_generated_scheme(): void
+    {
+        config(['trustedproxy.proxies' => ['10.0.0.2']]);
+
+        $headers = [
+            'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Port' => '443',
+        ];
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.10'])
+            ->get('http://admin.example.test/admin/login', $headers)
+            ->assertOk()
+            ->assertSee('http://admin.example.test/assets/', false)
+            ->assertDontSee('https://admin.example.test/assets/', false);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.10'])
+            ->get('http://admin.example.test/admin', $headers)
+            ->assertRedirect()
+            ->assertHeader('Location', 'http://admin.example.test/admin/login');
+    }
+
+    public function test_trusted_proxy_cannot_override_host_port_or_path_prefix(): void
+    {
+        config(['trustedproxy.proxies' => ['10.0.0.2']]);
+
+        $headers = [
+            'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Host' => 'attacker.example',
+            'X-Forwarded-Port' => '8443',
+            'X-Forwarded-Prefix' => '/spoofed',
+        ];
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->get('http://admin.example.test/admin/login', $headers)
+            ->assertOk()
+            ->assertSee(
+                'href="https://admin.example.test/assets/vendor/bootstrap/bootstrap.min.css"',
+                false
+            )
+            ->assertDontSee('attacker.example', false)
+            ->assertDontSee(':8443', false)
+            ->assertDontSee('/spoofed', false);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->get('http://admin.example.test/admin', $headers)
+            ->assertRedirect()
+            ->assertHeader('Location', 'https://admin.example.test/admin/login');
+    }
+
+    public function test_trusted_https_proxy_uses_sanitized_host_for_nonstandard_port(): void
+    {
+        config(['trustedproxy.proxies' => ['10.0.0.2']]);
+
+        $headers = [
+            'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Host' => 'attacker.example',
+            'X-Forwarded-Port' => '9443',
+        ];
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->get('http://admin.example.test:8443/admin/login', $headers)
+            ->assertOk()
+            ->assertSee(
+                'href="https://admin.example.test:8443/assets/vendor/bootstrap/bootstrap.min.css"',
+                false
+            )
+            ->assertDontSee('attacker.example', false)
+            ->assertDontSee(':9443', false);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->get('http://admin.example.test:8443/admin', $headers)
+            ->assertRedirect()
+            ->assertHeader('Location', 'https://admin.example.test:8443/admin/login');
+    }
+
     public function test_proxy_configuration_rejects_wildcards_and_invalid_networks(): void
     {
         $repository = Env::getRepository();

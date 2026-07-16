@@ -87,10 +87,21 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Forwarded headers are ignored by default. A deployment behind a reverse proxy must set
   `TRUSTED_PROXIES` to that proxy's explicit IP address or CIDR; multiple entries are separated
   with commas.
+- Public HTTPS deployments use their external HTTPS origin for `APP_URL` and set
+  `SESSION_SECURE_COOKIE=true` as defense in depth. Neither setting replaces explicit proxy
+  trust: the request scheme and client address still come through the inbound proxy boundary.
 - Never trust a wildcard or a network that untrusted clients can reach directly. The proxy must
-  construct a trustworthy client chain instead of passing client-supplied forwarded headers
-  through unchanged, and the application port must not be exposed through a path that bypasses
-  the proxy.
+  overwrite the public `Host` and forwarded scheme and construct a trustworthy client chain
+  instead of passing client-supplied headers through unchanged. The application accepts only
+  `X-Forwarded-For` and `X-Forwarded-Proto` from trusted peers; forwarded host, port, and prefix
+  are ignored to prevent generated-URL poisoning.
+- The application port must not be exposed through a path that bypasses the proxy. A dedicated
+  internal proxy network, a loopback-only host binding, or a proxy-only firewall rule establishes
+  this boundary. Never trust a shared bridge gateway/NAT peer when it also represents callers
+  that are outside the deployment's trusted host boundary.
+- Mixed-content errors, HTTP redirects from a public HTTPS origin, or cookies missing `Secure`
+  indicate a broken proxy trust boundary. Do not mask that boundary with wildcard trust,
+  hard-coded secure asset helpers, or a globally forced URL scheme.
 - Client IPs feed login and 2FA throttles, API-key IP allowlists, audit records, and last-seen
   metadata. Any new IP-based security control must use the framework request IP and retain this
   trusted-proxy boundary.

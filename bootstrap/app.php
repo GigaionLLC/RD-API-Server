@@ -28,6 +28,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->authenticateSessions();
         $middleware->appendToGroup('web', EnsureCredentialVersion::class);
+        // The application is hosted at the root origin. Trust only the proxy headers needed for
+        // the client chain and TLS scheme; Host supplies the public host and the HTTPS scheme
+        // supplies its default port. Ignoring forwarded host/port/prefix prevents URL poisoning
+        // when an otherwise trusted proxy passes an unexpected client header through.
+        $middleware->trustProxies(
+            headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO,
+        );
         // Unauthenticated admin requests go to the admin login page.
         $middleware->redirectGuestsTo('/admin/login');
     })
