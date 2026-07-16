@@ -1,4 +1,5 @@
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
+import { randomInt } from 'node:crypto';
 
 const USER = process.env.E2E_ADMIN_USER || 'admin';
 const PASS = process.env.E2E_ADMIN_PASS || 'admin12345678';
@@ -8,18 +9,13 @@ async function signIn(page: Page) {
     await page.fill('#username', USER);
     await page.fill('#password', PASS);
     await Promise.all([
-        page.waitForURL(/\/admin$/, { waitUntil: 'commit' }),
-        page.click('button[type=submit]'),
+        page.waitForURL(/\/admin$/, { waitUntil: 'domcontentloaded' }),
+        page.getByRole('button', { name: 'Sign in', exact: true }).click({ noWaitAfter: true }),
     ]);
 }
 
 async function uiReady(page: Page) {
     await page.locator('html[data-rd-ready="true"]').waitFor({ state: 'attached', timeout: 30_000 });
-}
-
-function peerIdFor(projectName: string) {
-    const checksum = [...projectName].reduce((total, character) => total + character.charCodeAt(0), 0);
-    return `99${String(checksum).padStart(4, '0').slice(-4)}`;
 }
 
 // Create a personal address book and peer through the real client API. CI only seeds the admin.
@@ -33,12 +29,13 @@ async function seedAddressBook(request: APIRequestContext, projectName: string) 
     const personal = await request.post('/api/ab/personal', { headers });
     expect(personal.ok()).toBeTruthy();
     const bookId = String((await personal.json()).guid);
-    const peerId = `${peerIdFor(projectName)}${String(Date.now()).slice(-5)}`;
-    const addPeer = await request.post('/api/ab/peer/add/personal', {
+    const peerId = `99${Date.now()}${randomInt(100_000_000, 1_000_000_000)}`;
+    const addPeer = await request.post(`/api/ab/peer/add/${bookId}`, {
         headers,
         data: { id: peerId, alias: `E2E ${projectName}` },
     });
     expect(addPeer.ok()).toBeTruthy();
+    expect(await addPeer.text(), 'address-book seed returned a business error').toBe('');
 
     return { bookId, peerId };
 }

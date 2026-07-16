@@ -3,6 +3,23 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 19:50] - Test: stabilize address-book browser validation
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `e2e/gui.spec.ts`, `e2e/login.spec.ts`
+- `e2e/accessibility.spec.ts`, `e2e/screenshots.spec.ts`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. The browser fixture still uses the public RustDesk client API and
+the application behavior and wire contract are unchanged.
+**Summary:** Removed Playwright's redundant submit-click navigation wait while retaining an
+explicit completed-navigation wait, preventing a slow Docker response from timing out after a
+successful sign-in. Address-book fixtures now add their peer to the exact numeric collection
+returned by the preceding request, use a high-entropy numeric ID, and require the protocol's
+empty success body so HTTP-200 business errors fail during setup rather than masquerading as UI
+regressions. The previously failing desktop-dark validation scenario passed four consecutive
+runs with two workers. The commit remains local on `main` pending the final full matrix and
+authorized completion push.
+
 ## [2026-07-15 19:45] - Security: require an address for email verification
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

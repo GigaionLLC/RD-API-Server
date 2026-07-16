@@ -8,8 +8,8 @@ async function signIn(page: Page) {
     await page.fill('#username', USER);
     await page.fill('#password', PASS);
     await Promise.all([
-        page.waitForURL(/\/admin$/, { waitUntil: 'commit' }),
-        page.click('button[type=submit]'),
+        page.waitForURL(/\/admin$/, { waitUntil: 'domcontentloaded' }),
+        page.getByRole('button', { name: 'Sign in', exact: true }).click({ noWaitAfter: true }),
     ]);
 }
 
