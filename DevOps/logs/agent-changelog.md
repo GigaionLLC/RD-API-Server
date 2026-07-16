@@ -3,6 +3,33 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 20:30] - Fix: enforce peer identity within each address book
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Models/AddressBookPeer.php`
+- `app/Http/Controllers/Api/AddressBookController.php`
+- `app/Http/Controllers/Api/V1/AddressBookController.php`
+- `app/Http/Controllers/Admin/AddressBookController.php`
+- `database/migrations/2026_07_15_100004_enforce_address_book_peer_identity.php`
+- `tests/Feature/AddressBookPeerIdentityMigrationTest.php`
+- `tests/Feature/AddressBookPeerConcurrencyTest.php`
+- `Wiki/core/08-core-architecture.md`, `docs/modernization/08-build-log.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds the named MariaDB unique index
+`address_book_peers_unique_book_rustdesk_id` on `(address_book_id, rustdesk_id)`. The migration
+aborts before DDL if historical duplicate pairs exist; rollback drops only this index. Existing
+client/admin API paths, JSON keys, status codes, and success/error response shapes are preserved.
+**Summary:** Made the database the final authority for peer identity so simultaneous inserts
+cannot create duplicate rows. Every single-peer writer retains its friendly precheck and maps a
+confirmed late unique conflict to the established RustDesk, API-v1, admin-modal, or CSV-skip
+result; confirmation reads from the writer. Legacy full replacement is transactional and
+collapses repeated payload IDs through update-or-create, while existing preset writers become
+durable through the same index. The migration reports bounded conflicting pairs without silently
+choosing between credentials/metadata and rejects a colliding named index with the wrong
+definition. Focused Docker suites passed 58 tests / 278 assertions; targeted Pint, PHPStan, and
+diff checks were clean. The commit remains local on `main` pending final matrices, wrap-up, and
+the authorized completion push.
+
 ## [2026-07-15 20:05] - Fix: enforce one personal address book per owner
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

@@ -8,9 +8,11 @@ use App\Models\AddressBookCollaborator;
 use App\Models\AddressBookPeer;
 use App\Models\Tag;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Address book endpoints for the RustDesk client
@@ -60,7 +62,9 @@ class AddressBookController extends Controller
             return response()->json(['error' => 'Invalid address book data']);
         }
 
-        $this->replaceBook($book, $payload);
+        DB::transaction(function () use ($book, $payload): void {
+            $this->replaceBook($book, $payload);
+        });
 
         return $this->ack();
     }
@@ -184,7 +188,7 @@ class AddressBookController extends Controller
             return response()->json(['error' => 'Peer id is required']);
         }
 
-        if (AddressBookPeer::where('address_book_id', $book->id)->where('rustdesk_id', $id)->exists()) {
+        if (AddressBookPeer::existsInBook($book->id, $id)) {
             return response()->json(['error' => 'ID already exists']);
         }
 
@@ -192,7 +196,15 @@ class AddressBookController extends Controller
             return response()->json(['error' => 'Address book is full ('.$book->effectiveMaxPeers().' max)']);
         }
 
-        AddressBookPeer::create($this->mapPeer($book, $data));
+        try {
+            AddressBookPeer::create($this->mapPeer($book, $data));
+        } catch (UniqueConstraintViolationException $exception) {
+            if (AddressBookPeer::existsInBook($book->id, $id)) {
+                return response()->json(['error' => 'ID already exists']);
+            }
+
+            throw $exception;
+        }
 
         return $this->ack();
     }
@@ -616,7 +628,14 @@ class AddressBookController extends Controller
             if (! is_array($peer) || ($peer['id'] ?? '') === '') {
                 continue;
             }
-            AddressBookPeer::create($this->mapPeer($book, $peer));
+            $mapped = $this->mapPeer($book, $peer);
+            AddressBookPeer::updateOrCreate(
+                [
+                    'address_book_id' => $book->id,
+                    'rustdesk_id' => (string) $peer['id'],
+                ],
+                $mapped,
+            );
         }
     }
 

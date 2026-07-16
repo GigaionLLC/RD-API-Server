@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\AddressBook;
 use App\Models\AddressBookPeer;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -86,7 +87,7 @@ class AddressBookController extends Controller
             'tags.*' => ['string', 'max:255'],
         ]);
 
-        if (AddressBookPeer::where('address_book_id', $addressBook->id)->where('rustdesk_id', $data['id'])->exists()) {
+        if (AddressBookPeer::existsInBook($addressBook->id, $data['id'])) {
             return response()->json(['error' => 'ID already exists in this address book'], 422);
         }
 
@@ -94,14 +95,22 @@ class AddressBookController extends Controller
             return response()->json(['error' => "Address book is full ({$addressBook->effectiveMaxPeers()} max)"], 422);
         }
 
-        $peer = AddressBookPeer::create([
-            'address_book_id' => $addressBook->id,
-            'user_id' => $addressBook->user_id,
-            'rustdesk_id' => $data['id'],
-            'alias' => $data['alias'] ?? null,
-            'note' => $data['note'] ?? null,
-            'tags' => array_values($data['tags'] ?? []),
-        ]);
+        try {
+            $peer = AddressBookPeer::create([
+                'address_book_id' => $addressBook->id,
+                'user_id' => $addressBook->user_id,
+                'rustdesk_id' => $data['id'],
+                'alias' => $data['alias'] ?? null,
+                'note' => $data['note'] ?? null,
+                'tags' => array_values($data['tags'] ?? []),
+            ]);
+        } catch (UniqueConstraintViolationException $exception) {
+            if (AddressBookPeer::existsInBook($addressBook->id, $data['id'])) {
+                return response()->json(['error' => 'ID already exists in this address book'], 422);
+            }
+
+            throw $exception;
+        }
 
         return response()->json(['data' => ['id' => $peer->rustdesk_id]], 201);
     }

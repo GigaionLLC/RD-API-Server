@@ -10,6 +10,7 @@ use App\Models\AddressBookPeer;
 use App\Models\Tag;
 use App\Models\User;
 use App\Services\AdminScopeService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -132,14 +133,32 @@ class AddressBookController extends Controller
                 continue;
             }
 
-            AddressBookPeer::create([
-                'address_book_id' => $addressBook->id,
-                'user_id' => $addressBook->user_id,
-                'rustdesk_id' => $id,
-                'alias' => trim((string) ($cols[1] ?? '')) ?: null,
-                'note' => trim((string) ($cols[2] ?? '')) ?: null,
-                'tags' => array_values(array_filter(array_map('trim', explode(';', (string) ($cols[3] ?? ''))))),
-            ]);
+            try {
+                AddressBookPeer::create([
+                    'address_book_id' => $addressBook->id,
+                    'user_id' => $addressBook->user_id,
+                    'rustdesk_id' => $id,
+                    'alias' => trim((string) ($cols[1] ?? '')) ?: null,
+                    'note' => trim((string) ($cols[2] ?? '')) ?: null,
+                    'tags' => array_values(array_filter(array_map('trim', explode(';', (string) ($cols[3] ?? ''))))),
+                ]);
+            } catch (UniqueConstraintViolationException $exception) {
+                if (! AddressBookPeer::existsInBook($addressBook->id, $id)) {
+                    throw $exception;
+                }
+
+                $existing[] = $id;
+                // The conflict may be a concurrently inserted row (not in the snapshot), or a
+                // collation-equivalent ID the strict PHP comparison missed. Re-read the writer
+                // so quota accounting is exact in both cases.
+                $count = AddressBookPeer::query()
+                    ->useWritePdo()
+                    ->where('address_book_id', $addressBook->id)
+                    ->count();
+                $skipped++;
+
+                continue;
+            }
 
             $existing[] = $id;
             $count++;
@@ -254,12 +273,8 @@ class AddressBookController extends Controller
         );
         $id = trim((string) $data['rustdesk_id']);
 
-        if (AddressBookPeer::where('address_book_id', $addressBook->id)->where('rustdesk_id', $id)->exists()) {
-            return redirect()
-                ->route('admin.address-books.show', $addressBook)
-                ->withInput($request->except(['password', 'password_confirmation']))
-                ->withErrors(['rustdesk_id' => "ID {$id} already exists in this address book."], 'peer')
-                ->with('address_book_modal', $modalState);
+        if (AddressBookPeer::existsInBook($addressBook->id, $id)) {
+            return $this->duplicatePeerRedirect($request, $addressBook, $id, $modalState);
         }
 
         if ($addressBook->isFull()) {
@@ -276,7 +291,15 @@ class AddressBookController extends Controller
             'rustdesk_id' => $id,
         ]);
         $this->fillPeer($peer, $data);
-        $peer->save();
+        try {
+            $peer->save();
+        } catch (UniqueConstraintViolationException $exception) {
+            if (AddressBookPeer::existsInBook($addressBook->id, $id)) {
+                return $this->duplicatePeerRedirect($request, $addressBook, $id, $modalState);
+            }
+
+            throw $exception;
+        }
 
         return redirect()
             ->route('admin.address-books.show', $addressBook)
@@ -413,6 +436,25 @@ class AddressBookController extends Controller
     private function authorizeBook(Request $request, AddressBook $addressBook, string $permission): void
     {
         $this->scope->authorizeUserId($request->user(), (int) $addressBook->user_id, $permission);
+    }
+
+    /**
+     * @param  array<string, mixed>  $modalState
+     */
+    private function duplicatePeerRedirect(
+        Request $request,
+        AddressBook $addressBook,
+        string $rustdeskId,
+        array $modalState,
+    ): RedirectResponse {
+        return redirect()
+            ->route('admin.address-books.show', $addressBook)
+            ->withInput($request->except(['password', 'password_confirmation']))
+            ->withErrors(
+                ['rustdesk_id' => "ID {$rustdeskId} already exists in this address book."],
+                'peer',
+            )
+            ->with('address_book_modal', $modalState);
     }
 
     /**

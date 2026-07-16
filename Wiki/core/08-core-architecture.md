@@ -28,5 +28,8 @@ remain independent of physical schema refactors.
 - **Personal collection identity:** A nullable marker plus MariaDB CHECK and unique index gives
   each owner exactly zero-or-one personal address book without restricting ordinary books.
   Concurrent first-use requests converge through the database constraint, not a name lookup.
+- **Peer identity:** A peer's RustDesk ID is unique within its address book. Every writer treats
+  MariaDB as the final concurrency authority and maps a lost insert race back to its normal
+  duplicate response instead of exposing an integrity exception.
 - **Wire stability:** Database changes never rename the RustDesk client's fixed API paths or JSON
   keys.

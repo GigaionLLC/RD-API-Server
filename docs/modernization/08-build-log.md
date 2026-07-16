@@ -2,6 +2,21 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - Per-book peer identity invariant (verified)
+
+- Added a named MariaDB unique index on `(address_book_id, rustdesk_id)`. Its read-only preflight
+  rejects legacy duplicate pairs before DDL and reports a bounded list instead of guessing which
+  peer credentials, tags, or metadata to delete. Exact index-definition checks make interrupted
+  migrations and schema-name collisions fail closed; rollback drops only the index.
+- Kept the existing friendly duplicate checks, then mapped a database-lost insert race back to
+  each surface's established response: HTTP-200 RustDesk error JSON, API-v1 422, the admin peer
+  modal/error bag with non-secret input, or a skipped CSV row. Winner confirmation reads from the
+  writer so replication lag cannot misclassify the uniqueness exception.
+- Wrapped legacy full-book replacement in a transaction and collapse duplicate payload IDs with
+  update-or-create, while deployment and system preset writers already use the same race-safe
+  primitive. No client route, key, success acknowledgement, or error shape changed. Focused Docker
+  suites passed 58 tests / 278 assertions; targeted Pint and PHPStan checks were clean.
+
 ## 2026-07-15 - Personal address-book singleton invariant (verified)
 
 - Replaced the default book's name-based identity with an explicit nullable `is_personal` marker.

@@ -35,6 +35,20 @@ class AddressBookPeer extends Model
     }
 
     /**
+     * Read from the writer so a just-won uniqueness race is visible before mapping its error.
+     *
+     * @phpstan-impure The answer can change between calls when another request commits.
+     */
+    public static function existsInBook(int $addressBookId, string $rustdeskId): bool
+    {
+        return self::query()
+            ->useWritePdo()
+            ->where('address_book_id', $addressBookId)
+            ->where('rustdesk_id', $rustdeskId)
+            ->exists();
+    }
+
+    /**
      * @return BelongsTo<AddressBook, $this>
      */
     public function addressBook(): BelongsTo
