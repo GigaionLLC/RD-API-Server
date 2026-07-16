@@ -34,7 +34,7 @@ test('login is free of automatically detectable accessibility violations', async
 
 test('representative authenticated pages pass automated accessibility checks', async ({ page }) => {
     await signIn(page);
-    for (const path of ['/admin', '/admin/devices', '/admin/settings']) {
+    for (const path of ['/admin', '/admin/devices', '/admin/settings', '/admin/2fa']) {
         await page.goto(path, { waitUntil: 'domcontentloaded' });
         await expect(page.locator('.rd-page-header')).toBeVisible();
         await expectNoAxeViolations(page);

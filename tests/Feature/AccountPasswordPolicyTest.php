@@ -156,14 +156,6 @@ class AccountPasswordPolicyTest extends TestCase
             ->assertOk()
             ->assertSee('minlength="12" maxlength="255"', false);
 
-        $admin->forceFill([
-            'two_factor_enabled' => true,
-            'two_factor_secret' => 'JBSWY3DPEHPK3PXP',
-        ])->save();
-        $this->actingAs($admin->fresh())
-            ->get(route('admin.2fa.show'))
-            ->assertOk()
-            ->assertSee('maxlength="255"', false);
     }
 
     /** @return array<string, mixed> */

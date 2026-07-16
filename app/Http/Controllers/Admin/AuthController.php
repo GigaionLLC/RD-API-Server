@@ -100,7 +100,8 @@ class AuthController extends Controller
             return redirect()->route('admin.login')->withErrors(['username' => 'This account is disabled.']);
         }
 
-        // SSO is the trust anchor (the IdP enforces MFA), so we skip the local TOTP challenge.
+        // SSO is the trust anchor, so local TOTP is not layered onto this path. Operators must
+        // enforce any MFA requirement at the identity provider.
         Auth::login($user, (bool) ($stash['remember'] ?? false));
         $request->session()->regenerate();
         $user->forceFill(['last_login_at' => now(), 'last_login_ip' => $request->ip()])->save();

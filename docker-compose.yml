@@ -36,6 +36,7 @@ services:
       # supplied, keep it stable and retain rotated keys in the comma-separated previous list.
       APP_KEY: "${APP_KEY:-}"
       APP_PREVIOUS_KEYS: "${APP_PREVIOUS_KEYS:-}"
+      AUTH_TWO_FACTOR_MANAGEMENT_TIMEOUT: "${AUTH_TWO_FACTOR_MANAGEMENT_TIMEOUT:-300}"
       HASH_VERIFY: "${HASH_VERIFY:-false}"
       ARGON_MEMORY: "${ARGON_MEMORY:-65536}"
       ARGON_THREADS: "${ARGON_THREADS:-1}"

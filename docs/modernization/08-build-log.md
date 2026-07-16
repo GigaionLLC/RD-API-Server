@@ -2,6 +2,35 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - Recent completed-sign-in boundary for 2FA management (verified)
+
+- Added an encrypted five-minute management marker after the configured console sign-in flow
+  completes. It is bound to the account, credential version, current password hash, regenerated
+  browser-session ID, issue/expiry times, and a random nonce; malformed, replayed, future-dated,
+  cross-account, changed-credential, expired, and missing markers fail closed. Session blocking
+  serializes every competing management/challenge request so consumed state cannot be restored by
+  a concurrent request snapshot.
+- Applied the boundary to the entire enrollment lifecycle and removal. Pending setup state is now
+  encrypted with its account, credential version, recent-auth nonce, and expiry, disappears from
+  stale read-only sessions, and cannot overwrite a factor enabled by another request.
+- Replaced the local-password-only removal path (which federated accounts could not satisfy) with
+  a current authenticator or unused recovery code after a recent local, LDAP, or SSO sign-in. A
+  factor just proved during local/LDAP application sign-in carries narrowly scoped assurance for
+  that exact enrollment, allowing even the final recovery code to authorize removal; replacement
+  invalidates that assurance and SSO still requires a factor code. Removal attempts are
+  rate-limited, recovery consumption remains serialized, and successful setup/removal consumes
+  the recent marker.
+- Added a real cancel action and a sign-out/re-entry path that preserves the intended settings
+  destination. Updated the UI to distinguish password-based sign-ins from SSO, whose MFA and
+  reauthentication interaction policy remain the responsibility of the identity provider.
+- Exposed `AUTH_TWO_FACTOR_MANAGEMENT_TIMEOUT` with a 300-second default and a server-enforced
+  60-900 second range in the example and bundled Compose environments. No schema, `/api/*`, JSON
+  key, or RustDesk client response change was introduced.
+- **Verified in Docker:** focused two-factor, SSO, LDAP, and password-policy suites passed 50 tests
+  / 534 assertions. Targeted Pint and PHPStan, Blade compilation, route discovery, Playwright test
+  discovery, and diff checks were clean. The complete-suite rerun is recorded by the final
+  hardening wrap-up after the separately revertible follow-on fixes.
+
 ## 2026-07-14 - MariaDB-only database boundary (verified)
 
 - Standardized runtime, development, PHPUnit, CI, browser, and screenshot paths on

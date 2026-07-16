@@ -6,6 +6,7 @@ use App\Models\AuthToken;
 use App\Models\LdapIdentity;
 use App\Models\User;
 use App\Services\LdapService;
+use App\Support\RecentAdminAuthentication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -90,6 +91,31 @@ class LdapIdentitySecurityTest extends TestCase
         $this->assertAuthenticatedAs($linkedUser);
         $this->assertSame('directory-admin', $linkedUser->username);
         $this->assertTrue((bool) $linkedUser->is_admin);
+        $this->assertTrue(session()->has(RecentAdminAuthentication::SESSION_KEY));
+
+        $this->withCookie((string) config('session.cookie'), session()->getId());
+        $this->get(route('admin.2fa.show'))
+            ->assertOk()
+            ->assertSee('Set up authenticator');
+
+        $this->post(route('admin.2fa.reauthenticate'))
+            ->assertRedirect(route('admin.login'))
+            ->assertSessionHas('url.intended', route('admin.2fa.show'))
+            ->assertSessionMissing(RecentAdminAuthentication::SESSION_KEY);
+        $this->assertGuest();
+
+        $this->withCookie((string) config('session.cookie'), session()->getId());
+        $this->post('/admin/login', [
+            'username' => 'directory-admin',
+            'password' => 'ldap-password',
+        ])->assertRedirect(route('admin.2fa.show'));
+
+        $this->assertAuthenticatedAs($linkedUser);
+        $this->withCookie((string) config('session.cookie'), session()->getId());
+        $this->get(route('admin.2fa.show'))
+            ->assertOk()
+            ->assertSee('Set up authenticator');
+        $this->assertTrue(app(RecentAdminAuthentication::class)->isValid(session()->driver(), $linkedUser->fresh()));
 
         $this->post('/admin/logout')->assertRedirect(route('admin.login'));
         $this->postJson('/api/login', [

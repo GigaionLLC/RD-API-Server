@@ -24,6 +24,19 @@ An installation using the retired SQLite path must complete the
 release before upgrading, or remain on that release. No automated converter is included. The
 parity tables below describe the historical Go-to-PHP rewrite and are intentionally unchanged.
 
+## Current admin two-factor status (2026-07-15)
+
+Personal authenticator setup and removal now require a completed console sign-in from the last
+five minutes. The encrypted proof is account-, credential-, and regenerated-session-ID-bound;
+stale sessions can review status but cannot reveal a pending setup secret or change two-factor
+state, and competing management requests are session-serialized. This works for local, LDAP, and
+SSO administrators through their normal application sign-in path. Removal requires the current
+authenticator or an unused recovery code unless that exact enrollment was just verified during
+local/LDAP sign-in; the carried proof cannot survive factor replacement. Console SSO neither
+layers local TOTP onto the callback nor guarantees that the provider prompts again, so provider
+MFA/step-up policy remains the operator's responsibility and an SSO removal still requires a
+factor code.
+
 ## Current admin UI status (2026-07-13)
 
 The historical table below predates the completed full-surface WebUI modernization. The

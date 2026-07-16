@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\RecentAdminAuthentication;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +22,8 @@ final class EnsureCredentialVersion
 {
     private const SESSION_KEY = 'auth.credential_version';
 
+    public function __construct(private readonly RecentAdminAuthentication $recentAuthentication) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
@@ -35,6 +38,7 @@ final class EnsureCredentialVersion
         $authenticated = $request->user();
         if (! $user instanceof User && $authenticated instanceof User) {
             $request->session()->put(self::SESSION_KEY, $this->version($authenticated));
+            $this->recentAuthentication->mark($request->session(), $authenticated);
         }
 
         return $response;

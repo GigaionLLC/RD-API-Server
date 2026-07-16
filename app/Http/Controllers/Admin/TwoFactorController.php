@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\TwoFactorService;
-use App\Support\AccountPasswordPolicy;
+use App\Support\RecentAdminAuthentication;
 use App\Support\TotpSecretFormat;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\RedirectResponse;
@@ -13,10 +13,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
+use JsonException;
 
 /**
  * TOTP two-factor authentication for the admin console. Reuses the same secret/columns as
@@ -29,6 +30,8 @@ class TwoFactorController extends Controller
     /** Session key carrying the candidate secret during enrollment. */
     private const SETUP_KEY = '2fa.setup_secret';
 
+    private const SETUP_VERSION = 1;
+
     /** Session keys carrying the deferred login between password and the second factor. */
     private const PENDING_USER = '2fa.user';
 
@@ -40,7 +43,10 @@ class TwoFactorController extends Controller
 
     private const CHALLENGE_LIFETIME_SECONDS = 300;
 
-    public function __construct(private readonly TwoFactorService $twoFactor) {}
+    public function __construct(
+        private readonly TwoFactorService $twoFactor,
+        private readonly RecentAdminAuthentication $recentAuthentication,
+    ) {}
 
     // --- Self-service management (authenticated) ----------------------------------------
 
@@ -49,7 +55,16 @@ class TwoFactorController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $setupSecret = $this->setupSecret($request);
+        $recentlyAuthenticated = $this->recentAuthentication->isValid($request->session(), $user);
+        $factorRecentlyVerified = $recentlyAuthenticated
+            && $this->recentAuthentication->factorWasVerified($request->session(), $user);
+        if (! $recentlyAuthenticated || $user->two_factor_enabled) {
+            $request->session()->forget(self::SETUP_KEY);
+        }
+
+        $setupSecret = $recentlyAuthenticated && ! $user->two_factor_enabled
+            ? $this->setupSecret($request, $user)
+            : null;
         $uri = $setupSecret !== null
             ? $this->twoFactor->provisioningUri($setupSecret, (string) $user->username)
             : null;
@@ -63,6 +78,9 @@ class TwoFactorController extends Controller
             'setupSecret' => $setupSecret,
             'setupUri' => $uri,
             'recoveryCodes' => null,
+            'recentlyAuthenticated' => $recentlyAuthenticated,
+            'factorRecentlyVerified' => $factorRecentlyVerified,
+            'recentAuthenticationWindow' => $this->recentAuthenticationWindow(),
         ])->withHeaders(self::sensitiveResponseHeaders());
     }
 
@@ -72,41 +90,112 @@ class TwoFactorController extends Controller
         $user = $request->user();
 
         if ($user->two_factor_enabled) {
+            $request->session()->forget(self::SETUP_KEY);
+
             return redirect()->route('admin.2fa.show');
         }
 
-        // It only becomes the user's secret after a valid code confirms it. Encrypt it explicitly
-        // because the default database session driver does not encrypt the full session payload.
-        $request->session()->put(
-            self::SETUP_KEY,
-            Crypt::encryptString($this->twoFactor->generateSecret()),
-        );
+        $nonce = $this->recentAuthentication->nonce($request->session(), $user);
+        if ($nonce === null) {
+            $request->session()->forget(self::SETUP_KEY);
+
+            return $this->recentAuthenticationRequired();
+        }
+
+        $createdAt = now()->getTimestamp();
+        $payload = json_encode([
+            'version' => self::SETUP_VERSION,
+            'user_id' => (string) $user->getAuthIdentifier(),
+            'credential_version' => max(1, (int) $user->credential_version),
+            'authentication_nonce' => $nonce,
+            'created_at' => $createdAt,
+            'expires_at' => $createdAt + $this->recentAuthentication->timeoutSeconds(),
+            'secret' => $this->twoFactor->generateSecret(),
+        ], JSON_THROW_ON_ERROR);
+
+        // The candidate only becomes the user's secret after a valid code confirms it. Encrypt
+        // the complete account-bound state because database sessions are not encrypted globally.
+        $request->session()->put(self::SETUP_KEY, Crypt::encryptString($payload));
 
         return redirect()->route('admin.2fa.show');
     }
 
     public function confirm(Request $request): Response|RedirectResponse
     {
-        $request->validate(['code' => ['required', 'string']]);
-
         /** @var User $user */
         $user = $request->user();
-        $secret = $this->setupSecret($request);
+        if (! $this->recentAuthentication->isValid($request->session(), $user)) {
+            $request->session()->forget(self::SETUP_KEY);
 
-        if ($secret === null || ! $this->twoFactor->verifyCode($secret, (string) $request->input('code'))) {
+            return $this->recentAuthenticationRequired();
+        }
+
+        $request->validate(['code' => ['required', 'string', 'max:32']]);
+
+        $secret = $this->setupSecret($request, $user);
+        if ($secret === null) {
+            return redirect()->route('admin.2fa.show')
+                ->with('warning', 'Two-factor setup expired or no longer matches this account. Restart setup to continue.');
+        }
+
+        $throttleKey = $this->managementThrottleKey('confirm', $user, $request);
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            return back()->withErrors(['code' => "Too many setup attempts. Try again in {$seconds} seconds."]);
+        }
+
+        if (! $this->twoFactor->verifyCode($secret, (string) $request->input('code'))) {
+            RateLimiter::hit($throttleKey, 60);
+
             return back()->withErrors(['code' => 'That code is incorrect or expired. Try again.']);
         }
 
-        $recovery = $this->twoFactor->generateRecoveryCodes();
-        $user->forceFill([
-            'two_factor_secret' => $secret,
-            'two_factor_enabled' => true,
-            'two_factor_confirmed_at' => now(),
-            'two_factor_recovery_codes' => $this->twoFactor->protectRecoveryCodes($recovery),
-            'login_verify' => User::LOGIN_VERIFY_TOTP,
-        ])->save();
+        RateLimiter::clear($throttleKey);
+
+        /** @var array{status:string,recovery?:list<string>} $outcome */
+        $outcome = DB::transaction(function () use ($request, $user, $secret): array {
+            /** @var User $locked */
+            $locked = User::query()->lockForUpdate()->findOrFail($user->getKey());
+
+            if (! $this->recentAuthentication->isValid($request->session(), $locked)) {
+                return ['status' => 'stale'];
+            }
+
+            if ($locked->two_factor_enabled) {
+                return ['status' => 'already_enabled'];
+            }
+
+            $recovery = $this->twoFactor->generateRecoveryCodes();
+            $locked->forceFill([
+                'two_factor_secret' => $secret,
+                'two_factor_enabled' => true,
+                'two_factor_confirmed_at' => now(),
+                'two_factor_recovery_codes' => $this->twoFactor->protectRecoveryCodes($recovery),
+                'login_verify' => User::LOGIN_VERIFY_TOTP,
+            ])->save();
+
+            return ['status' => 'enabled', 'recovery' => $recovery];
+        });
+
+        if ($outcome['status'] === 'stale') {
+            $request->session()->forget(self::SETUP_KEY);
+
+            return $this->recentAuthenticationRequired();
+        }
+
+        if ($outcome['status'] === 'already_enabled') {
+            $request->session()->forget(self::SETUP_KEY);
+
+            return redirect()->route('admin.2fa.show')
+                ->with('status', 'Two-factor authentication is already enabled.');
+        }
+
+        /** @var list<string> $recovery */
+        $recovery = $outcome['recovery'];
 
         $request->session()->forget([self::SETUP_KEY, '2fa.recovery_codes']);
+        $this->recentAuthentication->clear($request->session());
 
         // Surface plaintext recovery codes exactly once without writing them to the database
         // session or allowing a browser/proxy cache to retain the response.
@@ -115,33 +204,104 @@ class TwoFactorController extends Controller
             'setupSecret' => null,
             'setupUri' => null,
             'recoveryCodes' => $recovery,
+            'recentlyAuthenticated' => false,
+            'factorRecentlyVerified' => false,
+            'recentAuthenticationWindow' => $this->recentAuthenticationWindow(),
         ])->withHeaders(self::sensitiveResponseHeaders());
     }
 
     public function disable(Request $request): RedirectResponse
     {
-        $request->validate([
-            'password' => ['required', 'string', 'max:'.AccountPasswordPolicy::MAX_LENGTH],
-        ]);
-
         /** @var User $user */
         $user = $request->user();
 
-        if (! Hash::check((string) $request->input('password'), (string) $user->password)) {
-            return back()->withErrors(['password' => 'Incorrect password.']);
+        if (! $this->recentAuthentication->isValid($request->session(), $user)) {
+            return $this->recentAuthenticationRequired();
         }
 
-        $user->forceFill([
-            'two_factor_secret' => null,
-            'two_factor_enabled' => false,
-            'two_factor_confirmed_at' => null,
-            'two_factor_recovery_codes' => null,
-            'login_verify' => User::LOGIN_VERIFY_OFF,
-        ])->save();
+        $factorRecentlyVerified = $this->recentAuthentication
+            ->factorWasVerified($request->session(), $user);
+        $request->validate([
+            'code' => [$factorRecentlyVerified ? 'nullable' : 'required', 'string', 'max:32'],
+        ]);
+
+        $throttleKey = $this->managementThrottleKey('disable', $user, $request);
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            return back()->withErrors(['code' => "Too many removal attempts. Try again in {$seconds} seconds."]);
+        }
+
+        $code = (string) $request->input('code');
+        $outcome = DB::transaction(function () use ($request, $user, $code): string {
+            /** @var User $locked */
+            $locked = User::query()->lockForUpdate()->findOrFail($user->getKey());
+
+            if (! $this->recentAuthentication->isValid($request->session(), $locked)) {
+                return 'stale';
+            }
+
+            if (! $locked->two_factor_enabled) {
+                return 'already_disabled';
+            }
+
+            $validCode = $this->recentAuthentication
+                ->factorWasVerified($request->session(), $locked)
+                || $this->twoFactor->verifyTotp($locked, $code)
+                || $this->twoFactor->verifyRecoveryCode($locked, $code);
+            if (! $validCode) {
+                return 'invalid';
+            }
+
+            $locked->forceFill([
+                'two_factor_secret' => null,
+                'two_factor_enabled' => false,
+                'two_factor_confirmed_at' => null,
+                'two_factor_recovery_codes' => null,
+                'login_verify' => User::LOGIN_VERIFY_OFF,
+            ])->save();
+
+            return 'disabled';
+        });
+
+        if ($outcome === 'invalid') {
+            RateLimiter::hit($throttleKey, 60);
+
+            return back()->withErrors(['code' => 'That authenticator or recovery code is invalid.']);
+        }
+
+        if ($outcome === 'stale') {
+            return $this->recentAuthenticationRequired();
+        }
+
+        RateLimiter::clear($throttleKey);
 
         $request->session()->forget(self::SETUP_KEY);
+        if ($outcome === 'already_disabled') {
+            return redirect()->route('admin.2fa.show');
+        }
+
+        $this->recentAuthentication->clear($request->session());
 
         return redirect()->route('admin.2fa.show')->with('status', 'Two-factor authentication disabled.');
+    }
+
+    public function cancel(Request $request): RedirectResponse
+    {
+        $request->session()->forget(self::SETUP_KEY);
+
+        return redirect()->route('admin.2fa.show')->with('status', 'Two-factor setup cancelled.');
+    }
+
+    public function reauthenticate(Request $request): RedirectResponse
+    {
+        Auth::logoutCurrentDevice();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        $request->session()->put('url.intended', route('admin.2fa.show'));
+
+        return redirect()->route('admin.login')
+            ->with('status', 'Complete your normal sign-in to change two-factor authentication.');
     }
 
     // --- Post-password challenge (NOT authenticated; session-marker gated) ---------------
@@ -179,8 +339,10 @@ class TwoFactorController extends Controller
         }
 
         $code = (string) $request->input('code');
-        $ok = $this->twoFactor->verifyTotp($user, $code)
-            || $this->twoFactor->verifyRecoveryCode($user, $code);
+        $ok = $this->twoFactor->verifyTotp($user, $code);
+        if (! $ok) {
+            $ok = $this->twoFactor->verifyRecoveryCode($user, $code);
+        }
 
         if (! $ok) {
             RateLimiter::hit($throttleKey);
@@ -197,6 +359,7 @@ class TwoFactorController extends Controller
 
         Auth::login($user, $remember);
         $request->session()->regenerate();
+        $this->recentAuthentication->noteFactorVerification($request->session(), $user);
 
         $user->forceFill([
             'last_login_at' => now(),
@@ -279,10 +442,10 @@ class TwoFactorController extends Controller
     }
 
     /**
-     * Decrypt the candidate enrollment secret. A valid plaintext value from an in-flight
-     * pre-upgrade session is accepted once and immediately replaced with ciphertext.
+     * Decrypt and validate the account-, credential-, authentication-, and time-bound candidate
+     * enrollment state. Unbound state from an older release is intentionally discarded.
      */
-    private function setupSecret(Request $request): ?string
+    private function setupSecret(Request $request, User $user): ?string
     {
         $stored = $request->session()->get(self::SETUP_KEY);
         if (! is_string($stored)) {
@@ -292,26 +455,61 @@ class TwoFactorController extends Controller
         }
 
         try {
-            $secret = Crypt::decryptString($stored);
-        } catch (DecryptException) {
-            if (! TotpSecretFormat::isValid($stored)) {
-                $request->session()->forget(self::SETUP_KEY);
-
-                return null;
-            }
-
-            $request->session()->put(self::SETUP_KEY, Crypt::encryptString($stored));
-
-            return $stored;
-        }
-
-        if (! TotpSecretFormat::isValid($secret)) {
+            $decoded = json_decode(Crypt::decryptString($stored), true, 512, JSON_THROW_ON_ERROR);
+        } catch (DecryptException|JsonException) {
             $request->session()->forget(self::SETUP_KEY);
 
             return null;
         }
 
-        return $secret;
+        $authenticationNonce = $this->recentAuthentication->nonce($request->session(), $user);
+        $now = now()->getTimestamp();
+        $valid = is_array($decoded)
+            && ($decoded['version'] ?? null) === self::SETUP_VERSION
+            && is_string($decoded['user_id'] ?? null)
+            && hash_equals((string) $user->getAuthIdentifier(), $decoded['user_id'])
+            && ($decoded['credential_version'] ?? null) === max(1, (int) $user->credential_version)
+            && is_string($decoded['authentication_nonce'] ?? null)
+            && is_string($authenticationNonce)
+            && hash_equals($authenticationNonce, $decoded['authentication_nonce'])
+            && is_int($decoded['created_at'] ?? null)
+            && $decoded['created_at'] <= $now
+            && is_int($decoded['expires_at'] ?? null)
+            && $decoded['expires_at'] === $decoded['created_at'] + $this->recentAuthentication->timeoutSeconds()
+            && $decoded['expires_at'] >= $now
+            && is_string($decoded['secret'] ?? null)
+            && TotpSecretFormat::isValid($decoded['secret']);
+
+        if (! $valid) {
+            $request->session()->forget(self::SETUP_KEY);
+
+            return null;
+        }
+
+        return $decoded['secret'];
+    }
+
+    private function managementThrottleKey(string $action, User $user, Request $request): string
+    {
+        return '2fa-management:'.$action.':'.$user->getAuthIdentifier().'|'.$request->ip();
+    }
+
+    private function recentAuthenticationRequired(): RedirectResponse
+    {
+        return redirect()->route('admin.2fa.show')
+            ->with('warning', 'Sign in again to change two-factor authentication.');
+    }
+
+    private function recentAuthenticationWindow(): string
+    {
+        $seconds = $this->recentAuthentication->timeoutSeconds();
+        if ($seconds % 60 === 0) {
+            $minutes = intdiv($seconds, 60);
+
+            return $minutes.' '.str('minute')->plural($minutes);
+        }
+
+        return $seconds.' seconds';
     }
 
     /**

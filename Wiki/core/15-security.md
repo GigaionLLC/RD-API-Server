@@ -63,6 +63,10 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   identities cannot change its issuer, client, type, or key in place; it must be explicitly
   deleted and recreated. Deletion removes its links transactionally before the provider key
   can be reused, so a replacement issuer cannot inherit the previous users.
+- Console SSO treats the identity provider as the sign-in trust anchor and does not layer the
+  application's local TOTP challenge onto that path. Operators who require MFA for SSO must
+  enforce it at the identity provider; the application must not claim that every OIDC provider
+  or policy guarantees MFA.
 
 ## LDAP Identity Boundary
 
@@ -180,12 +184,47 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   invalidates affected recovery lists; the authenticator remains usable and new recovery codes
   require re-enrollment.
 
+## Two-Factor Management Reauthentication Boundary
+
+- A console session may change its own authenticator only shortly after its configured sign-in
+  flow completes. The marker is issued centrally after local, LDAP, or SSO authentication has
+  established the final browser session, and only after the application TOTP challenge when that
+  challenge applies. Password acceptance while a TOTP challenge is still pending never qualifies.
+- The marker is encrypted independently of the database session and bound to the exact user,
+  credential version, current password hash, regenerated browser-session ID, issue time, expiry,
+  and a random nonce. It expires after five minutes by default;
+  `AUTH_TWO_FACTOR_MANAGEMENT_TIMEOUT` is clamped to 60-900 seconds. Remembered or pre-upgrade
+  sessions without the marker remain signed in but cannot mutate two-factor state. Every route
+  that reads or consumes this state uses session blocking so overlapping requests cannot restore
+  a consumed marker or pending enrollment snapshot.
+- The settings page remains readable after expiry, but it clears and never renders a pending
+  enrollment secret. Starting and confirming enrollment and removing the factor each recheck
+  freshness. Candidate setup state is encrypted and bound to the same account, credential
+  version, marker nonce, and short expiry, so it cannot cross accounts, browser sessions, or a
+  later completed sign-in.
+- Successful enrollment is serialized against the user row and cannot overwrite a factor enabled
+  concurrently. Removal requires the existing authenticator or one unused recovery code unless
+  that exact factor was already proved while completing the immediately preceding application
+  sign-in. Carried factor assurance is keyed to the enrollment's encrypted seed and confirmation
+  time, so proof for a replaced factor cannot remove its successor. This permits a final recovery
+  code to complete sign-in and removal without demanding a nonexistent second code. Failures are
+  rate-limited per account and source IP; success clears the seed, recovery list, confirmation
+  time, login mode, pending setup, and recent marker together.
+- LDAP and SSO accounts use a new completed directory/provider sign-in instead of their unusable
+  random local password. The explicit “Sign out and sign in again” action invalidates the current
+  application session and returns the newly authenticated account to its two-factor settings.
+  An OIDC provider can satisfy that authorization from its own existing session; operators must
+  configure provider-side reauthentication or step-up policy when fresh IdP credential entry is
+  required. SSO does not carry application-factor assurance, so removal still requires the
+  current authenticator or a recovery code.
+
 ## Authenticator Secret and Application-Key Boundary
 
 - Authenticator seeds are encrypted before they are stored in `users.two_factor_secret`.
-  Enrollment candidates are also encrypted inside the database-backed session; setup and
-  recovery responses are private/no-store and suppress referrer disclosure. A database or session
-  disclosure without the application key therefore does not reveal a usable seed.
+  Enrollment candidates are also encrypted and account/session/time-bound inside the
+  database-backed session; setup and recovery responses are private/no-store and suppress
+  referrer disclosure. A database or session disclosure without the application key therefore
+  does not reveal a usable seed.
 - The runtime uses an explicit `APP_KEY` when configured; otherwise it generates and persists one
   at `storage/app/.appkey`. The database and that key are one backup unit. Restoring the database
   without the matching key makes existing authenticator secrets unreadable and keyed recovery

@@ -7,7 +7,7 @@
 | **Status** | `IN PROGRESS` |
 | **Version** | `v1.0.0` |
 | **Active Persona** | Security and frontend hardening implementer |
-| **Last Updated** | 2026-07-14 10:00 PDT |
+| **Last Updated** | 2026-07-15 17:00 PDT |
 
 ---
 
@@ -25,6 +25,8 @@ authorization, security, dependency, and release-integrity review.
 - Destructive permission gaps for alarms and recordings.
 - WebUI interaction, responsive, accessibility, and test gaps found by the audit.
 - Reproducible local frontend assets, third-party notices, and mutable Docker tooling.
+- Recent completed-sign-in enforcement for personal authenticator setup and removal.
+- Consistent TOTP state that generic user editing cannot bypass or make impossible.
 - Focused regression tests, full Docker gates, documentation, and isolated local commits.
 
 **Out of scope:**
@@ -64,7 +66,11 @@ can be reverted without reverting the redesign or another security fix. Nothing 
    build inputs.
 9. Run targeted tests after each boundary, then the complete PHPUnit, Pint, PHPStan, ESLint,
    vendor-build, Blade-cache, and Playwright matrix in Docker.
-10. Synchronize security/access-control/build docs, append changelog entries, archive this
+10. Require a short, account-bound completed-sign-in window for the entire personal TOTP
+    management lifecycle and a current authenticator/recovery code for removal.
+11. Remove generic user-editor control of TOTP state and repair inconsistent stored state without
+    changing the RustDesk client wire contract.
+12. Synchronize security/access-control/build docs, append changelog entries, archive this
     plan, and leave all commits local on `main`.
 
 ## 5. Phase 5: Product Owner Review
@@ -86,13 +92,15 @@ can be reverted without reverting the redesign or another security fix. Nothing 
 ## 7. Phase 7: Implementation Checklist
 
 - [x] Commit WebUI baseline independently.
-- [ ] Fix functional/accessibility regressions.
-- [ ] Fix API-key privilege escalation.
-- [ ] Fix stored XSS.
-- [ ] Fix client-config command/PIN handling.
-- [ ] Fix webhook SSRF and URL disclosure.
-- [ ] Fix alarm/recording destructive permissions.
-- [ ] Harden asset/license/build supply chain.
+- [x] Fix functional/accessibility regressions.
+- [x] Fix API-key privilege escalation.
+- [x] Fix stored XSS.
+- [x] Fix client-config command/PIN handling.
+- [x] Fix webhook SSRF and URL disclosure.
+- [x] Fix alarm/recording destructive permissions.
+- [x] Harden asset/license/build supply chain.
+- [ ] Require recent completed sign-in for personal TOTP management.
+- [ ] Prevent generic user editing from bypassing or corrupting TOTP state.
 - [ ] Run targeted and complete verification.
 - [ ] Synchronize docs/changelog and archive the plan.
 

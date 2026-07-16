@@ -344,7 +344,7 @@ test('clipboard fallback returns focus to the copy control', async ({ page }, te
 
 test('flagship pages contain wide content without page-level overflow', async ({ page }, testInfo) => {
     await signIn(page);
-    for (const path of ['/admin', '/admin/devices', '/admin/client-config', '/admin/ldap']) {
+    for (const path of ['/admin', '/admin/devices', '/admin/client-config', '/admin/ldap', '/admin/2fa']) {
         await page.goto(path, { waitUntil: 'domcontentloaded' });
         await expect(page.locator('.rd-page-header')).toBeVisible();
         await expectNoPageOverflow(page);
@@ -352,7 +352,7 @@ test('flagship pages contain wide content without page-level overflow', async ({
 
     if (testInfo.project.name === 'mobile-dark') {
         await page.setViewportSize({ width: 320, height: 800 });
-        for (const path of ['/admin', '/admin/devices', '/admin/client-config', '/admin/ldap']) {
+        for (const path of ['/admin', '/admin/devices', '/admin/client-config', '/admin/ldap', '/admin/2fa']) {
             await page.goto(path, { waitUntil: 'domcontentloaded' });
             await expect(page.locator('.rd-page-header')).toBeVisible();
             await expectNoPageOverflow(page);

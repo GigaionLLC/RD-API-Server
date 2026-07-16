@@ -3,6 +3,39 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 18:00] - Security: require recent authentication for two-factor management
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Support/RecentAdminAuthentication.php`
+- `app/Http/Middleware/EnsureCredentialVersion.php`
+- `app/Http/Controllers/Admin/TwoFactorController.php`, `app/Http/Controllers/Admin/AuthController.php`
+- `resources/views/admin/two_factor/show.blade.php`, `routes/web.php`, `config/auth.php`
+- `.env.example`, `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`
+- `tests/Feature/AdminTwoFactorTest.php`, `tests/Feature/AdminSsoLoginTest.php`
+- `tests/Feature/LdapIdentitySecurityTest.php`, `tests/Feature/AccountPasswordPolicyTest.php`
+- `e2e/accessibility.spec.ts`, `e2e/gui.spec.ts`
+- `Wiki/core/15-security.md`, `docs/modernization/08-build-log.md`
+- `docs/modernization/09-port-status.md`, `DevOps/plans/webui-security-hardening.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Existing TOTP columns, encrypted seeds, recovery digests, client
+login behavior, `/api/*` paths, and RustDesk wire shapes remain unchanged. The optional
+`AUTH_TWO_FACTOR_MANAGEMENT_TIMEOUT` setting defaults to 300 seconds and is clamped to 60-900.
+**Summary:** Personal authenticator setup and removal now require an encrypted, account-,
+credential-, regenerated-session-ID-, and time-bound completed-sign-in marker. Enrollment state
+cannot cross accounts, sessions, or authentication windows; stale sessions reveal no setup
+secret; route-level session blocking prevents concurrent state resurrection; and row locking
+prevents setup from overwriting an enabled factor. Removal now works for local, LDAP, and SSO
+administrators through their normal application sign-in plus a throttled current authenticator or
+single-use recovery code. A factor proved during local/LDAP sign-in carries assurance bound to
+that exact enrollment, so the final recovery code can authorize removal without proof for an old
+factor applying to its replacement; SSO continues to require a code. Added real setup
+cancellation and sign-out/re-entry flows, documented provider-controlled SSO reauthentication,
+and covered expiry boundaries, malformed/replayed state, credential/factor changes, concurrency,
+throttling, recovery consumption, and all three sign-in paths. Focused Docker suites passed 50
+tests / 534 assertions; targeted Pint/PHPStan, Blade compilation, route and Playwright discovery,
+and diff checks were clean. The complete-suite rerun will be recorded in the final hardening
+wrap-up. The commit remains local on `main` and was not pushed.
+
 ## [2026-07-14 23:10] - Build: require MariaDB
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

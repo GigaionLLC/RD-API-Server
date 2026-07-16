@@ -42,18 +42,21 @@ Route::get('/admin/sso/{op}/callback', [AuthController::class, 'ssoCallback'])->
 
 // Post-password TOTP challenge — gated by a session marker, NOT `auth` (the user is logged
 // out between supplying their password and their second factor). See TwoFactorController.
-Route::get('/admin/2fa/challenge', [TwoFactorController::class, 'challenge'])->name('admin.2fa.challenge');
-Route::post('/admin/2fa/challenge', [TwoFactorController::class, 'verifyChallenge'])->name('admin.2fa.challenge.verify');
+Route::get('/admin/2fa/challenge', [TwoFactorController::class, 'challenge'])->name('admin.2fa.challenge')->block(30, 10);
+Route::post('/admin/2fa/challenge', [TwoFactorController::class, 'verifyChallenge'])->name('admin.2fa.challenge.verify')->block(30, 10);
 
 Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     // Logout is available to any signed-in console user (no permission gate).
     Route::post('/admin/logout', [AuthController::class, 'logout'])->name('admin.logout');
 
-    // Personal two-factor management (any signed-in console user manages their own — no gate).
-    Route::get('/admin/2fa', [TwoFactorController::class, 'show'])->name('admin.2fa.show');
-    Route::post('/admin/2fa/enable', [TwoFactorController::class, 'enable'])->name('admin.2fa.enable');
-    Route::post('/admin/2fa/confirm', [TwoFactorController::class, 'confirm'])->name('admin.2fa.confirm');
-    Route::delete('/admin/2fa', [TwoFactorController::class, 'disable'])->name('admin.2fa.disable');
+    // Personal two-factor management. Mutations require a recent completed sign-in; removal also
+    // requires the current factor unless that exact enrollment was proved during this sign-in.
+    Route::get('/admin/2fa', [TwoFactorController::class, 'show'])->name('admin.2fa.show')->block(30, 10);
+    Route::post('/admin/2fa/enable', [TwoFactorController::class, 'enable'])->name('admin.2fa.enable')->block(30, 10);
+    Route::post('/admin/2fa/confirm', [TwoFactorController::class, 'confirm'])->name('admin.2fa.confirm')->block(30, 10);
+    Route::delete('/admin/2fa/setup', [TwoFactorController::class, 'cancel'])->name('admin.2fa.cancel')->block(30, 10);
+    Route::post('/admin/2fa/reauthenticate', [TwoFactorController::class, 'reauthenticate'])->name('admin.2fa.reauthenticate')->block(30, 10);
+    Route::delete('/admin/2fa', [TwoFactorController::class, 'disable'])->name('admin.2fa.disable')->block(30, 10);
 
     // Dashboard — real stats from the DashboardController.
     Route::get('/admin', [DashboardController::class, 'index'])->middleware('permission:dashboard.view')->name('admin.dashboard');

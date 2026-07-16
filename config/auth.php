@@ -114,4 +114,16 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Two-Factor Management Freshness
+    |--------------------------------------------------------------------------
+    |
+    | Two-factor setup and removal require a recently completed console sign-in.
+    | Runtime enforcement clamps this value to a secure 60-900 second range.
+    |
+    */
+
+    'two_factor_management_timeout' => env('AUTH_TWO_FACTOR_MANAGEMENT_TIMEOUT', 300),
+
 ];
