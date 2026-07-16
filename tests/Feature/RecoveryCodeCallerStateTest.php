@@ -18,6 +18,10 @@ class RecoveryCodeCallerStateTest extends TestCase
             'password' => 'legacy-password',
             'is_admin' => true,
             'status' => User::STATUS_NORMAL,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+            'two_factor_enabled' => true,
+            'two_factor_secret' => app(TwoFactorService::class)->generateSecret(),
+            'two_factor_confirmed_at' => now(),
             'two_factor_recovery_codes' => [
                 'ABCDEF-123456',
                 'FEDCBA-654321',

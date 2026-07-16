@@ -102,8 +102,11 @@ After the old release works correctly on MariaDB:
 7. Start only upgraded replicas, then repeat the authentication, client, address-book, audit, and
    integration smoke tests.
 
-Do not use a mixed-version rolling deployment across this boundary. In particular, the migration
-that encrypts authenticator secrets requires old writers to remain stopped while it runs.
+Do not use a mixed-version rolling deployment across this boundary. In particular, the migrations
+that encrypt authenticator secrets and normalize/enforce canonical TOTP state require old writers
+to remain stopped while they run. MariaDB cannot make the TOTP repair transaction and subsequent
+CHECK installation one atomic unit, so review the first upgraded instance's migration result
+before starting any writer.
 
 ## Rollback
 

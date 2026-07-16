@@ -37,6 +37,14 @@ layers local TOTP onto the callback nor guarantees that the provider prompts aga
 MFA/step-up policy remains the operator's responsibility and an SSO removal still requires a
 factor code.
 
+TOTP enrollment is available only to accounts with console access through their protected
+personal settings. Generic user create/edit screens and requests can select only `off` or `email`
+for inactive accounts; an active authenticator is read-only and its seed, confirmation time, and
+recovery list are preserved. A MariaDB repair migration validates all encrypted seeds before
+writing, normalizes historical partial states, and enforces the canonical active/inactive
+invariant with a named CHECK whose byte-exact policy comparisons cannot be weakened by MariaDB's
+case-insensitive text collation. This changes no RustDesk client keys or paths.
+
 ## Current admin UI status (2026-07-13)
 
 The historical table below predates the completed full-surface WebUI modernization. The

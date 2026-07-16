@@ -3,6 +3,37 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 19:15] - Security: enforce canonical user TOTP state
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Models/User.php`, `app/Http/Controllers/Admin/UserController.php`
+- `resources/views/admin/users/create.blade.php`, `resources/views/admin/users/edit.blade.php`
+- `database/migrations/2026_07_15_100001_normalize_user_two_factor_state.php`
+- `tests/Feature/AdminUserTwoFactorStateTest.php`
+- `tests/Feature/UserTwoFactorStateMigrationTest.php`
+- `tests/Feature/RecoveryCodeCallerStateTest.php`, `tests/Feature/RecoveryCodeSecurityTest.php`
+- `tests/Feature/TotpSecretEncryptionTest.php`, `tests/Feature/TotpSecretMigrationTest.php`
+- `Wiki/core/15-security.md`, `docs/modernization/08-build-log.md`
+- `docs/modernization/09-port-status.md`, `docs/sqlite-to-mariadb.md`, `docker/README.md`
+- `DevOps/plans/webui-security-hardening.md`, `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds the MariaDB CHECK constraint
+`users_two_factor_state_consistent` after a fail-before-write encrypted-seed preflight and
+one-way repair. No table/column, `/api/*`, JSON-key, or RustDesk wire-shape change. Rollback drops
+only the constraint and deliberately keeps repaired account state.
+**Summary:** Made protected console self-service the only TOTP enrollment authority. Generic
+account creation and editing no longer accept TOTP policy or factor material; active factors are
+shown read-only and preserved under a user-row lock, while inactive `off`/`email` updates clear
+orphan metadata. Factor fields must be entirely absent from generic requests and are defensively
+removed before persistence, closing empty/null/array validation bypasses that could corrupt a
+seed or recovery list. The migration decrypts and validates every stored seed with
+current/previous application keys before changing any row, resolves historical split states by
+strongest active intent, clears unusable/orphan state, normalizes unknown policy to `off`, and
+uses byte-exact policy comparisons so MariaDB's case-insensitive text collation cannot admit a
+value PHP would interpret differently. The invariant is durable in MariaDB. Focused Docker suites
+passed 23 tests / 157 assertions;
+targeted Pint/PHPStan, Blade compilation, and diff checks were clean. The complete-suite rerun is
+recorded in the final hardening wrap-up. The commit remains local on `main` and was not pushed.
+
 ## [2026-07-15 18:00] - Security: require recent authentication for two-factor management
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

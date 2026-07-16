@@ -76,11 +76,11 @@
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="login_verify">Login verification</label>
-                    <select class="rd-select" id="login_verify" name="login_verify">
+                    <select class="rd-select" id="login_verify" name="login_verify" aria-describedby="login-verify-help">
                         <option value="off" @selected(old('login_verify', 'off') === 'off')>Off</option>
                         <option value="email" @selected(old('login_verify') === 'email')>Email code</option>
-                        <option value="totp" @selected(old('login_verify') === 'totp')>TOTP</option>
                     </select>
+                    <span class="rd-help" id="login-verify-help">TOTP enrollment is available only to accounts with console access, from their personal two-factor settings.</span>
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="note">Note</label>

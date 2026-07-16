@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\PermissionService;
+use App\Support\TotpSecretFormat;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -64,6 +65,21 @@ class User extends Authenticatable
     public function isActive(): bool
     {
         return $this->status === self::STATUS_NORMAL;
+    }
+
+    /**
+     * Whether this account has a complete, usable authenticator-app factor.
+     */
+    public function hasActiveTotp(): bool
+    {
+        if ($this->login_verify !== self::LOGIN_VERIFY_TOTP || ! $this->two_factor_enabled) {
+            return false;
+        }
+
+        $secret = $this->two_factor_secret;
+
+        return is_string($secret)
+            && TotpSecretFormat::isValid($secret);
     }
 
     /**

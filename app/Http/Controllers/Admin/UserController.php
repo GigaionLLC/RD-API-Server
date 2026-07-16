@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -155,13 +156,21 @@ class UserController extends Controller
             'is_admin' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'boolean'],
             'status' => ['required', 'integer', Rule::in([User::STATUS_NORMAL, User::STATUS_DISABLED, User::STATUS_UNVERIFIED])],
             'force_sso' => ['nullable', 'boolean'],
-            'login_verify' => ['required', Rule::in([User::LOGIN_VERIFY_OFF, User::LOGIN_VERIFY_EMAIL, User::LOGIN_VERIFY_TOTP])],
+            'login_verify' => ['required', Rule::in([User::LOGIN_VERIFY_OFF, User::LOGIN_VERIFY_EMAIL])],
+            'two_factor_enabled' => ['missing'],
+            'two_factor_secret' => ['missing'],
+            'two_factor_confirmed_at' => ['missing'],
+            'two_factor_recovery_codes' => ['missing'],
             'group_id' => ['nullable', 'integer', 'exists:groups,id'],
             'note' => ['nullable', 'string', 'max:255'],
         ]);
 
         $data['is_admin'] = $canManageAdminAccess && (bool) ($data['is_admin'] ?? false);
         $data['force_sso'] = (bool) ($data['force_sso'] ?? false);
+        $data['two_factor_enabled'] = false;
+        $data['two_factor_secret'] = null;
+        $data['two_factor_confirmed_at'] = null;
+        $data['two_factor_recovery_codes'] = null;
 
         if (! $this->scope->isUnrestricted($request->user(), 'users.edit')) {
             if (($data['group_id'] ?? null) === null) {
@@ -194,6 +203,7 @@ class UserController extends Controller
             : [];
         $isFederated = LdapIdentity::query()->where('user_id', $user->id)->exists()
             || UserThird::query()->where('user_id', $user->id)->exists();
+        $hasActiveTotp = $user->hasActiveTotp();
 
         return view('admin.users.edit', compact(
             'user',
@@ -203,6 +213,7 @@ class UserController extends Controller
             'canEdit',
             'canManageAdminAccess',
             'isFederated',
+            'hasActiveTotp',
         ));
     }
 
@@ -211,6 +222,7 @@ class UserController extends Controller
         $this->scope->authorizeUser($request->user(), $user, 'users.edit');
         $this->authorizePrivilegedAccountManagement($request, $user);
         $canManageAdminAccess = (bool) $request->user()->is_admin;
+        $hasActiveTotp = $user->hasActiveTotp();
 
         $data = $request->validate([
             'email' => ['nullable', 'email', 'max:255'],
@@ -218,7 +230,13 @@ class UserController extends Controller
             'is_admin' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'boolean'],
             'status' => ['required', 'integer', Rule::in([User::STATUS_NORMAL, User::STATUS_DISABLED, User::STATUS_UNVERIFIED])],
             'force_sso' => ['nullable', 'boolean'],
-            'login_verify' => ['required', Rule::in([User::LOGIN_VERIFY_OFF, User::LOGIN_VERIFY_EMAIL, User::LOGIN_VERIFY_TOTP])],
+            'login_verify' => $hasActiveTotp
+                ? ['missing']
+                : ['required', Rule::in([User::LOGIN_VERIFY_OFF, User::LOGIN_VERIFY_EMAIL])],
+            'two_factor_enabled' => ['missing'],
+            'two_factor_secret' => ['missing'],
+            'two_factor_confirmed_at' => ['missing'],
+            'two_factor_recovery_codes' => ['missing'],
             'group_id' => ['nullable', 'integer', 'exists:groups,id'],
             'note' => ['nullable', 'string', 'max:255'],
             'admin_role_ids' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'string'],
@@ -226,7 +244,13 @@ class UserController extends Controller
 
         $data['force_sso'] = (bool) ($data['force_sso'] ?? false);
         $data['group_id'] = $data['group_id'] ?? null;
-        unset($data['admin_role_ids']);
+        unset(
+            $data['admin_role_ids'],
+            $data['two_factor_enabled'],
+            $data['two_factor_secret'],
+            $data['two_factor_confirmed_at'],
+            $data['two_factor_recovery_codes'],
+        );
 
         if (! $this->scope->isUnrestricted($request->user(), 'users.edit')) {
             if ($data['group_id'] === null) {
@@ -241,7 +265,26 @@ class UserController extends Controller
             unset($data['is_admin']);
         }
 
-        $user->fill($data)->save();
+        $user = DB::transaction(function () use ($user, $data): User {
+            $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->hasActiveTotp()) {
+                // Personal TOTP enrollment is owned by the account holder. A generic account
+                // update may change surrounding profile fields, but never the factor policy.
+                unset($data['login_verify']);
+            } else {
+                // Keep every inactive state canonical even if this row predates the repair
+                // migration or a concurrent enrollment request has not committed yet.
+                $data['two_factor_enabled'] = false;
+                $data['two_factor_secret'] = null;
+                $data['two_factor_confirmed_at'] = null;
+                $data['two_factor_recovery_codes'] = null;
+            }
+
+            $locked->fill($data)->save();
+
+            return $locked;
+        });
         if ($canManageAdminAccess) {
             $user->adminRoles()->sync($this->parseRoleIds($request->input('admin_role_ids')));
         }

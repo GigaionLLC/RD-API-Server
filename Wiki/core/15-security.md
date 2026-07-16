@@ -184,6 +184,33 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   invalidates affected recovery lists; the authenticator remains usable and new recovery codes
   require re-enrollment.
 
+## Canonical Authenticator State Boundary
+
+- An active account TOTP factor has all three structural signals together:
+  `login_verify = 'totp'`, `two_factor_enabled = 1`, and a non-null encrypted seed. Inactive
+  `off`/`email` state has a false enabled flag and null seed, confirmation time, and recovery
+  list. Policy values are compared byte-for-byte so the database's case-insensitive text
+  collation cannot turn variants such as `TOTP` into a state PHP would interpret differently. A
+  named MariaDB CHECK rejects partial or non-canonical states after deployment.
+- Before the repair migration changes any account, it decrypts and format-validates every stored
+  seed using the current `APP_KEY` or a configured `APP_PREVIOUS_KEYS` key. Any missing key,
+  malformed ciphertext, or invalid seed aborts before the first normalization write. Operators
+  must restore the matching key instead of silently discarding an unreadable factor.
+- A valid seed plus either historical active signal is normalized to active TOTP (strongest
+  security intent wins). An active signal without a seed becomes `off`, except an existing
+  `email` policy remains email; orphan seed/metadata and unknown policies become canonical
+  inactive state. Rolling back drops only the CHECK and does not recreate unsafe split state.
+- Only an account with console access may enroll or remove its own TOTP through the protected
+  personal settings. Generic user administration can set `off` or `email` only when TOTP is
+  inactive. An active factor is read-only there and preserved under a row lock; factor-state
+  fields must be missing from generic requests and are stripped defensively before persistence.
+  Full and delegated administrators cannot inject, replace, clear, or corrupt another account's
+  seed or recovery codes through the generic editor.
+- Run the normalization/constraint migration with old writers quiesced. Its preflight and repair
+  transaction prevent partial application failures, but MariaDB cannot make the repair and
+  subsequent `ALTER TABLE` one atomic unit; a legacy writer between them can make constraint
+  installation fail. Back up the database and matching application keys first.
+
 ## Two-Factor Management Reauthentication Boundary
 
 - A console session may change its own authenticator only shortly after its configured sign-in

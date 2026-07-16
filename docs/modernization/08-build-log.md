@@ -2,6 +2,25 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - Canonical TOTP state and console self-service ownership (verified)
+
+- Removed TOTP selection and factor-state writes from generic user creation/editing. Console
+  account owners enroll and remove authenticator apps only through the protected personal flow;
+  generic editors can still choose `off` or `email` for an inactive account, while an active
+  factor is rendered read-only and preserved under a user-row lock.
+- Required factor fields to be absent from generic requests and defensively strip them before
+  persistence. Crafted empty strings, nulls, and empty arrays therefore cannot replace an
+  encrypted seed, erase recovery codes, or turn an active factor into a partial state.
+- Added a fail-before-write MariaDB migration that validates every encrypted seed using the
+  current or configured previous application keys, then normalizes split historical rows by the
+  strongest usable TOTP intent. Unusable and orphaned state is cleared; unknown policy becomes
+  `off`; a named CHECK uses byte-exact policy comparisons so case-insensitive database collation
+  cannot admit values the application interprets differently. It keeps active and inactive state
+  structurally consistent; rollback removes only enforcement and keeps the repaired data.
+- No table/column, client API, or RustDesk wire-contract change was introduced. Focused Docker
+  suites passed 23 tests / 157 assertions; targeted Pint/PHPStan, Blade compilation, and diff
+  checks were clean. Complete quality-gate results are recorded in the final hardening wrap-up.
+
 ## 2026-07-15 - Recent completed-sign-in boundary for 2FA management (verified)
 
 - Added an encrypted five-minute management marker after the configured console sign-in flow

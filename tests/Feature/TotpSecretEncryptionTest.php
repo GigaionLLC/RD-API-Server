@@ -31,6 +31,8 @@ class TotpSecretEncryptionTest extends TestCase
             'username' => 'encrypted-totp-user',
             'password' => 'legacy-password',
             'status' => User::STATUS_NORMAL,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+            'two_factor_enabled' => true,
             'two_factor_secret' => $secret,
         ]);
 
@@ -65,6 +67,8 @@ class TotpSecretEncryptionTest extends TestCase
             'username' => 'previous-key-totp-user',
             'password' => 'legacy-password',
             'status' => User::STATUS_NORMAL,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+            'two_factor_enabled' => true,
             'two_factor_secret' => $ciphertext,
             'created_at' => now(),
             'updated_at' => now(),
@@ -96,6 +100,8 @@ class TotpSecretEncryptionTest extends TestCase
             'username' => 'corrupt-totp-user',
             'password' => 'legacy-password',
             'status' => User::STATUS_NORMAL,
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+            'two_factor_enabled' => true,
             'two_factor_secret' => 'not-valid-ciphertext!',
             'created_at' => now(),
             'updated_at' => now(),

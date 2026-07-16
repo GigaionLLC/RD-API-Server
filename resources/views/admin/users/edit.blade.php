@@ -86,12 +86,20 @@
                         </label>
                     </div>
                     <div class="rd-field">
-                        <label class="rd-label" for="login_verify">Login verification</label>
-                        <select class="rd-select" id="login_verify" name="login_verify" @disabled(! $canEdit)>
-                            <option value="off" @selected($user->login_verify === 'off')>Off</option>
-                            <option value="email" @selected($user->login_verify === 'email')>Email code</option>
-                            <option value="totp" @selected($user->login_verify === 'totp')>TOTP</option>
-                        </select>
+                        @if ($hasActiveTotp)
+                            <div class="rd-label">Login verification</div>
+                            <div class="rd-callout rd-callout--info" role="status">
+                                <i class="ri-shield-check-line" aria-hidden="true"></i>
+                                <p>Authenticator app enabled. This factor is read-only here; accounts with console access manage it from their personal two-factor settings.</p>
+                            </div>
+                        @else
+                            <label class="rd-label" for="login_verify">Login verification</label>
+                            <select class="rd-select" id="login_verify" name="login_verify" aria-describedby="login-verify-help" @disabled(! $canEdit)>
+                                <option value="off" @selected($user->login_verify === 'off')>Off</option>
+                                <option value="email" @selected($user->login_verify === 'email')>Email code</option>
+                            </select>
+                            <span class="rd-help" id="login-verify-help">TOTP enrollment is available only to accounts with console access, from their personal two-factor settings.</span>
+                        @endif
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="note">Note</label>

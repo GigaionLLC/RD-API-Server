@@ -7,7 +7,7 @@
 | **Status** | `IN PROGRESS` |
 | **Version** | `v1.0.0` |
 | **Active Persona** | Security and frontend hardening implementer |
-| **Last Updated** | 2026-07-15 17:00 PDT |
+| **Last Updated** | 2026-07-15 19:15 PDT |
 
 ---
 
@@ -99,8 +99,8 @@ can be reverted without reverting the redesign or another security fix. Nothing 
 - [x] Fix webhook SSRF and URL disclosure.
 - [x] Fix alarm/recording destructive permissions.
 - [x] Harden asset/license/build supply chain.
-- [ ] Require recent completed sign-in for personal TOTP management.
-- [ ] Prevent generic user editing from bypassing or corrupting TOTP state.
+- [x] Require recent completed sign-in for personal TOTP management.
+- [x] Prevent generic user editing from bypassing or corrupting TOTP state.
 - [ ] Run targeted and complete verification.
 - [ ] Synchronize docs/changelog and archive the plan.
 

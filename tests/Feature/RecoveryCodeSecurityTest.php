@@ -20,6 +20,7 @@ class RecoveryCodeSecurityTest extends TestCase
             'password' => 'legacy-password',
             'is_admin' => true,
             'status' => User::STATUS_NORMAL,
+            ...$this->activeFactorState(),
             'two_factor_recovery_codes' => [
                 'ABCDEF-123456',
                 'FEDCBA-654321',
@@ -51,6 +52,7 @@ class RecoveryCodeSecurityTest extends TestCase
             'password' => 'legacy-password',
             'is_admin' => true,
             'status' => User::STATUS_NORMAL,
+            ...$this->activeFactorState(),
             'two_factor_recovery_codes' => $protected,
         ]);
 
@@ -85,6 +87,7 @@ class RecoveryCodeSecurityTest extends TestCase
             'password' => 'legacy-password',
             'is_admin' => true,
             'status' => User::STATUS_NORMAL,
+            ...$this->activeFactorState(),
             'two_factor_recovery_codes' => ['v1:not-a-digest', 'not-a-code', 123],
         ]);
 
@@ -105,12 +108,14 @@ class RecoveryCodeSecurityTest extends TestCase
             'username' => 'legacy-recovery-user',
             'password' => 'legacy-password',
             'status' => User::STATUS_NORMAL,
+            ...$this->activeFactorState(),
             'two_factor_recovery_codes' => ['ABCDEF-123456', 'invalid'],
         ]);
         $alreadyProtected = User::create([
             'username' => 'protected-migration-user',
             'password' => 'legacy-password',
             'status' => User::STATUS_NORMAL,
+            ...$this->activeFactorState(),
             'two_factor_recovery_codes' => app(RecoveryCodeProtector::class)
                 ->protectMany(['FEDCBA-654321']),
         ]);
@@ -144,5 +149,16 @@ class RecoveryCodeSecurityTest extends TestCase
 
         // Restore the expected migration state for the test harness.
         $migration->up();
+    }
+
+    /** @return array<string, mixed> */
+    private function activeFactorState(): array
+    {
+        return [
+            'login_verify' => User::LOGIN_VERIFY_TOTP,
+            'two_factor_enabled' => true,
+            'two_factor_secret' => app(TwoFactorService::class)->generateSecret(),
+            'two_factor_confirmed_at' => now(),
+        ];
     }
 }
