@@ -2,6 +2,22 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - Email-verification address invariant (verified)
+
+- Required a valid address when admin user creation/editing selects email verification and
+  prevented partial API v1 updates from clearing the address of an existing email-policy account.
+  The CLI rejects an explicit empty address before any account mutation. Console forms now explain
+  the conditional requirement.
+- Made LDAP attribute synchronization validate the required address, fail closed, and roll back the
+  complete refresh when a linked email-policy account receives a blank or malformed directory
+  value; no stale destination, undeliverable replacement, or silent policy downgrade is accepted.
+- Added a read-only, fail-before-DDL MariaDB preflight that reports up to 20 affected user IDs.
+  Operators must explicitly repair the address or policy. A named CHECK uses byte-exact policy
+  comparison and POSIX whitespace detection, and rollback removes only enforcement.
+- No RustDesk client path, JSON key, or wire shape changed. Focused Docker suites passed 37 tests /
+  285 assertions; targeted Pint/PHPStan, Blade compilation, and diff checks were clean. Complete
+  quality-gate results are recorded in the final hardening wrap-up.
+
 ## 2026-07-15 - Canonical TOTP state and console self-service ownership (verified)
 
 - Removed TOTP selection and factor-state writes from generic user creation/editing. Console

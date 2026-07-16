@@ -41,7 +41,9 @@
                 <div class="rd-field">
                     <label class="rd-label" for="email">Email</label>
                     <input class="rd-input" id="email" name="email" type="email" value="{{ old('email') }}"
-                           @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
+                           aria-describedby="email-policy-help @error('email') email-error @enderror"
+                           @error('email') aria-invalid="true" @enderror>
+                    <span class="rd-help" id="email-policy-help">Required when login verification uses an email code.</span>
                     @error('email')<span class="rd-help rd-help--error" id="email-error">{{ $message }}</span>@enderror
                 </div>
                 <div class="rd-field">
@@ -80,7 +82,7 @@
                         <option value="off" @selected(old('login_verify', 'off') === 'off')>Off</option>
                         <option value="email" @selected(old('login_verify') === 'email')>Email code</option>
                     </select>
-                    <span class="rd-help" id="login-verify-help">TOTP enrollment is available only to accounts with console access, from their personal two-factor settings.</span>
+                    <span class="rd-help" id="login-verify-help">Email code requires the email field above. TOTP enrollment is available only to accounts with console access, from their personal two-factor settings.</span>
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="note">Note</label>

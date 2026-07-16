@@ -158,6 +158,46 @@ class LdapIdentitySecurityTest extends TestCase
         $this->assertSame(1, LdapIdentity::count());
     }
 
+    public function test_linked_email_verification_account_rejects_invalid_directory_email_without_mutation(): void
+    {
+        Config::set('ldap.sync', true);
+        $service = app(LdapService::class);
+        $original = $this->ldapAttributes('email-policy-user', 'email-policy-subject');
+        $user = $service->syncUser($original);
+        $user->login_verify = User::LOGIN_VERIFY_EMAIL;
+        $user->save();
+        $identity = LdapIdentity::where('user_id', $user->id)->firstOrFail();
+
+        foreach (['   ', 'not-an-address'] as $invalidEmail) {
+            $refreshed = $original;
+            $refreshed['email'] = $invalidEmail;
+            $refreshed['display_name'] = 'Updated Directory Name';
+            $refreshed['is_admin'] = true;
+
+            try {
+                $service->syncUser($refreshed);
+                $this->fail('LDAP synchronization accepted an invalid required email address.');
+            } catch (\RuntimeException $exception) {
+                $this->assertSame(
+                    'LDAP synchronization requires a valid email address while email verification is enabled.',
+                    $exception->getMessage(),
+                );
+            }
+        }
+
+        $user->refresh();
+        $identity->refresh();
+        $this->assertSame($original['email'], $user->email);
+        $this->assertSame($original['display_name'], $user->display_name);
+        $this->assertFalse((bool) $user->is_admin);
+        $this->assertSame(User::LOGIN_VERIFY_EMAIL, $user->login_verify);
+        $this->assertSame($user->id, $identity->user_id);
+        $this->assertSame($original['provider'], $identity->provider);
+        $this->assertSame($original['subject_hash'], $identity->subject_hash);
+        $this->assertSame(1, User::count());
+        $this->assertSame(1, LdapIdentity::count());
+    }
+
     public function test_sync_cannot_relink_users_across_directory_subjects(): void
     {
         Config::set('ldap.sync', true);

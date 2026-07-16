@@ -103,6 +103,14 @@ class CreateUser extends Command
                     return [$user, false];
                 }
 
+                if ($emailProvided
+                    && $email === null
+                    && $user->login_verify === User::LOGIN_VERIFY_EMAIL) {
+                    throw ValidationException::withMessages([
+                        'email' => 'Email verification requires a non-empty email address.',
+                    ]);
+                }
+
                 $previousEmail = $user->email;
 
                 if ($grantAdmin) {

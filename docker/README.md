@@ -137,11 +137,14 @@ upgraded instance, and then start only upgraded replicas. Do not use a mixed-ver
 deployment for this migration. An old replica can write plaintext after the migration while an
 upgraded replica expects encrypted values.
 
-Use the same quiesced deployment for the follow-on TOTP state normalization and CHECK migration.
-It validates every encrypted seed before writing and repairs rows transactionally, but MariaDB
-cannot atomically combine that repair with the later `ALTER TABLE`. A legacy writer in between can
-make constraint installation fail. Confirm that the single upgraded instance completed all
-migrations before restoring traffic or starting another replica.
+Use the same quiesced deployment for the follow-on TOTP state normalization and email-verification
+CHECK migrations. TOTP normalization validates every encrypted seed before writing and repairs
+rows transactionally. The email-verification migration performs a read-only preflight and aborts
+with affected user IDs if an exact `email` policy lacks a nonblank address; add an address or
+explicitly change that policy, then retry. It never silently downgrades a configured second factor.
+MariaDB cannot atomically combine either preflight/repair boundary with its later `ALTER TABLE`; a
+legacy writer in between can make constraint installation fail. Confirm that the single upgraded
+instance completed every migration before restoring traffic or starting another replica.
 
 ## Updating a pin
 

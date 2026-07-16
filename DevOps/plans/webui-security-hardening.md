@@ -7,7 +7,7 @@
 | **Status** | `IN PROGRESS` |
 | **Version** | `v1.0.0` |
 | **Active Persona** | Security and frontend hardening implementer |
-| **Last Updated** | 2026-07-15 19:15 PDT |
+| **Last Updated** | 2026-07-15 19:45 PDT |
 
 ---
 
@@ -27,6 +27,7 @@ authorization, security, dependency, and release-integrity review.
 - Reproducible local frontend assets, third-party notices, and mutable Docker tooling.
 - Recent completed-sign-in enforcement for personal authenticator setup and removal.
 - Consistent TOTP state that generic user editing cannot bypass or make impossible.
+- Consistent email-verification state with a nonblank challenge destination.
 - Focused regression tests, full Docker gates, documentation, and isolated local commits.
 
 **Out of scope:**
@@ -70,7 +71,9 @@ can be reverted without reverting the redesign or another security fix. Nothing 
     management lifecycle and a current authenticator/recovery code for removal.
 11. Remove generic user-editor control of TOTP state and repair inconsistent stored state without
     changing the RustDesk client wire contract.
-12. Synchronize security/access-control/build docs, append changelog entries, archive this
+12. Require a nonblank address everywhere email verification can be configured or synchronized,
+    and enforce that invariant in MariaDB without silently downgrading existing accounts.
+13. Synchronize security/access-control/build docs, append changelog entries, archive this
     plan, and leave all commits local on `main`.
 
 ## 5. Phase 5: Product Owner Review
@@ -101,6 +104,7 @@ can be reverted without reverting the redesign or another security fix. Nothing 
 - [x] Harden asset/license/build supply chain.
 - [x] Require recent completed sign-in for personal TOTP management.
 - [x] Prevent generic user editing from bypassing or corrupting TOTP state.
+- [x] Prevent email verification from existing without a nonblank challenge address.
 - [ ] Run targeted and complete verification.
 - [ ] Synchronize docs/changelog and archive the plan.
 

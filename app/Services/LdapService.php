@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LDAP\Connection;
@@ -238,7 +239,20 @@ class LdapService
         if ((bool) config('ldap.sync', false)) {
             // The local username and identity link are immutable. Mutable directory attributes
             // may be refreshed, but they can never select or relink another local account.
-            $user->email = $this->nullableUserAttribute($attrs['email']);
+            $directoryEmail = $this->nullableUserAttribute($attrs['email']);
+            // Fail closed if LDAP removes or corrupts the destination required by email
+            // verification. Validate before assigning any synchronized account fields.
+            $requiredEmailIsInvalid = $user->login_verify === User::LOGIN_VERIFY_EMAIL
+                && Validator::make(
+                    ['email' => trim($attrs['email'])],
+                    ['email' => ['required', 'email', 'max:255']],
+                )->fails();
+            if ($requiredEmailIsInvalid) {
+                throw new RuntimeException(
+                    'LDAP synchronization requires a valid email address while email verification is enabled.'
+                );
+            }
+            $user->email = $directoryEmail;
             $user->display_name = $this->nullableUserAttribute($attrs['display_name']);
             $user->is_admin = $attrs['is_admin'];
             $user->save();

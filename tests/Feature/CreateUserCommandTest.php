@@ -208,6 +208,45 @@ class CreateUserCommandTest extends TestCase
         $this->assertTrue(Hash::check('replacement-member-password', (string) $member->password));
     }
 
+    public function test_explicit_empty_email_cannot_lock_an_email_verification_account(): void
+    {
+        $user = User::create([
+            'username' => 'email-verification-user',
+            'password' => 'original-password-value',
+            'email' => 'required@example.com',
+            'is_admin' => false,
+            'status' => User::STATUS_DISABLED,
+            'login_verify' => User::LOGIN_VERIFY_EMAIL,
+        ]);
+        $originalPasswordHash = $user->password;
+
+        $result = $this->runCommand(
+            [
+                'username' => $user->username,
+                '--password-stdin' => true,
+                '--email' => '',
+                '--admin' => true,
+            ],
+            ['replacement-password-value'],
+            false,
+        );
+
+        $this->assertSame(Command::FAILURE, $result->statusCode);
+        $this->assertStringContainsString(
+            'Email verification requires a non-empty email address.',
+            $result->getDisplay(),
+        );
+
+        $user->refresh();
+        $this->assertSame($originalPasswordHash, $user->password);
+        $this->assertTrue(Hash::check('original-password-value', (string) $user->password));
+        $this->assertSame('required@example.com', $user->email);
+        $this->assertSame(User::LOGIN_VERIFY_EMAIL, $user->login_verify);
+        $this->assertFalse($user->is_admin);
+        $this->assertSame(User::STATUS_DISABLED, $user->status);
+        $this->assertSame(1, $user->credential_version);
+    }
+
     public function test_federated_reset_rolls_back_requested_email_and_admin_changes(): void
     {
         $user = User::create([

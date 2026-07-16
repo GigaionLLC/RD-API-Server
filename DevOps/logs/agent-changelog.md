@@ -3,6 +3,37 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 19:45] - Security: require an address for email verification
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Http/Controllers/Admin/UserController.php`, `app/Http/Controllers/Api/V1/UserController.php`
+- `app/Console/Commands/CreateUser.php`, `app/Services/LdapService.php`
+- `resources/views/admin/users/create.blade.php`, `resources/views/admin/users/edit.blade.php`
+- `database/migrations/2026_07_15_100002_require_email_for_email_verification.php`
+- `tests/Feature/EmailVerificationAddressValidationTest.php`
+- `tests/Feature/UserEmailVerificationStateMigrationTest.php`
+- `tests/Feature/CreateUserCommandTest.php`, `tests/Feature/LdapIdentitySecurityTest.php`
+- `tests/Feature/UserTwoFactorStateMigrationTest.php`
+- `Wiki/core/15-security.md`, `docs/modernization/08-build-log.md`
+- `docs/modernization/09-port-status.md`, `docs/sqlite-to-mariadb.md`, `docker/README.md`
+- `DevOps/plans/webui-security-hardening.md`, `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Adds the MariaDB CHECK constraint
+`users_email_verification_requires_address`. Its read-only preflight aborts before DDL when an
+exact `email` policy lacks a non-whitespace address and reports a bounded list of affected user
+IDs. No column, RustDesk client path, JSON key, or wire shape changes. Admin and API v1 writes now
+return validation errors for invalid combinations; rollback drops only the constraint.
+**Summary:** Made a nonblank destination part of the email-verification state invariant. Admin
+creation/editing, partial API updates, and the `rustdesk:user` command cannot enable or preserve
+email verification while clearing its address. LDAP synchronization fails closed before any
+linked-account mutation if the directory removes or malforms a required address. The console
+explains the conditional requirement, while byte-exact database comparisons prevent
+case-insensitive collation
+from diverging from PHP policy handling. Invalid historical state is never silently downgraded to
+password-only: operators must add an address or explicitly change policy before retrying the
+quiesced migration. Focused Docker suites passed 37 tests / 285 assertions; targeted Pint/PHPStan,
+Blade compilation, and diff checks were clean. Complete-suite results are recorded in the final
+hardening wrap-up. The commit remains local on `main` and was not pushed.
+
 ## [2026-07-15 19:15] - Security: enforce canonical user TOTP state
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
@@ -30,8 +61,8 @@ current/previous application keys before changing any row, resolves historical s
 strongest active intent, clears unusable/orphan state, normalizes unknown policy to `off`, and
 uses byte-exact policy comparisons so MariaDB's case-insensitive text collation cannot admit a
 value PHP would interpret differently. The invariant is durable in MariaDB. Focused Docker suites
-passed 23 tests / 157 assertions;
-targeted Pint/PHPStan, Blade compilation, and diff checks were clean. The complete-suite rerun is
+passed 23 tests / 157 assertions; targeted Pint/PHPStan, Blade compilation, and diff checks were
+clean. The complete-suite rerun is
 recorded in the final hardening wrap-up. The commit remains local on `main` and was not pushed.
 
 ## [2026-07-15 18:00] - Security: require recent authentication for two-factor management

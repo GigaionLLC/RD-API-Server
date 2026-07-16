@@ -32,6 +32,7 @@ class UserTwoFactorStateMigrationTest extends TestCase
                 'two_factor_recovery_codes' => json_encode(['keep-policy-metadata']),
             ]);
             $this->insertRaw('flag-activates', [
+                'email' => 'flag-activates@example.test',
                 'login_verify' => User::LOGIN_VERIFY_EMAIL,
                 'two_factor_enabled' => true,
                 'two_factor_secret' => $ciphertext,
@@ -39,6 +40,7 @@ class UserTwoFactorStateMigrationTest extends TestCase
                 'two_factor_recovery_codes' => json_encode(['keep-flag-metadata']),
             ]);
             $this->insertRaw('email-without-secret', [
+                'email' => 'email-without-secret@example.test',
                 'login_verify' => User::LOGIN_VERIFY_EMAIL,
                 'two_factor_enabled' => true,
                 'two_factor_secret' => null,

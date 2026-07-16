@@ -103,10 +103,12 @@ After the old release works correctly on MariaDB:
    integration smoke tests.
 
 Do not use a mixed-version rolling deployment across this boundary. In particular, the migrations
-that encrypt authenticator secrets and normalize/enforce canonical TOTP state require old writers
-to remain stopped while they run. MariaDB cannot make the TOTP repair transaction and subsequent
-CHECK installation one atomic unit, so review the first upgraded instance's migration result
-before starting any writer.
+that encrypt authenticator secrets, normalize/enforce canonical TOTP state, and enforce the
+email-verification address invariant require old writers to remain stopped while they run.
+MariaDB cannot make a preflight/repair and subsequent CHECK installation one atomic unit. If the
+email migration reports account IDs, add a valid address or intentionally change those policies
+and retry; it will not silently downgrade them to password-only. Review the first upgraded
+instance's complete migration result before starting any writer.
 
 ## Rollback
 

@@ -95,7 +95,13 @@ class UserController extends Controller
         $data = $request->validate([
             'username' => ['sometimes', 'string', 'max:255', Rule::unique('users', 'username')->ignore($user->id)],
             'password' => AccountPasswordPolicy::rules(required: false),
-            'email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'email' => [
+                'sometimes',
+                Rule::requiredIf($user->login_verify === User::LOGIN_VERIFY_EMAIL),
+                'nullable',
+                'email',
+                'max:255',
+            ],
             'display_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'group_id' => ['sometimes', 'nullable', 'integer', 'exists:groups,id'],
             'is_admin' => ['prohibited'],

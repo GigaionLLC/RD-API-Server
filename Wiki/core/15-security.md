@@ -170,6 +170,20 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   at the fifth wrong code and atomically consumed on success, preventing replay.
 - Rows created before the challenge-hash migration contain no challenge digest and are therefore
   intentionally unusable after deployment; the user can begin a fresh five-minute login attempt.
+- The exact `login_verify = 'email'` policy requires a non-null address containing at least one
+  non-whitespace character. Admin create/edit requests and API v1 partial updates validate the
+  effective policy, while the user-management command rejects an explicit clear before changing
+  the password, role, address, or credential version.
+- With directory attribute synchronization enabled, LDAP refuses the complete linked-account
+  refresh before assigning any fields when the directory removes or supplies a malformed address
+  required by email verification. It does not keep a potentially stale destination, persist an
+  undeliverable value, or silently weaken the policy.
+- A named MariaDB CHECK makes the address invariant durable with byte-exact policy comparison.
+  The deployment migration performs a read-only preflight and aborts with a bounded list of user
+  IDs when historical invalid state exists. Operators must add a valid address or intentionally
+  change policy; the migration never converts a configured second factor to password-only.
+- Run the preflight and constraint installation with old writers quiesced. `ALTER TABLE` cannot be
+  made atomic with the preceding read, so a legacy write between them can make installation fail.
 
 ## Two-Factor Recovery Boundary
 

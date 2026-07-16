@@ -150,7 +150,12 @@ class UserController extends Controller
         $canManageAdminAccess = (bool) $request->user()->is_admin;
         $data = $request->validate([
             'username' => ['required', 'string', 'max:255', 'unique:users,username'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => [
+                Rule::requiredIf($request->input('login_verify') === User::LOGIN_VERIFY_EMAIL),
+                'nullable',
+                'email',
+                'max:255',
+            ],
             'display_name' => ['nullable', 'string', 'max:255'],
             'password' => AccountPasswordPolicy::rules(),
             'is_admin' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'boolean'],
@@ -225,7 +230,12 @@ class UserController extends Controller
         $hasActiveTotp = $user->hasActiveTotp();
 
         $data = $request->validate([
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => [
+                Rule::requiredIf($request->input('login_verify') === User::LOGIN_VERIFY_EMAIL),
+                'nullable',
+                'email',
+                'max:255',
+            ],
             'display_name' => ['nullable', 'string', 'max:255'],
             'is_admin' => [Rule::prohibitedIf(! $canManageAdminAccess), 'nullable', 'boolean'],
             'status' => ['required', 'integer', Rule::in([User::STATUS_NORMAL, User::STATUS_DISABLED, User::STATUS_UNVERIFIED])],

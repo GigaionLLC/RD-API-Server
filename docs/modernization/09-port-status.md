@@ -45,6 +45,12 @@ writing, normalizes historical partial states, and enforces the canonical active
 invariant with a named CHECK whose byte-exact policy comparisons cannot be weakened by MariaDB's
 case-insensitive text collation. This changes no RustDesk client keys or paths.
 
+Email verification now has the same durable state discipline: its exact policy requires a
+nonblank challenge destination in admin, API v1, CLI, and LDAP synchronization paths, backed by a
+named MariaDB CHECK. The migration aborts before DDL and reports affected account IDs instead of
+silently changing configured second-factor intent to password-only. Operators explicitly repair
+the address or policy before retrying with legacy writers quiesced.
+
 ## Current admin UI status (2026-07-13)
 
 The historical table below predates the completed full-surface WebUI modernization. The
