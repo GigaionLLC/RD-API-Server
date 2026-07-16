@@ -60,6 +60,84 @@ container. The command asks for the password twice without echoing it. For non-i
 automation, pipe one password line to `--password-stdin`; passing a password as a positional
 argument is deprecated because shells can expose it in history and process listings.
 
+### Production HTTPS and reverse proxies
+
+When OpenResty, Nginx Proxy Manager, or another reverse proxy terminates TLS, configure the public
+origin and the inbound trust boundary together:
+
+```env
+APP_URL=https://api.example.com
+RUSTDESK_API_SERVER=https://api.example.com
+TRUSTED_PROXIES=172.23.0.5
+SESSION_SECURE_COOKIE=true
+```
+
+`TRUSTED_PROXIES` is the proxy address **as seen by the application container**, not the proxy's
+public address. Prefer that exact address. If container addresses can change, use only the narrow
+CIDR of an isolated network shared exclusively by the application and trusted proxies. Never use
+`*`, `/0`, all of `172.16.0.0/12`, or another network reachable by untrusted clients. Prevent
+direct access to the application port, too.
+
+Use one of these topologies instead of leaving the application port publicly reachable:
+
+- Put a containerized proxy and the application on a dedicated internal Docker network, proxy to
+  the service on port 80, and do not publish the application port. Trust the proxy's exact address
+  or that exclusive network's narrow CIDR.
+- For a proxy running directly on the same host, bind the application port to loopback, for
+  example `127.0.0.1:21114:80`. With this repository's bundled `docker-compose.yml`, set
+  `PORT=127.0.0.1:21114`; the Compose definition appends the container's `:80` target.
+- For a proxy on another host, firewall the application port so only that proxy can connect.
+
+Do not trust a shared Docker bridge gateway or NAT address merely because it appears first in an
+access log when untrusted containers or callers can also reach the backend through it. Move a
+containerized application and proxy to an isolated direct network instead. A loopback-only
+backend for a native host proxy deliberately makes the host itself the trusted boundary.
+
+RD-API-Server accepts only sanitized `X-Forwarded-For` and `X-Forwarded-Proto` values from an
+explicitly trusted peer. The edge must overwrite `Host` and `X-Forwarded-Proto` and construct a
+trustworthy `X-Forwarded-For` chain. Forwarded host, port, and path-prefix headers are ignored to
+prevent URL poisoning; a nonstandard public HTTPS port must be present in the sanitized `Host`
+header. `APP_URL` alone does not make Laravel trust a forwarded HTTPS scheme. Missing or
+mismatched trust produces HTTP redirects and asset references, browser mixed-content errors,
+inaccurate client IPs, and cookies without request-derived `Secure` protection.
+
+To identify the immediate peer, make one `/admin` request and correlate it with the application
+access log. The first address on that exact request line is what the application container sees;
+validate that it is proxy-specific before trusting it:
+
+```bash
+docker logs --tail 200 rustdesk-api 2>&1 \
+  | grep -F '"GET /admin HTTP/' \
+  | tail -1
+
+docker inspect rustdesk-api --format '{{json .NetworkSettings.Networks}}'
+docker inspect <proxy-container> --format '{{json .NetworkSettings.Networks}}'
+docker network inspect <shared-network> \
+  --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}'
+```
+
+After setting the exact address or isolated-network CIDR, recreate the application container so
+its startup cache contains the new values:
+
+```bash
+docker compose up -d --force-recreate <api-service>
+
+docker compose exec <api-service> php artisan config:show app.url
+docker compose exec <api-service> php artisan config:show trustedproxy.proxies
+docker compose exec <api-service> php artisan config:show session.secure
+```
+
+Inspect only these non-secret keys; a broad configuration dump can expose `APP_KEY` and other
+credentials. Then run the repository's fail-closed smoke check against the complete public
+edge-to-application path:
+
+```bash
+scripts/check-https-proxy.sh https://api.example.com
+```
+
+The check fails on an absent/wrong HTTPS redirect, any insecure stylesheet or script URL,
+missing or non-`Secure` login cookies, a TLS/DNS/request error, or an unreachable theme asset.
+
 ## 3. Email (optional)
 
 For 2FA email codes, invitations, and alarm notifications, add SMTP:

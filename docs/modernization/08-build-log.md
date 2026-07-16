@@ -2,6 +2,32 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-15 - HTTPS reverse-proxy hardening and recovery tooling (source verified; live pending)
+
+- Confirmed the public mixed-content outage is an inbound proxy-trust failure: the HTTPS admin
+  request redirects to an HTTP login URL, and the login HTML emits HTTP stylesheets/scripts even
+  though the same assets are reachable over HTTPS. This also prevents request-derived `Secure`
+  cookies and leaves the application with the proxy address instead of the client address.
+- Preserved explicit IP/CIDR proxy trust while reducing accepted forwarded input to
+  `X-Forwarded-For` and `X-Forwarded-Proto`. Forwarded host, port, and path-prefix values are now
+  ignored; hostile URL-poisoning and sanitized nonstandard-port cases have regression coverage.
+- Added HTTPS asset, guest-redirect, secure-session/CSRF-cookie, untrusted-scheme, and hostile
+  forwarded-header tests. The runtime image now warns when an HTTPS `APP_URL` has no valid parsed
+  proxy allowlist, and production examples expose the secure-cookie setting without changing the
+  local HTTP default.
+- Added safe isolated-network, loopback, and firewall topology guidance plus a fail-closed
+  `scripts/check-https-proxy.sh` edge probe. The probe checks the exact HTTPS redirect, insecure
+  asset URLs, session/CSRF cookie attributes, and a 2xx CSS asset without printing cookies.
+- **Verified in Docker:** the focused suite passed 10 tests / 48 assertions; the full suite passed
+  538 tests / 3,051 assertions; Pint passed 275 files; PHPStan reported no errors; ESLint and the
+  20-file vendor-integrity check passed; both Compose examples rendered; Bash syntax passed; and
+  the runtime image built successfully. Empty and wildcard proxy trust produced the intended
+  warning, while an exact IP did not.
+- **Production remains pending:** the public probe still fails on
+  `http://api-rustdesk1.gigaion.com/admin/login`. The live deployment must set the proxy's
+  application-observed exact IP or narrow isolated-network CIDR, recreate the API container, and
+  pass the public probe before this incident is marked resolved.
+
 ## 2026-07-15 - GitHub Actions Node 24 runtime migration (verified)
 
 - Replaced every immutable `actions/checkout` and `actions/setup-node` reference in CI and image

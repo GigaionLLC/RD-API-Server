@@ -41,8 +41,10 @@ services:
       ARGON_MEMORY: "${ARGON_MEMORY:-65536}"
       ARGON_THREADS: "${ARGON_THREADS:-1}"
       ARGON_TIME: "${ARGON_TIME:-4}"
-      # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
+      # Set only for a reverse proxy; use its exact peer IP or narrow isolated-network CIDR.
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      # Set true for a public HTTPS origin. Null preserves request-based detection for local HTTP.
+      SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-null}"
 
       # First-run admin account. There is no production fallback: the runtime refuses to create
       # a missing administrator from an empty, known, placeholder, derived, or short password.

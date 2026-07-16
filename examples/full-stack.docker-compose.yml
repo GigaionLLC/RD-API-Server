@@ -5,8 +5,9 @@
 # Setup:
 #   1. Set a unique ADMIN_PASS (at least 12 characters) in your shell or a local .env file,
 #      then replace every CHANGE_ME and your-domain.com value below.
-#   2. Put the API behind a TLS-terminating reverse proxy:
-#        https://api.your-domain.com  ->  this-host:21114
+#   2. Put the API behind a TLS-terminating reverse proxy. The loopback binding below supports
+#      a host-based proxy. For a containerized proxy, remove that port, attach the proxy + API to
+#      a dedicated internal network, and proxy directly to rustdesk-api:80.
 #   3. docker compose -f full-stack.docker-compose.yml up -d
 #   4. hbbs generates a key on first start. Copy its public key into RUSTDESK_KEY:
 #        cat ./data/hbbs/id_ed25519.pub
@@ -73,8 +74,9 @@ services:
       - "ARGON_MEMORY=${ARGON_MEMORY:-65536}"
       - "ARGON_THREADS=${ARGON_THREADS:-1}"
       - "ARGON_TIME=${ARGON_TIME:-4}"
-      # Exact IP or CIDR of the TLS proxy from step 2; never use a wildcard:
+      # Exact application-observed IP, or narrow isolated shared-network CIDR, of the TLS proxy:
       - TRUSTED_PROXIES=CHANGE_ME_proxy_ip_or_cidr
+      - SESSION_SECURE_COOKIE=true
       # First-run admin (seeded once). There is deliberately no production password default:
       - ADMIN_USER=admin
       - "ADMIN_PASS=${ADMIN_PASS:-}"
@@ -109,7 +111,7 @@ services:
       # - MAIL_PASSWORD=
       # - MAIL_FROM_ADDRESS=no-reply@your-domain.com
     ports:
-      - 21114:80        # host 21114 -> container 80 (point your TLS proxy here)
+      - 127.0.0.1:21114:80  # host-based TLS proxy only; never expose this backend publicly
     volumes:
       - ./data/api:/var/www/html/storage
     networks: [ rustdesk ]

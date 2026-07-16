@@ -3,6 +3,37 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-15 22:41] - Add HTTPS proxy diagnosis and recovery tooling
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.env.example`, `docker-compose.yml`, `examples/full-stack.docker-compose.yml`
+- `docker/entrypoint.sh`, `scripts/check-https-proxy.sh`
+- `README.md`, `QUICKSTART.md`
+- `DevOps/plans/https-proxy-mixed-content.md`
+- `docs/modernization/08-build-log.md`, `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Database state, RustDesk client paths/keys, response bodies, and
+application routes are unchanged.
+**Summary:** Added secure-cookie passthrough/examples, a parsed-config startup warning, safe
+proxy-network guidance, and a fail-closed public HTTPS smoke check. The runtime image and full
+local matrix are green, but the live incident remains open until production supplies its actual
+proxy IP/CIDR, recreates the API container, and passes the public probe; these changes remain local
+pending that deployment input and the user-authorized completion push.
+
+## [2026-07-15 22:40] - Restrict trusted proxy header surface
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `bootstrap/app.php`
+- `tests/Feature/TrustedProxySecurityTest.php`
+- `Wiki/core/15-security.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. The RustDesk wire contract is unchanged. Trusted proxies continue
+to supply the forwarded client address and HTTPS scheme; forwarded host, port, and prefix values
+are now deliberately ignored.
+**Summary:** Limited Laravel's trusted proxy mask to `X-Forwarded-For` and
+`X-Forwarded-Proto`, preventing a trusted OpenResty/Nginx hop from passing attacker-controlled URL
+host/port/prefix overrides. Regression coverage includes HTTPS assets/redirects/cookies,
+untrusted scheme spoofing, hostile forwarded URL headers, and sanitized nonstandard public ports.
+
 ## [2026-07-15 21:45] - CI: migrate GitHub Actions to Node 24 runtimes
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

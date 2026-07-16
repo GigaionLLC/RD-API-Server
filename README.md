@@ -122,10 +122,13 @@ services:
   rustdesk-api:
     image: "${RUSTDESK_API_IMAGE:-ghcr.io/gigaionllc/rustdesk-api-server:latest}"
     restart: unless-stopped
-    ports: ["21114:80"]
+    # Host-based proxy: keep the backend on loopback. For a containerized proxy, remove this
+    # port and attach both services to a dedicated internal network.
+    ports: ["127.0.0.1:21114:80"]
     environment:
       APP_ENV: production
       APP_URL: https://api.your-domain.com
+      SESSION_SECURE_COOKIE: "true"
       # Leave APP_KEY empty for the persistent generated key. Replicas must share explicit keys.
       APP_KEY: "${APP_KEY:-}"
       APP_PREVIOUS_KEYS: "${APP_PREVIOUS_KEYS:-}"
@@ -173,10 +176,12 @@ password. Automation can pipe one line to `--password-stdin`.
 
 If TLS terminates at a reverse proxy, set `TRUSTED_PROXIES` to that proxy's exact IP address or
 network CIDR as seen by the application container (comma-separated when there is more than one).
-The application ignores
-`X-Forwarded-*` headers by default because trusting arbitrary senders would let a direct client
-spoof the address used by login throttles and API-key IP allowlists. Never set this value to a
-wildcard, and do not expose the application port through a path that bypasses the trusted proxy.
+Use the public HTTPS origin for `APP_URL` and set `SESSION_SECURE_COOKIE=true`. The application
+ignores `X-Forwarded-*` headers by default because trusting arbitrary senders would let a direct
+client spoof the address used by login throttles and API-key IP allowlists. Never set this value
+to a wildcard, and do not expose the application port through a path that bypasses the trusted
+proxy. See [Production HTTPS and reverse proxies](QUICKSTART.md#production-https-and-reverse-proxies)
+for safe network topologies, diagnosis, recovery, and the executable post-deployment check.
 
 **Full stack** — to run the RustDesk `hbbs`/`hbbr` rendezvous + relay alongside the API, copy
 **[examples/full-stack.docker-compose.yml](examples/full-stack.docker-compose.yml)** and follow
