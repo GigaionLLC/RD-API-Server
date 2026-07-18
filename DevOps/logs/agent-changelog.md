@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-18 13:10] - Record Nginx candidate publication
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `DevOps/logs/version-history.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. This documentation-only follow-up does not publish or promote a
+new application artifact.
+**Summary:** Recorded the passing GitHub run, verified AMD64/ARM64 candidate digest, and unchanged
+v1.0.1 `latest` digest after the user-authorized main push.
+
 ## [2026-07-18 13:05] - Remove runtime compiler drivers and kernel headers
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
