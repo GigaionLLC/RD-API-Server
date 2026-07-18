@@ -2,7 +2,7 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
-## 2026-07-17 - v1.0.1 release candidate (verified locally)
+## 2026-07-17 - v1.0.1 patch release (published)
 
 - Synchronized source-controlled version `1.0.1`, its exact API assertion, public changelog,
   README stable-release guidance, release notes, version history, and upgrade instructions. The
@@ -15,10 +15,19 @@ Chronological record of what was built and its verification state. Newest at top
 - Rebuilt the current runtime from warm layers in 7.3 seconds. Composer platform requirements
   passed, and a fresh container migrated a disposable MariaDB/InnoDB database, answered `/up`,
   served the themed admin login, and reported `1.0.1` from `/api/version`.
-- Native AMD64/ARM64 timing, digest smoke tests, and final manifest/provenance verification remain
-  the required GitHub `CI` gate before tagging and publishing the release.
+- Published verified commit `8a3f708` as annotated tag `v1.0.1` and the
+  [GitHub Release](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.0.1). Main CI run
+  [`29627965974`](https://github.com/GigaionLLC/RD-API-Server/actions/runs/29627965974)
+  completed in 7 minutes 11 seconds, including native AMD64 and ARM64 image jobs in 1 minute 55
+  seconds and 2 minutes 31 seconds. The cache-warm tag run
+  [`29628204395`](https://github.com/GigaionLLC/RD-API-Server/actions/runs/29628204395)
+  completed in 5 minutes 49 seconds, with the native jobs finishing in 35 and 49 seconds.
+- Both publication paths passed digest pull-back smoke tests and final provenance/platform checks.
+  GHCR tags `1.0.1`, `1.0`, and `1` contain AMD64 and ARM64 runtime images plus their expected
+  attestations at manifest digest
+  `sha256:65fdd380ab101ef8fcf40e8281aa303257559f3da4008dfb00782138e71268e2`.
 
-## 2026-07-17 - v1.0.1 native image publication graph (locally validated)
+## 2026-07-17 - v1.0.1 native image publication graph (verified on GitHub)
 
 - Consolidated quality gates and runtime publication into one exact-commit GitHub Actions graph.
   Public image jobs remain unreachable from pull requests and receive package-write permission
@@ -30,10 +39,11 @@ Chronological record of what was built and its verification state. Newest at top
   tag guards, serialized final promotion, documentation-only push filtering, and exact SHA pins
   for the Node 24 artifact actions. The independent publisher was removed, so no path can publish
   a runtime tag before the exact source revision passes the main CI graph.
-- **Local workflow verification:** actionlint 1.7.12 passed the consolidated workflow, all `uses:`
-  entries retain full commit pins, and the runtime smoke-test module list was checked against the
-  locally built PHP 8.5.8 image. Native runner timing and final-manifest verification remain gated
-  on the first GitHub execution.
+- **Workflow verification:** actionlint 1.7.12 passed the consolidated workflow, all `uses:`
+  entries retain full commit pins, and GitHub main and tag runs passed native PHP/module/Apache
+  smoke tests, digest pull-back checks, artifact handoff, provenance retention, and final-manifest
+  verification. The release-tag run demonstrated cache-warm AMD64 and ARM64 jobs in 35 and 49
+  seconds respectively.
 
 ## 2026-07-17 - v1.0.1 runtime image layering (verified locally)
 

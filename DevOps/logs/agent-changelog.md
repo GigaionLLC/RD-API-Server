@@ -3,6 +3,21 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 20:35] - Publish and close v1.0.1
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docs/modernization/08-build-log.md`
+- `DevOps/logs/version-history.md`, `DevOps/logs/agent-changelog.md`
+- `DevOps/archive-plans/v1.0.1-dark-default-and-build-speed.md` (moved from active plans)
+**Database/API Changes:** None.
+**Summary:** Published verified commit `8a3f708` as annotated tag `v1.0.1`, promoted the GHCR
+SemVer manifests, and published the v1.0.1 GitHub Release. Main CI run `29627965974` passed in 7
+minutes 11 seconds and tag CI run `29628204395` passed in 5 minutes 49 seconds; both covered the
+complete application quality gates, native AMD64/ARM64 digest smoke tests, and final manifest and
+provenance validation. The cache-warm tag architecture jobs completed in 35 seconds on AMD64 and
+49 seconds on ARM64. GHCR `1.0.1`, `1.0`, and `1` resolve to manifest digest
+`sha256:65fdd380ab101ef8fcf40e8281aa303257559f3da4008dfb00782138e71268e2`.
+
 ## [2026-07-17 20:25] - Prepare and verify v1.0.1 release metadata
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
