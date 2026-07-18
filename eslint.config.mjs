@@ -31,4 +31,17 @@ export default [
             globals: globals.node,
         },
     },
+    {
+        files: ['tests/Performance/**/*.js'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+            globals: {
+                __ENV: 'readonly',
+            },
+        },
+        rules: {
+            'no-unused-vars': ['warn', { caughtErrors: 'none' }],
+        },
+    },
 ];

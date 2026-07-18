@@ -1,0 +1,124 @@
+name: rustdesk-api-performance
+
+services:
+  app:
+    image: "${PERF_IMAGE:?Set PERF_IMAGE to the Apache control or Nginx candidate image}"
+    pull_policy: "${PERF_PULL_POLICY:-missing}"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://app
+      APP_KEY: "base64:dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHQ="
+      DB_CONNECTION: mariadb
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_DATABASE: rustdesk_api_performance
+      DB_USERNAME: rustdesk_performance
+      DB_PASSWORD: rustdesk_performance
+      DB_SOCKET: ""
+      DB_URL: ""
+      ADMIN_USER: performance-admin
+      ADMIN_PASS: "Performance-Only_4862!Delete-Me"
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      MAIL_MAILER: log
+      RUSTDESK_REQUIRE_DEPLOYMENT: "true"
+      RUSTDESK_AUTO_REGISTER: "false"
+      PERF_DISPOSABLE_DATABASE: I_UNDERSTAND_THIS_IS_A_DISPOSABLE_PERFORMANCE_DATABASE
+      PERF_DEVICE_COUNT: "${PERF_DEVICE_COUNT:-30}"
+      PERF_STRATEGY_MODIFIED_AT: "${PERF_STRATEGY_MODIFIED_AT:-1700000000}"
+    volumes:
+      - ../tests/Performance:/performance:ro
+    tmpfs:
+      - /var/www/html/storage:size=128m,mode=0770,uid=33,gid=33
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - 'exit(@file_get_contents("http://127.0.0.1/up") === false ? 1 : 0);'
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+    cpus: "${PERF_APP_CPUS:-2.0}"
+    mem_limit: "${PERF_APP_MEMORY:-1024m}"
+    pids_limit: 512
+    restart: "no"
+
+  db:
+    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+    environment:
+      MARIADB_ROOT_PASSWORD: rustdesk_performance_root
+      MARIADB_DATABASE: rustdesk_api_performance
+      MARIADB_USER: rustdesk_performance
+      MARIADB_PASSWORD: rustdesk_performance
+    command:
+      - --max-connections=256
+      - --performance-schema=ON
+    tmpfs:
+      - /var/lib/mysql:size=2048m,mode=0770,uid=999,gid=999
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 5s
+    cpus: "${PERF_DB_CPUS:-2.0}"
+    mem_limit: "${PERF_DB_MEMORY:-2048m}"
+    pids_limit: 512
+    restart: "no"
+
+  k6:
+    profiles: ["load"]
+    image: grafana/k6:1.4.2@sha256:3656673de3f30424e8ebcfa46acd9558d83b6a43612d0f668ffeac953950c6c7
+    user: "${PERF_K6_USER:-12345:12345}"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    environment:
+      PERF_TARGET_URL: http://app
+      PERF_DEVICE_COUNT: "${PERF_DEVICE_COUNT:-30}"
+      PERF_ACTIVE_FRACTION: "${PERF_ACTIVE_FRACTION:-0.2}"
+      PERF_WARMUP_DURATION: "${PERF_WARMUP_DURATION:-5s}"
+      PERF_TEST_DURATION: "${PERF_TEST_DURATION:-20s}"
+      PERF_CONNECTION_PROFILE: "${PERF_CONNECTION_PROFILE:-keepalive}"
+      PERF_RUN_LABEL: "${PERF_RUN_LABEL:-local-smoke}"
+      PERF_MODE: "${PERF_MODE:-custom}"
+      PERF_TRIAL: "${PERF_TRIAL:-1}"
+      PERF_TOTAL_TRIALS: "${PERF_TRIALS:-1}"
+      PERF_ORDER_SEED: "${PERF_ORDER_SEED:-20260718}"
+      PERF_RUNTIME: "${PERF_RUNTIME:-unknown}"
+      PERF_RUNTIME_IMAGE: "${PERF_IMAGE}"
+      PERF_RUNTIME_IMAGE_ID: "${PERF_RUNTIME_IMAGE_ID:-unknown}"
+      PERF_OCI_REVISION: "${PERF_OCI_REVISION:-unknown}"
+      PERF_APPLICATION_FINGERPRINT: "${PERF_APPLICATION_FINGERPRINT:-unknown}"
+      PERF_STRATEGY_MODIFIED_AT: "${PERF_STRATEGY_MODIFIED_AT:-1700000000}"
+      PERF_ENFORCE_GATE: "${PERF_ENFORCE_GATE:-false}"
+      PERF_P95_LIMIT_MS: "${PERF_P95_LIMIT_MS:-250}"
+      PERF_P99_LIMIT_MS: "${PERF_P99_LIMIT_MS:-750}"
+      PERF_PREALLOCATED_VUS: "${PERF_PREALLOCATED_VUS:-20}"
+      PERF_MAX_VUS: "${PERF_MAX_VUS:-100}"
+      PERF_APP_CPUS: "${PERF_APP_CPUS:-2.0}"
+      PERF_APP_MEMORY: "${PERF_APP_MEMORY:-1024m}"
+      PERF_DB_CPUS: "${PERF_DB_CPUS:-2.0}"
+      PERF_DB_MEMORY: "${PERF_DB_MEMORY:-2048m}"
+      PERF_K6_CPUS: "${PERF_K6_CPUS:-2.0}"
+      PERF_K6_MEMORY: "${PERF_K6_MEMORY:-1024m}"
+    volumes:
+      - ../tests/Performance:/performance:ro
+      - "${PERF_RESULTS_DIR:-../tests/Performance/results}:/results"
+    depends_on:
+      app:
+        condition: service_healthy
+    # Keep long capacity trials readable while retaining the final metrics and threshold report.
+    command: ["run", "--no-color", "--quiet", "/performance/heartbeat.js"]
+    cpus: "${PERF_K6_CPUS:-2.0}"
+    mem_limit: "${PERF_K6_MEMORY:-1024m}"
+    pids_limit: 512

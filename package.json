@@ -7,7 +7,7 @@
         "build:vendor": "node scripts/copy-admin-vendor.mjs",
         "check:vendor": "node scripts/copy-admin-vendor.mjs --check",
         "dev": "vite",
-        "lint:js": "eslint public/assets/js scripts",
+        "lint:js": "eslint public/assets/js scripts tests/Performance/heartbeat.js",
         "test:e2e": "playwright test"
     },
     "devDependencies": {
