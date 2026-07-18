@@ -96,6 +96,31 @@ major tag from the action's official upstream Git repository, use the peeled com
 annotated tag, review that commit's release notes and diff, and update every matching workflow
 reference together. Do not replace a full SHA with a movable tag.
 
+Runtime publication is part of the same `CI` dependency graph as PHP, JavaScript, vendor-integrity,
+and browser gates. Pull requests receive read-only quality checks and cannot reach package-write
+jobs. A trusted main or stable `vMAJOR.MINOR.PATCH` push can publish only after every quality job
+passes for that exact commit. A release tag must point to the current main commit, and the final
+publication job rechecks main before moving any public tag so a superseded run cannot roll the
+image channel backward.
+
+AMD64 runs on `ubuntu-24.04` and ARM64 runs on the native `ubuntu-24.04-arm` runner. Each job
+builds one architecture, pushes an untagged canonical digest, pulls and smoke-tests that digest on
+matching hardware, and uploads only the validated digest. The final job requires exactly two
+digest artifacts before creating the multi-architecture manifest and verifies both runtime
+platforms, provenance attestations, and every generated tag. QEMU is not installed or used.
+
+BuildKit caches are isolated by architecture. GitHub's cache accelerates repeat jobs, while the
+`buildcache-amd64` and `buildcache-arm64` registry references provide a durable read fallback.
+Only main writes the registry fallback, avoiding tag-build races; release builds consume it and
+write their own short-lived GitHub cache. These cache references are build inputs, not release
+channels. Final images are still assembled from newly built, smoke-tested content-addressed
+digests.
+
+Documentation-only main pushes are excluded from CI image publication, but path filtering is not
+applied to pull requests and GitHub does not apply it to tag pushes. Manual runs on main execute
+the same quality and publication graph. Failed or cancelled architecture jobs leave only untagged
+digests and never move `latest` or a version tag.
+
 ## First-party application image
 
 The published `ghcr.io/gigaionllc/rustdesk-api-server:latest` reference is intentionally the

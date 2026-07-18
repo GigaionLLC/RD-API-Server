@@ -2,6 +2,23 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-17 - v1.0.1 native image publication graph (locally validated)
+
+- Consolidated quality gates and runtime publication into one exact-commit GitHub Actions graph.
+  Public image jobs remain unreachable from pull requests and receive package-write permission
+  only after the PHP, JavaScript, vendor-integrity, and browser jobs pass.
+- Replaced the emulated combined build with concurrent native `linux/amd64` and `linux/arm64`
+  jobs. Each pushes and smoke-tests an untagged digest; the final job validates both artifacts,
+  assembles the manifest, retains provenance, and verifies every generated tag before success.
+- Added architecture-scoped GitHub caches, main-owned GHCR cache fallbacks, stale-main and release
+  tag guards, serialized final promotion, documentation-only push filtering, and exact SHA pins
+  for the Node 24 artifact actions. The independent publisher was removed, so no path can publish
+  a runtime tag before the exact source revision passes the main CI graph.
+- **Local workflow verification:** actionlint 1.7.12 passed the consolidated workflow, all `uses:`
+  entries retain full commit pins, and the runtime smoke-test module list was checked against the
+  locally built PHP 8.5.8 image. Native runner timing and final-manifest verification remain gated
+  on the first GitHub execution.
+
 ## 2026-07-17 - v1.0.1 runtime image layering (verified locally)
 
 - Replaced separate PHP CLI and Apache extension builds with one digest-pinned PHP-Apache base

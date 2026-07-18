@@ -3,6 +3,24 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 20:05] - Gate native image publishing behind exact-commit CI
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.github/workflows/ci.yml` (consolidated quality and native publication graph)
+- `.github/workflows/docker-publish.yml` (removed independent publisher)
+- `docker/README.md`, `Skills/Test-and-Deploy/SKILL.md`
+- `CHANGELOG.md`, `docs/modernization/08-build-log.md`
+- `DevOps/plans/v1.0.1-dark-default-and-build-speed.md`
+**Database/API Changes:** None.
+**Summary:** Replaced the QEMU multi-architecture publisher with parallel native AMD64 and ARM64
+jobs that push and smoke-test content-addressed digests before a serialized manifest job moves any
+public tag. Runtime publication is now downstream of the exact revision's PHP, JavaScript,
+vendor-integrity, and Playwright gates; pull requests remain read-only. Added stale-ref guards,
+strict digest artifact validation, provenance and platform checks, architecture-isolated caches,
+main-only registry cache writes, documentation-only main filtering, and immutable Node 24 action
+pins. Local actionlint 1.7.12 and the action-pin audit passed; first native-run timing remains a
+GitHub verification item.
+
 ## [2026-07-17 19:30] - Compile runtime extensions once and preserve dependency layers
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

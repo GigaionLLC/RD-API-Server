@@ -18,6 +18,10 @@ notes.
   pinned PHP-Apache layer between dependency assembly and the final runtime. Composer downloads
   are cached independently of application source changes, while the final image still excludes
   Composer and the extension installer.
+- Release images now build concurrently on native AMD64 and ARM64 GitHub runners instead of
+  compiling ARM dependencies through QEMU. Each architecture is published by digest and
+  smoke-tested before a CI-gated final manifest moves public image tags; architecture-specific
+  GitHub and registry caches preserve fast repeat builds.
 
 ## [1.0.0] - 2026-07-17
 

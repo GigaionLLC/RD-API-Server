@@ -50,12 +50,13 @@ do not increment the public version.
 1. Review `git diff --check` and the complete intended diff.
 2. Stage explicit paths, commit with a concise conventional message, and follow the branch policy
    explicitly requested by the user.
-3. Push only after local gates pass, then wait for the matching GitHub CI and Docker Publish runs.
+3. Push only after local gates pass, then wait for the matching GitHub `CI` run. Its image jobs
+   start only after PHP, JavaScript, vendor-integrity, and browser gates pass for the exact commit.
 
 ## 5. Publish a release
 
 1. Create an annotated `vMAJOR.MINOR.PATCH` tag on the verified release commit and push it.
-2. Wait for the tag-triggered multi-architecture image workflow. Confirm the version, minor,
-   major, and commit-SHA image tags exist.
+2. Wait for the tag-triggered `CI` graph to pass both native architecture builds and final
+   manifest verification. Confirm the version, minor, major, and commit-SHA image tags exist.
 3. Create the GitHub Release from the existing verified tag using the checked-in release notes.
 4. Record workflow IDs, image results, tag, and release URL in the operational logs.
