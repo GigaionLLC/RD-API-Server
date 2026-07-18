@@ -2,6 +2,17 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-17 - v1.0.1 runtime image layering (verified locally)
+
+- Replaced separate PHP CLI and Apache extension builds with one digest-pinned PHP-Apache base
+  shared by Composer assembly and the final runtime. The final image retains the same production
+  extension set and excludes Composer and the extension installer.
+- Split locked Composer dependency installation from the application source copy, followed by an
+  optimized script-free autoload dump and explicit production platform-requirement check.
+- **Local AMD64 verification:** a cold extension/dependency build completed in 78.3 seconds; an
+  unchanged warm rebuild completed in 0.95 seconds. PHP 8.5.8, required modules, Apache syntax,
+  Composer platform requirements, and final-image build-tool exclusions passed.
+
 ## 2026-07-17 - v1.0.1 dark-default theme behavior (targeted verification passed)
 
 - Changed the no-preference theme path on the sign-in, two-factor, and shared administration

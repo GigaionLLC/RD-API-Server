@@ -8,25 +8,35 @@
 FROM composer:2.10.2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760 AS composer
 FROM mlocati/php-extension-installer:2.11.12@sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138 AS php_extension_installer
 
-# ---- Stage 1: install PHP dependencies ----
-FROM php:8.5.8-cli-bookworm@sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a5b0bf0105725f8987b54bee AS build
+# ---- Stage 1: shared PHP-Apache runtime ----
+# Apache's image also provides the PHP CLI, so the dependency and final stages can share this
+# exact extension layer. This avoids compiling the same native extensions twice per architecture.
+FROM php:8.5.8-apache-bookworm@sha256:76f447018df51801eb0587bdced331709c2d7ac4e0bb8b9cb00bd4f93dd85d1c AS php_runtime
 
-COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
 # MariaDB uses PDO's MySQL-compatible driver. The upstream PHP image's statically compiled
 # SQLite symbols are inert because the application exposes and accepts only MariaDB.
-RUN install-php-extensions pdo_mysql mbstring intl gmp bcmath zip gd opcache sockets ldap
+RUN install-php-extensions pdo_mysql mbstring intl gmp bcmath zip gd opcache ldap \
+    && rm /usr/local/bin/install-php-extensions \
+    && a2enmod rewrite
+
+# ---- Stage 2: install locked PHP dependencies ----
+FROM php_runtime AS build
+
+COPY --from=composer /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
+COPY composer.json composer.lock /app/
+RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --no-autoloader
+
+# Application-only changes no longer invalidate the downloaded dependency layer. The source copy
+# intentionally follows dependency installation; .dockerignore excludes host vendor/cache state.
 COPY . /app
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+RUN composer dump-autoload --no-dev --no-interaction --optimize --no-scripts \
+    && composer check-platform-reqs --no-dev
 
-# ---- Stage 2: runtime ----
-FROM php:8.5.8-apache-bookworm@sha256:76f447018df51801eb0587bdced331709c2d7ac4e0bb8b9cb00bd4f93dd85d1c AS runtime
-
-COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_mysql mbstring intl gmp bcmath zip gd opcache ldap \
-    && a2enmod rewrite
+# ---- Stage 3: production image ----
+FROM php_runtime AS runtime
 
 # Production PHP ini + Apache vhost (docroot -> public/).
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"

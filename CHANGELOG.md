@@ -12,6 +12,13 @@ notes.
   of the operating-system color preference. An explicit saved light or dark choice remains
   persistent and is never overridden by later operating-system theme changes.
 
+### Performance
+
+- The production image now compiles its PHP extensions once per architecture and shares that
+  pinned PHP-Apache layer between dependency assembly and the final runtime. Composer downloads
+  are cached independently of application source changes, while the final image still excludes
+  Composer and the extension installer.
+
 ## [1.0.0] - 2026-07-17
 
 First stable release of the independent RD-API-Server application.

@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 19:30] - Compile runtime extensions once and preserve dependency layers
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docker/Dockerfile.runtime`, `docker/README.md`
+- `CHANGELOG.md`, `docs/modernization/08-build-log.md`
+**Database/API Changes:** None.
+**Summary:** Rebased runtime dependency assembly on the same digest-pinned PHP-Apache extension
+stage as the final image, removing the second native extension compilation per architecture.
+Composer packages are installed from the lock files before application source and receive a later
+optimized, script-free autoload dump and platform check. A local AMD64 cold build completed in
+78.3 seconds and an unchanged warm rebuild in 0.95 seconds; PHP 8.5.8, required modules, Apache
+syntax, Composer platform requirements, and final-image build-tool exclusions passed.
+
 ## [2026-07-17 19:22] - Make dark mode the stable default
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

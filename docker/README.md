@@ -29,6 +29,20 @@ digests, application dependency locks, and exact standalone tool versions remain
 can still receive Debian security updates. Never replace the pinned official Node image with a
 downloaded repository setup script or execute a remote response through a shell.
 
+## Runtime layer and dependency cache design
+
+`docker/Dockerfile.runtime` derives both dependency assembly and the final image from the same
+digest-pinned PHP-Apache stage. Native PHP extensions are compiled once per target architecture;
+the build does not copy modules between different CLI and Apache base variants. Composer is copied
+only into the dependency stage, and the extension installer is removed after the shared runtime
+layer is built. Neither tool is present in the final image.
+
+The Dockerfile copies `composer.json` and `composer.lock` before application source. It installs
+the exact production dependency graph without scripts or an autoloader, then copies the source and
+generates the optimized, script-free autoloader. As a result, ordinary PHP, Blade, JavaScript, or
+documentation changes do not redownload dependencies. A build-time platform check still verifies
+the locked production packages against the exact final PHP extension set.
+
 ## Supported database
 
 RD-API-Server supports **MariaDB with InnoDB only**. Runtime startup, PHPUnit, browser tests,
