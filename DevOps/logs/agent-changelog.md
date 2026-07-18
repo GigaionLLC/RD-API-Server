@@ -3,6 +3,106 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-18 13:05] - Remove runtime compiler drivers and kernel headers
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docker/Dockerfile.runtime`
+- `scripts/ci-runtime-smoke.sh`
+- `CHANGELOG.md`
+- `docker/README.md`
+- `docs/modernization/08-build-log.md`
+- `DevOps/plans/nginx-php-fpm-runtime.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Removed the official PHP image's retained C/C++ compiler drivers, `make`, extension
+installer, and Linux kernel headers after extension compilation. Extended native runtime smoke to
+prevent their return. A same-database Trivy scan found no fixable high/critical candidate findings.
+
+## [2026-07-18 12:30] - Close Nginx candidate review and operator documentation
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `CHANGELOG.md`
+- `README.md`
+- `docker/README.md`
+- `docs/DEVELOPMENT.md`
+- `docs/modernization/08-build-log.md`
+- `docs/modernization/09-port-status.md`
+- `DevOps/plans/nginx-php-fpm-runtime.md`
+- `DevOps/logs/agent-changelog.md`
+- `DevOps/logs/version-history.md`
+**Database/API Changes:** None. Stable `latest` remains v1.0.1; no route, schema, or wire change.
+**Summary:** Documented the drop-in runtime contract, cgroup-aware defaults, build/cache evidence,
+security baseline, short source-parity-safe 300-RPS result, pending full capacity/public-canary
+gates, digest-based rollback, and the decision not to promote the candidate yet.
+
+## [2026-07-18 12:20] - Add source-parity-safe runtime capacity harness
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docker/compose.performance.yml`
+- `tests/Performance/.gitignore`
+- `tests/Performance/README.md`
+- `tests/Performance/heartbeat.js`
+- `tests/Performance/seed.php`
+- `tests/Performance/compare.php`
+- `tests/Performance/fingerprint.sh`
+- `tests/Performance/run.ps1`
+- `tests/Performance/run.sh`
+- `eslint.config.mjs`
+- `package.json`
+**Database/API Changes:** None. The harness creates only guarded, disposable MariaDB schemas.
+**Summary:** Added isolated Apache/Nginx keep-alive and no-reuse trials with real client cadence,
+fixed resource limits, deterministic fixtures, application-payload fingerprints, threshold-safe
+comparison output, and CI lint/Compose/k6 validation.
+
+## [2026-07-18 11:50] - Gate the production runtime on native integration behavior
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.github/workflows/ci.yml`
+- `scripts/ci-runtime-smoke.sh`
+**Database/API Changes:** None. Smoke data uses a disposable MariaDB container.
+**Summary:** Added an always-running AMD64 production-image job and native AMD64/ARM64 publication
+smoke covering syntax, HTTP/API/proxy parity, secure cookies, Unix-socket isolation, protected
+paths, body limits, secret/tool removal, process failure, and graceful in-flight shutdown.
+
+## [2026-07-18 11:20] - Implement the Nginx and PHP-FPM runtime candidate
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docker/Dockerfile.runtime`
+- `docker/entrypoint.sh`
+- `docker/nginx.conf.template`
+- `docker/php-fpm-runtime.conf.template`
+- `docker/render-runtime-config.sh`
+- `docker/runtime-supervisor.sh`
+- `docker-compose.yml`
+- `docker-compose.dev.yml`
+- `examples/full-stack.docker-compose.yml`
+**Database/API Changes:** None. MariaDB, storage, port 80, environment, and RustDesk wire contracts
+remain unchanged.
+**Summary:** Replaced Apache/mod_php in the candidate image with a supervised Nginx/PHP-FPM pair,
+private Unix FastCGI socket, cgroup-aware workers, pre-migration tuning validation, bounded request
+limits, compatible proxy handling, and graceful Docker stop behavior.
+
+## [2026-07-18 10:50] - Protect stable container release channels
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.github/workflows/ci.yml`
+**Database/API Changes:** None.
+**Summary:** Restricted `latest` and SemVer publication to reviewed annotated stable tags on current
+main, leaving main-branch builds on full-commit SHA discovery tags paired with immutable digests.
+
+## [2026-07-18 10:27] - Design benchmark-gated Nginx and PHP-FPM runtime migration
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `DevOps/plans/nginx-php-fpm-runtime.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. This is a runtime decision and execution plan only.
+**Summary:** Planned a benchmark-gated single-container Nginx + PHP-FPM candidate for `v1.1.0`
+while preserving the image, port, storage, environment, proxy, entrypoint, update, and rollback
+contracts. The plan keeps stable channels on Apache until native parity and benchmarks using the
+client's real 15-second idle / three-second active cadence prove a material gain. It separately
+identifies MariaDB hot-path and access-log scale as fleet-capacity limits that a web-server swap
+cannot solve alone.
+
 ## [2026-07-17 20:35] - Publish and close v1.0.1
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

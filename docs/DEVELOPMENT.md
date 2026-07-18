@@ -56,6 +56,46 @@ GHCR — use it to verify your changes as they'll ship. Because it runs with
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
+The source-built candidate runs Nginx and PHP-FPM in one container without changing its external
+contract: HTTP remains on container port `80`, persistent application data remains under
+`/var/www/html/storage`, and existing application/database/reverse-proxy environment settings are
+unchanged. FastCGI is private to `/run/php/rustdesk-api.sock`; there must be no live TCP listener
+on port `9000`, even though the upstream FPM image can retain inert OCI exposure metadata.
+
+The image validates optional Nginx/FPM tuning before migrations. Defaults are 16 FPM children, 4
+starting workers, 2 minimum and 6 maximum spare workers, 500 requests per worker, a five-second
+slow-log threshold, a cgroup-quota-aware Nginx process count, 4,096 connections per Nginx worker,
+and one Nginx access log on stdout. The body limit is derived from the configured recording chunk
+plus 1 MiB of headroom, never below 5 MiB. See the
+[runtime tuning table](../docker/README.md#production-http-runtime-and-tuning) before overriding
+these settings; child count must be sized against measured worker memory and MariaDB connection
+capacity.
+
+An unchanged custom Compose file gets the image's eight-second graceful-drain default, which fits
+inside Compose's ten-second stop timeout. The bundled Compose files intentionally pair a
+30-second internal drain with `stop_grace_period: 35s`. Keep the outer stop grace longer than the
+runtime deadline if either value is customized.
+
+CI smoke-tests the exact image digest on native AMD64 and ARM64 after starting it with a disposable
+MariaDB schema. The gate covers Nginx/FPM syntax, Unix-socket permissions and TCP isolation,
+startup/migrations, HTTP and API behavior, trusted HTTPS proxy handling, client-IP recovery,
+secure cookies, static assets, request-size limits, protected paths, build-tool and bootstrap-secret
+removal, managed-process crashes, and in-flight graceful shutdown through `SIGQUIT` and explicit
+`SIGTERM`.
+
+The runtime remains a candidate until it passes the capacity comparison and a public
+reverse-proxy canary; `latest` continues to identify the published v1.0.1 Apache runtime during
+that evaluation. A short local harness check can be run with:
+
+```powershell
+.\tests\Performance\run.ps1 -Mode smoke
+```
+
+The smoke preset verifies the comparison machinery only. Follow
+[`tests/Performance/README.md`](../tests/Performance/README.md) for the reproducible steady and
+recovery workloads; their results, not the web-server label alone, decide whether the candidate
+is eligible for promotion.
+
 ## Handy commands
 
 ```bash

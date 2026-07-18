@@ -8,6 +8,35 @@
 > status and remaining roadmap, see **[04-gap-analysis.md](04-gap-analysis.md)** (top section).
 > This file is kept for history only.
 
+## Current production-runtime candidate (2026-07-18)
+
+The application source now contains a benchmark-gated Nginx + PHP-FPM container candidate. It is
+a drop-in runtime change rather than a RustDesk API port change: container port `80`, persistent
+`/var/www/html/storage`, MariaDB initialization, application environment variables, reverse-proxy
+trust, client paths, JSON keys, and response shapes remain unchanged.
+
+Nginx talks to PHP-FPM only through the permission-restricted
+`/run/php/rustdesk-api.sock`; there is no live or published TCP FastCGI port. Startup rejects
+invalid optional worker, connection, access-log, body-limit, slow-log, and drain values before
+database migrations. Nginx derives its process count from the tighter visible-CPU/cgroup quota by
+default. The body ceiling follows the recording chunk plus headroom, Nginx owns the single
+toggleable access log, and a peer supervisor fails the container if either server dies. The image keeps an eight-second
+drain for unchanged Compose compatibility, while bundled Compose files pair a 30-second drain with
+a 35-second orchestrator stop grace.
+
+Native AMD64/ARM64 publication jobs now require a real MariaDB-backed runtime smoke covering
+syntax, socket/TCP isolation, HTTP/API/proxy parity, secure cookies, request and path boundaries,
+secret/build-tool removal, child-process failure, and graceful in-flight shutdown. A separate
+fixed-resource Apache/Nginx harness supplies capacity evidence. Those capacity trials and the
+public reverse-proxy canary are not complete, so `latest` remains the published Apache-based
+v1.0.1 image and no Nginx/PHP-FPM release promotion is recorded here.
+
+A short local, payload-matched 300-heartbeat-RPS tuning run passed both keep-alive and no-reuse
+profiles for both runtimes with zero failures, drops, or wire mismatches and roughly 7 ms p95
+latency. The quota-aware Nginx candidate used less sampled CPU and app memory in that run. This
+supports continuing the candidate but does not replace the full steady, recovery, background-route,
+native-CI, or public 1Panel gates.
+
 ## Current database support (2026-07-14)
 
 The current PHP application supports **MariaDB with InnoDB only**. Runtime, development,

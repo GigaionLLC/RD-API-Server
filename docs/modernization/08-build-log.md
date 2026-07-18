@@ -2,6 +2,49 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-18 - Nginx/PHP-FPM runtime candidate (capacity and canary pending)
+
+- Reworked the production-image source into a single-container Nginx + PHP-FPM candidate while
+  preserving container port `80`, `/var/www/html/storage`, the existing environment contract,
+  MariaDB initialization, and reverse-proxy topology. FastCGI uses only the
+  permission-restricted `/run/php/rustdesk-api.sock`; no TCP `9000` listener is configured or
+  published.
+- Added startup-rendered, range-checked Nginx and FPM tuning. The request-body ceiling is derived
+  from the configured recording chunk plus 1 MiB, never below 5 MiB; request buffering protects
+  FPM workers while response buffering stays off for streamed exports/downloads. Nginx owns one
+  stdout access log controlled by `NGINX_ACCESS_LOG_ENABLED`, with duplicate FPM access logging
+  disabled.
+- Added a `tini`-backed peer supervisor that treats an unexpected Nginx or FPM exit as container
+  failure and translates both the declared `SIGQUIT` and explicit `SIGTERM` paths into a bounded
+  graceful drain. The image default is eight seconds for compatibility with an unchanged
+  Compose ten-second timeout; bundled Compose files pair a 30-second drain with
+  `stop_grace_period: 35s`.
+- Retained the compile-once extension/dependency layering on the digest-pinned official PHP-FPM
+  base, then removed the C/C++ compiler drivers, `make`, and Linux kernel headers from every
+  downstream stage. The runtime-only Nginx/tini branch can build in parallel with Composer
+  assembly. **Local implementation evidence:** one Docker Desktop run rebuilt the invalidated
+  extension layer and assembled the image in 74.3 seconds; a warm application/source rebuild
+  measured 5.9 seconds and a fully unchanged build measured 0.84 seconds. Those figures validate
+  cache reuse for that machine; they are not CI-duration or request-capacity evidence.
+- Extended each native AMD64/ARM64 digest smoke gate to boot the real image with disposable
+  MariaDB and verify Nginx/FPM syntax, socket permissions and TCP isolation, migrations,
+  health/version/static/API behavior, trusted HTTPS proxy and client-IP recovery, secure cookies,
+  body-size and protected-path boundaries, hidden runtime versions, build-tool/bootstrap-secret
+  removal, managed-child failure, and in-flight shutdown for both stop signals.
+- Added an isolated, fixed-resource Apache-versus-Nginx heartbeat harness for keep-alive and
+  no-reuse profiles with deterministic data, per-profile disposable stacks, application-payload
+  parity fingerprints, and machine-readable output. A short post-fix 300-RPS local tuning run gave
+  all four runtime/profile cases zero failures, drops, and wire mismatches at about 7 ms p95;
+  Nginx sampled 17.7%-84.2% less app memory across the two profiles. This is not the required
+  three-trial fleet-capacity or public 1Panel canary result. Stable `latest` therefore remains the
+  published Apache-based v1.0.1 manifest; main candidates use full-commit SHA discovery tags paired
+  with content digests and cannot move stable channels.
+- A same-database Trivy scan after removing the compiler drivers and Linux header package reported
+  no fixable high/critical issue in the candidate. The candidate had 49 high and 16 critical
+  unfixed Debian findings versus 181 high, 17 critical, and four fixable findings in the published
+  v1.0.1 control. These time-sensitive counts are baseline evidence, not an exploitability
+  assessment.
+
 ## 2026-07-17 - v1.0.1 patch release (published)
 
 - Synchronized source-controlled version `1.0.1`, its exact API assertion, public changelog,

@@ -135,6 +135,7 @@ services:
   rustdesk-api:
     image: "${RUSTDESK_API_IMAGE:-ghcr.io/gigaionllc/rustdesk-api-server:latest}"
     restart: unless-stopped
+    stop_grace_period: 35s
     # Host-based proxy: keep the backend on loopback. For a containerized proxy, remove this
     # port and attach both services to a dedicated internal network.
     ports: ["127.0.0.1:21114:80"]
@@ -142,6 +143,7 @@ services:
       APP_ENV: production
       APP_URL: https://api.your-domain.com
       SESSION_SECURE_COOKIE: "true"
+      RUNTIME_SHUTDOWN_GRACE_SECONDS: "30"
       # Leave APP_KEY empty for the persistent generated key. Replicas must share explicit keys.
       APP_KEY: "${APP_KEY:-}"
       APP_PREVIOUS_KEYS: "${APP_PREVIOUS_KEYS:-}"

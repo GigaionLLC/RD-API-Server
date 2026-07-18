@@ -6,6 +6,58 @@ notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Added a benchmark-gated production runtime candidate using Nginx and PHP-FPM in one supervised
+  container. It preserves container port `80`, `/var/www/html/storage`, all existing application
+  environment settings, the MariaDB startup/migration path, and reverse-proxy behavior as a
+  drop-in replacement for the Apache runtime.
+- Added validated, optional controls for Nginx connections and access logging, PHP-FPM pool size,
+  spare workers, request recycling and slow logging, and graceful-drain duration. Request-body
+  limits are derived from the configured recording chunk with upload headroom, and the one Nginx
+  access log can be disabled without creating a duplicate PHP-FPM access log.
+- Nginx now derives its default worker-process count from the tighter visible CPU count or Docker
+  cgroup quota instead of over-provisioning from host CPUs. All runtime tuning and generated server
+  configuration are rejected before migrations or first-run seeding can change persistent state.
+- The image keeps an eight-second shutdown default for compatibility with unchanged Compose files.
+  Bundled Compose examples pair a 30-second runtime drain with a 35-second
+  `stop_grace_period` so in-flight work has more time to complete.
+
+### Security
+
+- FastCGI is restricted to a permission-controlled Unix socket; PHP-FPM does not listen on or
+  publish TCP port `9000`. Nginx executes only Laravel's exact front controller, denies dotfiles
+  and other PHP paths, hides runtime versions, preserves the existing explicit trusted-proxy
+  boundary, and keeps streamed response buffering disabled.
+- Native AMD64 and ARM64 image gates now start each exact candidate digest with disposable
+  MariaDB and verify runtime syntax, socket isolation, HTTPS proxy recovery, secure cookies,
+  static assets and API behavior, request-size and protected-path boundaries, secret/build-tool
+  removal, managed-process failure, and graceful `SIGQUIT`/`SIGTERM` handling.
+- Removed the C/C++ compiler drivers, `make`, and Linux header package after extension compilation.
+  A same-database Trivy scan on 2026-07-18 found no fixable high/critical vulnerability in the
+  final candidate image; vulnerability databases and unfixed vendor findings remain time-sensitive.
+
+### Performance
+
+- The digest-pinned PHP-FPM extension layer is shared by dependency assembly and the final image,
+  so extensions compile once, after which the C/C++ compiler drivers, `make`, and Linux kernel
+  headers are removed. Nginx/tini installation and Composer assembly use independent BuildKit
+  branches, while source-only changes continue to reuse locked dependencies. One local Docker
+  Desktop implementation run rebuilt the invalidated extension layer in 74.3 seconds; a warm
+  source rebuild measured 5.9 seconds and a fully cached verification took 0.84 seconds. These are
+  cache observations, not CI or capacity guarantees.
+- Added a reproducible Apache-versus-Nginx heartbeat harness with isolated MariaDB datasets,
+  keep-alive and no-reuse profiles, fixed resource limits, payload-fingerprint parity checks, and
+  machine-readable output. A short post-fix 300-RPS local run completed without failures, drops, or
+  wire mismatches at about 7 ms p95 for both runtimes while the candidate used less sampled CPU and
+  app memory. The full capacity workloads and public reverse-proxy canary remain required before
+  release promotion.
+
+The stable `latest` channel remains the published Apache-based v1.0.1 image while this candidate
+is evaluated. Main-branch builds publish full-commit SHA discovery tags, with the recorded content
+digest remaining the immutable deployment identity; no Nginx/PHP-FPM release or promotion is
+claimed here.
+
 ## [1.0.1] - 2026-07-17
 
 ### Changed

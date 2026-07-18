@@ -9,7 +9,7 @@ digest prevents a registry tag from silently resolving to different bytes later.
 | Input | Version | Multi-architecture digest |
 |---|---:|---|
 | PHP CLI | 8.5.8 Bookworm | `sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a5b0bf0105725f8987b54bee` |
-| PHP Apache | 8.5.8 Bookworm | `sha256:76f447018df51801eb0587bdced331709c2d7ac4e0bb8b9cb00bd4f93dd85d1c` |
+| PHP FPM | 8.5.8 Bookworm | `sha256:83c155135b9c4aa664fc6ce47020a10fe53576a0ed3468119cf2efec22fd16b9` |
 | Node.js | 24.18.0 Bookworm slim | `sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d` |
 | Composer | 2.10.2 | `sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760` |
 | PHP extension installer | 2.11.12 | `sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138` |
@@ -32,16 +32,78 @@ downloaded repository setup script or execute a remote response through a shell.
 ## Runtime layer and dependency cache design
 
 `docker/Dockerfile.runtime` derives both dependency assembly and the final image from the same
-digest-pinned PHP-Apache stage. Native PHP extensions are compiled once per target architecture;
-the build does not copy modules between different CLI and Apache base variants. Composer is copied
-only into the dependency stage, and the extension installer is removed after the shared runtime
-layer is built. Neither tool is present in the final image.
+digest-pinned PHP-FPM stage. Native PHP extensions are compiled once per target architecture;
+the build does not copy modules between different PHP base variants. Composer is copied only into
+the dependency stage. The extension installer, C/C++ compiler drivers, `make`, and
+`linux-libc-dev` kernel headers are removed after the shared runtime layer is built. None is
+present in the final image. The final runtime branch installs Bookworm's security-maintained
+`nginx-light` and `tini` packages independently of Composer assembly, so BuildKit can execute
+those branches in parallel.
 
 The Dockerfile copies `composer.json` and `composer.lock` before application source. It installs
 the exact production dependency graph without scripts or an autoloader, then copies the source and
 generates the optimized, script-free autoloader. As a result, ordinary PHP, Blade, JavaScript, or
 documentation changes do not redownload dependencies. A build-time platform check still verifies
 the locked production packages against the exact final PHP extension set.
+
+One Docker Desktop implementation run rebuilt the invalidated extension layer, removed its
+compiler drivers, `make`, and kernel headers, and assembled the image in 74.3 seconds. A warm
+application/source rebuild measured 5.9 seconds, while a fully unchanged verification build
+measured 0.84 seconds. These timings demonstrate that the cache boundaries work; they are not a
+CI duration guarantee or runtime-capacity evidence.
+
+## Production HTTP runtime and tuning
+
+The Nginx/PHP-FPM candidate is a drop-in container replacement: it still listens for HTTP on
+container port `80`, serves the same Laravel routes, consumes the existing environment variables,
+and uses the same `/var/www/html/storage` persistence boundary. No Compose port, reverse-proxy
+target, database, storage mount, or application-key migration is required by the web-server
+change.
+
+Nginx and PHP-FPM run in the same container, supervised as peer processes by `tini`. FastCGI uses
+the permission-restricted Unix socket `/run/php/rustdesk-api.sock`; PHP-FPM does not listen on TCP
+port `9000`, and Compose does not publish it. The upstream FPM base may retain OCI `EXPOSE 9000`
+metadata, so validate the effective FPM configuration and live listener table instead of treating
+that inert image metadata as network reachability.
+
+Request buffering remains enabled so slow uploads do not occupy a PHP worker. The generated Nginx
+and PHP body ceiling is the larger of 5 MiB or
+`RUSTDESK_RECORDING_UPLOAD_MAX_CHUNK_BYTES + 1 MiB`; this keeps the configured recording chunk and
+the supported 4 MiB CSV import below the web-server boundary. An explicit
+`NGINX_CLIENT_MAX_BODY_BYTES` may raise that ceiling but cannot lower it below the derived value.
+FastCGI response buffering is disabled so streamed CSV exports and recording downloads are not
+spooled into Nginx temporary files.
+
+The runtime validates optional tuning and generated server configuration before it creates
+application state or applies database migrations. It rejects malformed, out-of-range, or
+internally inconsistent values:
+
+| Setting | Image default | Valid boundary / purpose |
+|---|---:|---|
+| `RUNTIME_SHUTDOWN_GRACE_SECONDS` | `8` | Integer `1`-`300`; internal drain deadline |
+| `NGINX_ACCESS_LOG_ENABLED` | `true` | Boolean; controls the one request log on stdout |
+| `NGINX_WORKER_PROCESSES` | Cgroup-aware | Integer `1`-`1024`; defaults to the tighter available-CPU or container-quota count |
+| `NGINX_WORKER_CONNECTIONS` | `4096` | Integer `256`-`65535` per Nginx worker |
+| `NGINX_CLIENT_MAX_BODY_BYTES` | Derived | Derived ceiling through `4294967296` bytes |
+| `PHP_FPM_MAX_CHILDREN` | `16` | Integer `1`-`512`; hard concurrent PHP-request limit |
+| `PHP_FPM_START_SERVERS` | Up to `4` | Integer `1`-`PHP_FPM_MAX_CHILDREN` |
+| `PHP_FPM_MIN_SPARE_SERVERS` | Up to `2` | Integer `1`-`PHP_FPM_START_SERVERS` |
+| `PHP_FPM_MAX_SPARE_SERVERS` | Up to `6` | At least `PHP_FPM_START_SERVERS`, no more than the child limit |
+| `PHP_FPM_MAX_REQUESTS` | `500` | Integer `1`-`100000`; recycles workers after bounded use |
+| `PHP_FPM_SLOWLOG_TIMEOUT_SECONDS` | `5` | Integer `1`-`300`; slow-request diagnostics on stderr |
+
+PHP-FPM access logging is deliberately disabled because Nginx owns the single toggleable request
+log. High-heartbeat deployments can set `NGINX_ACCESS_LOG_ENABLED=false` after confirming that
+their operational audit requirements are met; application audit records remain separate. Size
+`PHP_FPM_MAX_CHILDREN` from measured worker memory and MariaDB connection capacity, leaving memory,
+database, and scheduler headroom. Raising it blindly can move queuing or failure into MariaDB.
+
+The image defaults to an 8-second drain so unchanged external Compose files retain margin inside
+Compose's historical 10-second stop timeout. The bundled production and development Compose files
+opt into `RUNTIME_SHUTDOWN_GRACE_SECONDS=30` and `stop_grace_period: 35s`. When overriding these,
+keep the Compose grace period longer than the internal runtime deadline. The supervisor first
+stops Nginx from accepting new work, drains it, then gracefully stops PHP-FPM; both the declared
+`SIGQUIT` stop path and an explicit `SIGTERM` use that sequence.
 
 ## Supported database
 
@@ -98,16 +160,27 @@ reference together. Do not replace a full SHA with a movable tag.
 
 Runtime publication is part of the same `CI` dependency graph as PHP, JavaScript, vendor-integrity,
 and browser gates. Pull requests receive read-only quality checks and cannot reach package-write
-jobs. A trusted main or stable `vMAJOR.MINOR.PATCH` push can publish only after every quality job
-passes for that exact commit. A release tag must point to the current main commit, and the final
-publication job rechecks main before moving any public tag so a superseded run cannot roll the
-image channel backward.
+jobs. A trusted main push publishes only a full-commit `sha-<40-hex>` discovery tag after every
+quality job passes. Registry tags remain movable, so deployments and benchmark evidence must pair
+that tag with the recorded content digest. Only a stable annotated `vMAJOR.MINOR.PATCH` tag that
+points directly to the current main commit may move `latest` and the SemVer aliases. The final
+publication job rechecks both refs immediately before publication so a superseded run cannot roll
+the image channel backward.
 
 AMD64 runs on `ubuntu-24.04` and ARM64 runs on the native `ubuntu-24.04-arm` runner. Each job
 builds one architecture, pushes an untagged canonical digest, pulls and smoke-tests that digest on
 matching hardware, and uploads only the validated digest. The final job requires exactly two
 digest artifacts before creating the multi-architecture manifest and verifies both runtime
 platforms, provenance attestations, and every generated tag. QEMU is not installed or used.
+
+The native digest smoke gate starts the real image with disposable MariaDB, then checks Nginx and
+FPM syntax, Unix-socket ownership, absence of a TCP FastCGI listener, migrations, health/version,
+static MIME types, API authentication and heartbeat behavior, trusted-proxy HTTPS URLs and client
+IP recovery, secure cookies, body-size boundaries, hidden server versions, denied dotfiles and
+non-front-controller PHP paths, removal of build tools and `ADMIN_PASS`, peer-process failure, and
+graceful in-flight completion through both `SIGQUIT` and explicit `SIGTERM`. This gate verifies
+runtime parity and security on each native architecture; it does not replace the separate
+fleet-capacity and public reverse-proxy canary gates.
 
 BuildKit caches are isolated by architecture. GitHub's cache accelerates repeat jobs, while the
 `buildcache-amd64` and `buildcache-arm64` registry references provide a durable read fallback.
@@ -124,12 +197,16 @@ digests and never move `latest` or a version tag.
 ## First-party application image
 
 The published `ghcr.io/gigaionllc/rustdesk-api-server:latest` reference is intentionally the
-project's update channel, so it cannot be pinned in this repository without pointing new releases
-back at an older build. Operators who require a fully locked deployment can set
+project's stable update channel. While the Nginx/PHP-FPM candidate is under capacity and canary
+validation, `latest` remains the Apache-based v1.0.1 image at manifest digest
+`sha256:65fdd380ab101ef8fcf40e8281aa303257559f3da4008dfb00782138e71268e2`.
+Main-branch candidate builds use full-commit SHA discovery tags plus content digests and do not
+move stable channels.
+Operators who require a fully locked deployment can set
 `RUSTDESK_API_IMAGE` to a published tag and digest before running Compose, for example:
 
 ```bash
-RUSTDESK_API_IMAGE='ghcr.io/gigaionllc/rustdesk-api-server:sha-abcdef@sha256:<64-hex-digest>' \
+RUSTDESK_API_IMAGE='ghcr.io/gigaionllc/rustdesk-api-server:sha-<40-hex-commit>@sha256:<64-hex-digest>' \
   docker compose up -d
 ```
 
@@ -144,8 +221,8 @@ administrator exists, `ADMIN_PASS` may be removed from the deployment environmen
 
 The toolchain stack uses `APP_ENV=local` and keeps the predictable development seed credential
 needed by tests and screenshot fixtures. That fallback is never accepted by a production seed.
-After bootstrap the entrypoint removes `ADMIN_PASS` from the Apache process environment; the
-stored administrator password remains a one-way hash in the database.
+After bootstrap the entrypoint removes `ADMIN_PASS` before PHP-FPM inherits the application
+environment; the stored administrator password remains a one-way hash in the database.
 
 ## Application encryption key
 
