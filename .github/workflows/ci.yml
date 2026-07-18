@@ -64,6 +64,10 @@ jobs:
         run: composer install --no-interaction --prefer-dist
       - name: Prepare env
         run: cp .env.example .env && php artisan key:generate
+      - name: Shell script syntax
+        run: |
+          find docker scripts tests -type f -name '*.sh' -print0 \
+            | xargs -0 --no-run-if-empty bash -n
       - name: Pint (code style)
         run: ./vendor/bin/pint --test
       - name: PHPStan (static analysis)
@@ -108,6 +112,43 @@ jobs:
         run: npm run check:vendor
       - name: ESLint
         run: npm run lint:js
+      - name: Validate performance harness configuration
+        env:
+          PERF_IMAGE: ghcr.io/gigaionllc/rustdesk-api-server:1.0.1@sha256:65fdd380ab101ef8fcf40e8281aa303257559f3da4008dfb00782138e71268e2
+          PERF_RESULTS_DIR: /tmp/rustdesk-api-performance-results
+        run: |
+          docker compose -f docker/compose.performance.yml --profile load config --quiet
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+            -v "$PWD/tests/Performance:/performance:ro" \
+            grafana/k6:1.4.2@sha256:3656673de3f30424e8ebcfa46acd9558d83b6a43612d0f668ffeac953950c6c7 \
+            inspect /performance/heartbeat.js >/dev/null
+
+  runtime:
+    name: Production runtime (AMD64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Build production image for native integration
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: docker/Dockerfile.runtime
+          platforms: linux/amd64
+          load: true
+          tags: rustdesk-api:ci-runtime
+          cache-from: type=gha,scope=runtime-amd64
+          cache-to: type=gha,scope=runtime-amd64,mode=max
+
+      - name: Exercise production Nginx and PHP-FPM runtime
+        run: bash scripts/ci-runtime-smoke.sh rustdesk-api:ci-runtime amd64 linux/amd64
 
   e2e:
     name: E2E (Playwright)
@@ -245,7 +286,7 @@ jobs:
   publish_prepare:
     name: Prepare image publication
     runs-on: ubuntu-24.04
-    needs: [php, js, e2e]
+    needs: [php, js, runtime, e2e]
     if: >-
       (github.event_name == 'push' &&
        (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
@@ -417,12 +458,7 @@ jobs:
 
             require "/var/www/html/vendor/autoload.php";
           '
-          docker run --rm --platform "$PLATFORM" --entrypoint apache2ctl "$image" -t
-          docker run --rm --platform "$PLATFORM" --entrypoint apache2ctl "$image" -M 2>/dev/null | grep -q 'rewrite_module'
-          docker run --rm --platform "$PLATFORM" --entrypoint sh "$image" -c '
-            test ! -e /usr/bin/composer
-            test ! -e /usr/local/bin/install-php-extensions
-          '
+          bash scripts/ci-runtime-smoke.sh "$image" "$EXPECTED_ARCH" "$PLATFORM"
 
       - name: Export digest artifact
         shell: bash
