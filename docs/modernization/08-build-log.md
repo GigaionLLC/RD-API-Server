@@ -2,7 +2,7 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
-## 2026-07-17 - v1.0.0 first stable release candidate (verified locally)
+## 2026-07-17 - v1.0.0 first stable release (published)
 
 - Centralized the source-controlled application version as `config('app.version')`, removed
   duplicated controller fallbacks, and asserted the exact public `/api/version` response. The
@@ -19,6 +19,11 @@ Chronological record of what was built and its verification state. Newest at top
   ESLint, 20-file vendor integrity, strict Composer validation, Compose rendering, Bash syntax,
   local documentation links, and diff checks passed. A fresh runtime image built successfully
   and reported application version `1.0.0`.
+- **Published from verified commit `026b841`:** GitHub CI run `29626539704` and main-image run
+  `29626539712` passed before the annotated `v1.0.0` tag was pushed. Tag-image run `29626681147`
+  then published `1.0.0`, `1.0`, and `1` for AMD64 and ARM64 at manifest digest
+  `sha256:512c1fb8b40ff72cb71fe1a66c872198741f1ac6d08a4c0c0f00ee5877949705`.
+- **Release:** <https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.0.0>
 
 ## 2026-07-17 - HTTPS reverse-proxy hardening and production recovery (resolved)
 

@@ -3,12 +3,25 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 19:17] - Publish v1.0.0 and open v1.0.1 follow-up
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docs/modernization/08-build-log.md`
+- `DevOps/logs/version-history.md`, `DevOps/logs/agent-changelog.md`
+- `DevOps/plans/v1.0.1-dark-default-and-build-speed.md`
+**Database/API Changes:** None.
+**Summary:** Published verified commit `026b841` as annotated tag `v1.0.0` and the first stable
+GitHub Release after CI run `29626539704` and Docker runs `29626539712` / `29626681147` passed.
+Verified the matching GHCR `1.0.0`, `1.0`, and `1` AMD64/ARM64 manifests at digest
+`sha256:512c1fb8b40ff72cb71fe1a66c872198741f1ac6d08a4c0c0f00ee5877949705`. Opened a separate
+v1.0.1 plan for dark-by-default theme behavior and native-architecture Docker build acceleration.
+
 ## [2026-07-17 18:55] - Prepare v1.0.0 and close HTTPS proxy recovery
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
-- `config/app.php`, `.env.example`, `docker-compose.yml`, `docker-compose.dev.yml`
+- `config/app.php`, `docker-compose.dev.yml`
 - `app/Http/Controllers/Api/IndexController.php`, `app/Http/Controllers/Api/SystemController.php`
-- `tests/Feature/SmokeTest.php`, `examples/full-stack.docker-compose.yml`
+- `tests/Feature/SmokeTest.php`
 - `README.md`, `QUICKSTART.md`, `CHANGELOG.md`, `docs/releases/v1.0.0.md`
 - `Skills/Test-and-Deploy/SKILL.md`
 - `docs/modernization/08-build-log.md`, `DevOps/logs/version-history.md`
