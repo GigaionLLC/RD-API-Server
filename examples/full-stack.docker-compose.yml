@@ -60,6 +60,7 @@ services:
     # Keep the default release channel, or set RUSTDESK_API_IMAGE to a verified tag+digest.
     image: "${RUSTDESK_API_IMAGE:-ghcr.io/gigaionllc/rustdesk-api-server:latest}"
     container_name: rustdesk-api
+    stop_grace_period: "${RUNTIME_STOP_GRACE_PERIOD:-35s}"
     environment:
       - TZ=UTC
       - APP_ENV=production
@@ -77,6 +78,9 @@ services:
       # Exact application-observed IP, or narrow isolated shared-network CIDR, of the TLS proxy:
       - TRUSTED_PROXIES=CHANGE_ME_proxy_ip_or_cidr
       - SESSION_SECURE_COOKIE=true
+      # The image defaults to an 8-second drain for old Compose files; this stack pairs a
+      # 30-second runtime drain with the 35-second stop_grace_period above.
+      - "RUNTIME_SHUTDOWN_GRACE_SECONDS=${RUNTIME_SHUTDOWN_GRACE_SECONDS:-30}"
       # First-run admin (seeded once). There is deliberately no production password default:
       - ADMIN_USER=admin
       - "ADMIN_PASS=${ADMIN_PASS:-}"

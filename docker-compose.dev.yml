@@ -15,6 +15,8 @@ services:
     image: rustdesk-api:dev
     container_name: rustdesk-api
     restart: unless-stopped
+    # Give the runtime's 30-second graceful drain five seconds of orchestrator headroom.
+    stop_grace_period: "${RUNTIME_STOP_GRACE_PERIOD:-35s}"
     ports:
       - "${PORT:-21114}:80"
     environment:
@@ -34,6 +36,19 @@ services:
       # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-null}"
+
+      # The image itself defaults to 8 seconds for compatibility with unchanged custom stacks.
+      RUNTIME_SHUTDOWN_GRACE_SECONDS: "${RUNTIME_SHUTDOWN_GRACE_SECONDS:-30}"
+      NGINX_ACCESS_LOG_ENABLED: "${NGINX_ACCESS_LOG_ENABLED:-}"
+      NGINX_WORKER_PROCESSES: "${NGINX_WORKER_PROCESSES:-}"
+      NGINX_WORKER_CONNECTIONS: "${NGINX_WORKER_CONNECTIONS:-}"
+      NGINX_CLIENT_MAX_BODY_BYTES: "${NGINX_CLIENT_MAX_BODY_BYTES:-}"
+      PHP_FPM_MAX_CHILDREN: "${PHP_FPM_MAX_CHILDREN:-}"
+      PHP_FPM_START_SERVERS: "${PHP_FPM_START_SERVERS:-}"
+      PHP_FPM_MIN_SPARE_SERVERS: "${PHP_FPM_MIN_SPARE_SERVERS:-}"
+      PHP_FPM_MAX_SPARE_SERVERS: "${PHP_FPM_MAX_SPARE_SERVERS:-}"
+      PHP_FPM_MAX_REQUESTS: "${PHP_FPM_MAX_REQUESTS:-}"
+      PHP_FPM_SLOWLOG_TIMEOUT_SECONDS: "${PHP_FPM_SLOWLOG_TIMEOUT_SECONDS:-}"
 
       # This exercises the production bootstrap guard; there is deliberately no default.
       # Existing installations may remove ADMIN_PASS after the administrator has been created.

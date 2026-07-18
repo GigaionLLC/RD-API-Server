@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Runtime entrypoint: prepares storage, app key, database, and caches, then starts Apache.
+# Runtime entrypoint: prepares storage, app key, database, caches, and generated web config,
+# then starts the supervised Nginx + PHP-FPM runtime.
 # Handles setup automatically after the required first-run secrets have been provided.
 set -e
 
@@ -53,6 +54,10 @@ fi
 DATABASE_PROBE_TIMEOUT=$((DB_CONNECT_TIMEOUT + 5))
 export DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD DB_SOCKET DB_CONNECT_TIMEOUT
 export MYSQL_ATTR_SSL_CA
+
+# Reject malformed runtime tuning and validate the generated Nginx/FPM/PHP configuration before
+# creating application state or applying a database migration.
+/usr/local/bin/render-runtime-config.sh
 
 echo "[entrypoint] preparing storage..."
 mkdir -p \
@@ -231,7 +236,7 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# The bundled Apache image accepts HTTP internally. An HTTPS origin therefore needs an explicitly
+# The bundled application runtime accepts HTTP internally. An HTTPS origin therefore needs an explicitly
 # trusted TLS proxy so Laravel can safely honor its sanitized forwarded headers.
 # Check the parsed configuration rather than the raw environment value because wildcard, /0,
 # and malformed entries are intentionally discarded by config/trustedproxy.php.
@@ -258,6 +263,9 @@ elif [ "$proxy_configuration_status" != "ok" ]; then
 fi
 
 chown -R www-data:www-data storage bootstrap/cache || true
+
+# PHP-FPM starts only after ADMIN_PASS has been removed above. It intentionally inherits the
+# remaining application environment through clear_env=no.
 
 echo "[entrypoint] ready -> starting: $*"
 exec "$@"

@@ -1,0 +1,111 @@
+user www-data;
+worker_processes __NGINX_WORKER_PROCESSES__;
+pid /run/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+    worker_connections __NGINX_WORKER_CONNECTIONS__;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    log_format rustdesk '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" forwarded_for="$http_x_forwarded_for"';
+    __NGINX_ACCESS_LOG_DIRECTIVE__
+
+    server_tokens off;
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 5s;
+    keepalive_requests 1000;
+    reset_timedout_connection on;
+
+    client_max_body_size __NGINX_CLIENT_MAX_BODY_BYTES__;
+    client_body_timeout 300s;
+    send_timeout 300s;
+
+    # Static assets use normal Nginx ETag/Last-Modified revalidation. The filenames are not
+    # content-hashed, so this runtime deliberately does not add immutable cache directives.
+    etag on;
+    if_modified_since exact;
+
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+
+        root /var/www/html/public;
+        index index.php;
+        autoindex off;
+        absolute_redirect off;
+
+        # Vendor code is never a valid public URL namespace. The private application storage
+        # directory is outside this document root; /storage remains available for Laravel's
+        # optional public/storage -> storage/app/public link.
+        location ~ ^/vendor(?:/|$) {
+            return 404;
+        }
+
+        # Deny every dotfile, including .env and the Apache compatibility .htaccess file.
+        location ~ (^|/)\. {
+            return 404;
+        }
+
+        location / {
+            try_files $uri $uri/ @laravel;
+        }
+
+        # Match Laravel's Apache fallback: missing virtual paths lose one trailing slash with a
+        # relative redirect, then every other missing path is internally front-controlled.
+        location @laravel {
+            if ($uri ~ ^(.+)/$) {
+                return 301 $1$is_args$args;
+            }
+            rewrite ^ /index.php last;
+        }
+
+        # Laravel's front controller is the only PHP file Nginx may execute.
+        location = /index.php {
+            include /etc/nginx/fastcgi_params;
+            fastcgi_pass unix:/run/php/rustdesk-api.sock;
+            fastcgi_hide_header X-Powered-By;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+            fastcgi_param SCRIPT_NAME /index.php;
+            fastcgi_param DOCUMENT_ROOT /var/www/html/public;
+
+            # Preserve the original Host (including a nonstandard port), credentials, API
+            # headers, and proxy headers. REMOTE_ADDR remains the immediate connected proxy;
+            # Laravel alone decides whether forwarded values may be trusted.
+            fastcgi_param HTTP_HOST $http_host;
+            fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+            fastcgi_param HTTP_X_XSRF_TOKEN $http_x_xsrf_token;
+            fastcgi_param HTTP_X_API_KEY $http_x_api_key;
+            fastcgi_param HTTP_X_RECORDING_TOKEN $http_x_recording_token;
+            fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+            fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+            fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;
+            fastcgi_param HTTP_X_FORWARDED_PORT $http_x_forwarded_port;
+            fastcgi_param HTTP_FORWARDED $http_forwarded;
+            fastcgi_param HTTP_PROXY "";
+            fastcgi_param REMOTE_ADDR $remote_addr;
+            fastcgi_pass_request_headers on;
+            fastcgi_pass_request_body on;
+
+            # Buffer incoming bodies before assigning an FPM worker, but never spool streamed
+            # Laravel responses or recording downloads into FastCGI temporary files.
+            fastcgi_request_buffering on;
+            fastcgi_buffering off;
+            fastcgi_read_timeout 300s;
+            fastcgi_send_timeout 300s;
+        }
+
+        # Do not allow PATH_INFO or any PHP file other than the exact front controller above.
+        location ~ \.php(?:/|$) {
+            return 404;
+        }
+    }
+}

@@ -25,6 +25,8 @@ services:
     image: "${RUSTDESK_API_IMAGE:-ghcr.io/gigaionllc/rustdesk-api-server:latest}"
     container_name: rustdesk-api
     restart: unless-stopped
+    # Give the runtime's 30-second graceful drain five seconds of orchestrator headroom.
+    stop_grace_period: "${RUNTIME_STOP_GRACE_PERIOD:-35s}"
     ports:
       - "${PORT:-21114}:80"
     environment:
@@ -45,6 +47,21 @@ services:
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       # Set true for a public HTTPS origin. Null preserves request-based detection for local HTTP.
       SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-null}"
+
+      # Existing custom stacks need no change: the image default is an 8-second drain, within
+      # Docker Compose's 10-second stop timeout. This bundled stack opts into the longer drain.
+      RUNTIME_SHUTDOWN_GRACE_SECONDS: "${RUNTIME_SHUTDOWN_GRACE_SECONDS:-30}"
+      # Empty values select the image's validated defaults and preserve derived relationships.
+      NGINX_ACCESS_LOG_ENABLED: "${NGINX_ACCESS_LOG_ENABLED:-}"
+      NGINX_WORKER_PROCESSES: "${NGINX_WORKER_PROCESSES:-}"
+      NGINX_WORKER_CONNECTIONS: "${NGINX_WORKER_CONNECTIONS:-}"
+      NGINX_CLIENT_MAX_BODY_BYTES: "${NGINX_CLIENT_MAX_BODY_BYTES:-}"
+      PHP_FPM_MAX_CHILDREN: "${PHP_FPM_MAX_CHILDREN:-}"
+      PHP_FPM_START_SERVERS: "${PHP_FPM_START_SERVERS:-}"
+      PHP_FPM_MIN_SPARE_SERVERS: "${PHP_FPM_MIN_SPARE_SERVERS:-}"
+      PHP_FPM_MAX_SPARE_SERVERS: "${PHP_FPM_MAX_SPARE_SERVERS:-}"
+      PHP_FPM_MAX_REQUESTS: "${PHP_FPM_MAX_REQUESTS:-}"
+      PHP_FPM_SLOWLOG_TIMEOUT_SECONDS: "${PHP_FPM_SLOWLOG_TIMEOUT_SECONDS:-}"
 
       # First-run admin account. There is no production fallback: the runtime refuses to create
       # a missing administrator from an empty, known, placeholder, derived, or short password.
