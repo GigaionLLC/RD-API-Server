@@ -2,6 +2,19 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-17 - v1.0.1 dark-default theme behavior (targeted verification passed)
+
+- Changed the no-preference theme path on the sign-in, two-factor, and shared administration
+  shells from operating-system detection to a stable dark default. Removed live OS theme
+  following while preserving explicit saved light/dark selection and accessible toggle behavior.
+- Made the Playwright light project seed a real persisted light preference so light-mode UI and
+  accessibility coverage remain meaningful after dark became the default.
+- Added browser coverage proving an OS-light first visit remains dark across authentication,
+  later OS preference changes do not flip it, and a user-selected theme survives navigation and
+  reload.
+- **Targeted verification:** ESLint, 20-file vendor integrity, Blade compilation, Playwright test
+  discovery, and 5 theme browser checks passed with 3 intentional project skips.
+
 ## 2026-07-17 - v1.0.0 first stable release (published)
 
 - Centralized the source-controlled application version as `config('app.version')`, removed

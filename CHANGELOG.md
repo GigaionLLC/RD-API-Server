@@ -4,6 +4,14 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [Unreleased]
+
+### Changed
+
+- Dark mode is now the first-visit default on authentication and administration pages, regardless
+  of the operating-system color preference. An explicit saved light or dark choice remains
+  persistent and is never overridden by later operating-system theme changes.
+
 ## [1.0.0] - 2026-07-17
 
 First stable release of the independent RD-API-Server application.

@@ -3,6 +3,21 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 19:22] - Make dark mode the stable default
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `resources/views/layouts/admin.blade.php`, `resources/views/admin/login.blade.php`
+- `resources/views/admin/two_factor/challenge.blade.php`, `public/assets/js/app.js`
+- `playwright.config.ts`, `e2e/gui.spec.ts`, `Wiki/core/06-design-system.md`
+- `CHANGELOG.md`, `docs/modernization/08-build-log.md`
+- `DevOps/plans/v1.0.1-dark-default-and-build-speed.md`
+**Database/API Changes:** None.
+**Summary:** Made dark mode the first-visit default independently of the operating-system theme,
+removed automatic OS preference following, and preserved explicit persisted light/dark choices.
+The light Playwright project now supplies a stored light preference, preventing accidental loss of
+light-mode accessibility coverage. ESLint, vendor integrity, Blade compilation, Playwright test
+discovery, and 5 targeted browser checks passed with 3 intentional project skips.
+
 ## [2026-07-17 19:17] - Publish v1.0.0 and open v1.0.1 follow-up
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

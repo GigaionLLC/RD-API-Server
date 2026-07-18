@@ -440,13 +440,6 @@
     }
   }
 
-  function systemTheme() {
-    return window.matchMedia &&
-      window.matchMedia('(prefers-color-scheme: light)').matches
-      ? 'light'
-      : 'dark';
-  }
-
   function updateThemeControls(theme) {
     $('[data-theme-toggle]').each(function () {
       var next = theme === 'dark' ? 'light' : 'dark';
@@ -679,7 +672,7 @@
   }
 
   RD.bindShell = function () {
-    var initial = readStoredTheme() || systemTheme();
+    var initial = readStoredTheme() || 'dark';
     RD.setTheme(initial, false);
     restoreNavGroupState();
 
@@ -733,20 +726,6 @@
       })
       .triggerHandler('resize.rdShell');
 
-    if (window.matchMedia) {
-      var preference = window.matchMedia('(prefers-color-scheme: light)');
-      var onPreferenceChange = function () {
-        if (!readStoredTheme()) {
-          RD.setTheme(systemTheme(), false);
-        }
-      };
-
-      if (preference.addEventListener) {
-        preference.addEventListener('change', onPreferenceChange);
-      } else if (preference.addListener) {
-        preference.addListener(onPreferenceChange);
-      }
-    }
   };
 
   /* ApexCharts wrapper driven entirely by design tokens */

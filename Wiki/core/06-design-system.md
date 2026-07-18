@@ -96,17 +96,17 @@ Technical values use the `--rd-mono-font` stack. Use `--rd-shadow-sm`, `--rd-sha
 - The selected theme is represented by both `data-theme` and `data-bs-theme` on `<html>` so
   the custom system and Bootstrap overlays stay synchronized.
 - `resources/views/layouts/admin.blade.php` and the standalone sign-in/two-factor challenge
-  views run a small head bootstrap before styles load. It reads `localStorage.rd_theme`,
-  otherwise follows
-  `prefers-color-scheme`, and falls back to dark if browser storage is unavailable. This
+  views run a small head bootstrap before styles load. It reads `localStorage.rd_theme` and
+  otherwise selects dark, including when browser storage is unavailable. The first visit never
+  follows the operating-system preference, which makes dark mode the stable product default and
   avoids a wrong-theme flash on first paint.
 - Theme buttons use `[data-theme-toggle]`. `RD.setTheme(theme, persist)` updates the document,
   accessible button labels, stored preference, and dispatches `rd:themechange`.
 - `RD.themeTokens()` exposes computed semantic colors to JavaScript. `RD.areaChart()` consumes
   these tokens and updates an existing chart after `rd:themechange`; charts must not embed
   their own palette.
-- If the user has not stored a preference, a live operating-system color-scheme change is
-  followed automatically.
+- An explicit stored light or dark choice persists across authentication and navigation. Later
+  operating-system color-scheme changes do not override either that choice or the dark default.
 
 ## Application shell
 
@@ -248,12 +248,13 @@ UI work is verified in the Docker toolchain, not assumed from a single desktop s
 The Playwright configuration covers:
 
 - `desktop-dark` at `1440x900`
-- `desktop-light` at `1440x900`
+- `desktop-light` at `1440x900` with an explicit saved light preference
 - `tablet-dark` at `1024x768` with touch enabled
 - `mobile-dark` at `390x844` with touch/mobile behavior enabled
 
-`e2e/gui.spec.ts` exercises theme persistence, responsive flagship pages, page-level overflow,
-strategy tabs, bulk device actions, and keyboard-dismissible dialogs.
+`e2e/gui.spec.ts` exercises the dark first-visit default under an OS-light browser, saved-theme
+persistence, responsive flagship pages, page-level overflow, strategy tabs, bulk device actions,
+and keyboard-dismissible dialogs.
 `e2e/accessibility.spec.ts` runs axe against login and scans representative authenticated
 pages in both desktop themes. `e2e/screenshots.spec.ts` is opt-in and must never overwrite the
 gallery during a normal quality-gate run.

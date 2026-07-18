@@ -13,7 +13,7 @@
                 var saved = window.localStorage.getItem('rd_theme');
                 var theme = saved === 'light' || saved === 'dark'
                     ? saved
-                    : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+                    : 'dark';
                 document.documentElement.setAttribute('data-theme', theme);
                 document.documentElement.setAttribute('data-bs-theme', theme);
             } catch (error) {

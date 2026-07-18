@@ -195,17 +195,52 @@ test('dismissing the collaborator combobox keeps its parent dialog open', async 
     await expect(shareDialog.locator('.rd-combo__menu')).not.toHaveClass(/is-open/);
 });
 
-test('saved theme preference is applied and can be toggled', async ({ page }, testInfo) => {
+test('first visit defaults to dark even when the operating system prefers light', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-light', 'The OS-light project proves the first-visit default.');
+
+    await page.addInitScript(() => localStorage.removeItem('rd_theme'));
+    await page.goto('/admin/login', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('html')).toHaveAttribute('data-bs-theme', 'dark');
+    expect(await page.evaluate(() => localStorage.getItem('rd_theme'))).toBeNull();
+
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    await signIn(page);
+    await uiReady(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
+test('saved theme preference is applied, toggled, and retained across navigation', async ({ page }, testInfo) => {
     const theme = testInfo.project.name.includes('light') ? 'light' : 'dark';
     const nextTheme = theme === 'light' ? 'dark' : 'light';
-    await page.addInitScript((savedTheme) => localStorage.setItem('rd_theme', savedTheme), theme);
-    await signIn(page);
+
+    await page.goto('/admin/login', { waitUntil: 'domcontentloaded' });
+    await page.evaluate((savedTheme) => localStorage.setItem('rd_theme', savedTheme), theme);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.fill('#username', USER);
+    await page.fill('#password', PASS);
+    await Promise.all([
+        page.waitForURL(/\/admin$/, { waitUntil: 'domcontentloaded' }),
+        page.getByRole('button', { name: 'Sign in', exact: true }).click({ noWaitAfter: true }),
+    ]);
     await uiReady(page);
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(page.locator('html')).toHaveAttribute('data-bs-theme', theme);
     const toggle = page.locator('[data-theme-toggle]');
     await expect(toggle).toBeVisible();
     await toggle.click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', nextTheme);
+    await expect(page.locator('html')).toHaveAttribute('data-bs-theme', nextTheme);
+    expect(await page.evaluate(() => localStorage.getItem('rd_theme'))).toBe(nextTheme);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await uiReady(page);
     await expect(page.locator('html')).toHaveAttribute('data-theme', nextTheme);
 });
 
