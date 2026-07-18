@@ -16,9 +16,13 @@ FROM php:8.5.8-fpm-bookworm@sha256:83c155135b9c4aa664fc6ce47020a10fe53576a0ed346
 
 COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
 # MariaDB uses PDO's MySQL-compatible driver. The upstream PHP image's statically compiled
-# SQLite symbols are inert because the application exposes and accepts only MariaDB.
+# SQLite symbols are inert because the application exposes and accepts only MariaDB. Remove the
+# official image's public compiler drivers, make, and Linux kernel headers after the extensions are
+# complete; all downstream stages retain the extension runtime libraries from this exact layer.
 RUN install-php-extensions pdo_mysql mbstring intl gmp bcmath zip gd opcache ldap \
-    && rm /usr/local/bin/install-php-extensions
+    && rm /usr/local/bin/install-php-extensions \
+    && apt-get purge -y --auto-remove $PHPIZE_DEPS gcc-12 linux-libc-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # ---- Stage 2: install locked PHP dependencies ----
 FROM php_runtime AS build

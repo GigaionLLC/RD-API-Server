@@ -197,7 +197,7 @@ actual_arch="$(docker image inspect "$image" --format '{{.Architecture}}')"
 
 # Validate the artifact without starting the database-dependent entrypoint. The FastCGI pool may
 # retain inherited OCI EXPOSE metadata for 9000, but its effective configuration must be a Unix
-# socket and bootstrap-only tools must not be present in the final layer.
+# socket; bootstrap tools, compiler drivers, make, and Linux kernel headers must not remain.
 docker run --rm --platform "$platform" --entrypoint sh "$image" -eu -c '
     nginx -t
     php-fpm -tt > /tmp/php-fpm-config 2>&1
@@ -205,6 +205,13 @@ docker run --rm --platform "$platform" --entrypoint sh "$image" -eu -c '
     ! grep -Eq "listen = ([^/].*:)?9000$" /tmp/php-fpm-config
     test ! -e /usr/bin/composer
     test ! -e /usr/local/bin/install-php-extensions
+    ! command -v cc >/dev/null 2>&1
+    ! command -v gcc >/dev/null 2>&1
+    ! command -v g++ >/dev/null 2>&1
+    ! command -v make >/dev/null 2>&1
+    test -z "$(find /usr/bin -maxdepth 1 -name "*gcc-[0-9]*" -print -quit)"
+    test -z "$(find /usr/bin -maxdepth 1 -name "*g++-[0-9]*" -print -quit)"
+    ! dpkg-query -W linux-libc-dev >/dev/null 2>&1
 '
 
 # Runtime tuning must fail before the entrypoint can wait for or mutate a database.
