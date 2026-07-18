@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 17:25] - Deliver HTTPS proxy source safeguards
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `DevOps/logs/agent-changelog.md`, `DevOps/logs/version-history.md`
+- `DevOps/plans/https-proxy-mixed-content.md`
+**Database/API Changes:** None. This delivery record changes no application behavior, database
+state, route, or RustDesk response contract.
+**Summary:** Pushed the separately revertible proxy-header security commit `52410f9` and HTTPS
+recovery-tooling commit `4c28f08` to `origin/main` after reconfirming a clean worktree, GitHub
+authentication, and the prior full Docker verification. No deployment was performed. The public
+smoke check still fails on the HTTP login redirect, so the active plan remains open for the
+production `TRUSTED_PROXIES` value, container recreation, and live verification.
+
 ## [2026-07-15 22:41] - Add HTTPS proxy diagnosis and recovery tooling
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**
@@ -16,8 +29,8 @@ application routes are unchanged.
 **Summary:** Added secure-cookie passthrough/examples, a parsed-config startup warning, safe
 proxy-network guidance, and a fail-closed public HTTPS smoke check. The runtime image and full
 local matrix are green, but the live incident remains open until production supplies its actual
-proxy IP/CIDR, recreates the API container, and passes the public probe; these changes remain local
-pending that deployment input and the user-authorized completion push.
+proxy IP/CIDR, recreates the API container, and passes the public probe. The completed source
+changes were delivered to `origin/main` on 2026-07-17 as `52410f9` and `4c28f08`.
 
 ## [2026-07-15 22:40] - Restrict trusted proxy header surface
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)

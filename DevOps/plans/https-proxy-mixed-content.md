@@ -4,10 +4,10 @@
 
 | Metric | Value |
 | :--- | :--- |
-| **Status** | `WAITING FOR PRODUCTION PROXY INPUT` |
+| **Status** | `SOURCE PUSHED; WAITING FOR PRODUCTION PROXY INPUT` |
 | **Version** | `v1.0.0` |
 | **Active Persona** | `Senior engineer / security reviewer` |
-| **Last Updated** | 2026-07-15 22:41 |
+| **Last Updated** | 2026-07-17 17:25 |
 
 ---
 
@@ -114,7 +114,8 @@
 - `[x]` Add diagnosis, recovery, and smoke-test documentation.
 - `[x]` Run focused and full Docker verification.
 - `[x]` Complete review records and create separately revertible source/security commits.
-- `[ ]` Archive this plan, complete delivery records, and push `main` after the live fix passes.
+- `[x]` Complete source-delivery records and push the reviewed commits to `origin/main`.
+- `[ ]` Archive this plan after production configuration and the live check pass.
 - `[ ]` Re-probe the public origin after the production environment is corrected/recreated.
 
 ## 8. Phase 8: Verification Dashboard
@@ -142,4 +143,4 @@
 Source implementation, independent reviews, and the full local verification matrix are complete.
 The public origin still redirects HTTPS `/admin` to an HTTP login URL. Completion requires the
 actual application-observed production proxy IP/CIDR, container recreation, a passing public
-smoke check, completion push, plan archival, and the final delivery record.
+smoke check, plan archival, and the final live-resolution record.
