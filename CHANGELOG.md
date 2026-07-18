@@ -6,6 +6,8 @@ notes.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-17
+
 ### Changed
 
 - Dark mode is now the first-visit default on authentication and administration pages, regardless
@@ -22,6 +24,9 @@ notes.
   compiling ARM dependencies through QEMU. Each architecture is published by digest and
   smoke-tested before a CI-gated final manifest moves public image tags; architecture-specific
   GitHub and registry caches preserve fast repeat builds.
+
+See the [complete v1.0.1 release notes](docs/releases/v1.0.1.md) for upgrade and verification
+details.
 
 ## [1.0.0] - 2026-07-17
 
@@ -53,4 +58,6 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.0.1...HEAD
+[1.0.1]: docs/releases/v1.0.1.md
 [1.0.0]: docs/releases/v1.0.0.md

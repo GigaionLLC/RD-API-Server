@@ -31,7 +31,7 @@ class SmokeTest extends TestCase
 
     public function test_api_version_endpoint(): void
     {
-        $this->getJson('/api/version')->assertOk()->assertExactJson(['version' => '1.0.0']);
+        $this->getJson('/api/version')->assertOk()->assertExactJson(['version' => '1.0.1']);
     }
 
     public function test_heartbeat_accepts_a_device(): void

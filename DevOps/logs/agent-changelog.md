@@ -3,6 +3,23 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 20:25] - Prepare and verify v1.0.1 release metadata
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `config/app.php`, `tests/Feature/SmokeTest.php`
+- `README.md`, `CHANGELOG.md`, `docs/releases/v1.0.1.md`
+- `docs/modernization/08-build-log.md`, `DevOps/logs/version-history.md`
+- `DevOps/plans/v1.0.1-dark-default-and-build-speed.md`
+**Database/API Changes:** No schema, route, or RustDesk response-shape change. The existing public
+version response advances from `1.0.0` to `1.0.1`.
+**Summary:** Prepared the stable patch metadata and upgrade notes for dark-by-default behavior and
+native container publication. The full Docker matrix passed 538 PHPUnit tests / 3,051 assertions,
+69 Playwright tests with 15 intentional skips, Pint across 275 files, PHPStan across 177 files,
+JavaScript/vendor checks, dependency audits, packaging, workflow lint, and action-pin validation.
+The current runtime image rebuilt from warm layers in 7.3 seconds and passed a fresh disposable
+MariaDB/InnoDB startup, migration, health, admin-shell, and API-version probe. Native AMD64/ARM64
+publication remains the required GitHub gate before the v1.0.1 tag and Release.
+
 ## [2026-07-17 20:05] - Gate native image publishing behind exact-commit CI
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

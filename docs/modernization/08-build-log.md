@@ -2,6 +2,22 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-17 - v1.0.1 release candidate (verified locally)
+
+- Synchronized source-controlled version `1.0.1`, its exact API assertion, public changelog,
+  README stable-release guidance, release notes, version history, and upgrade instructions. The
+  patch introduces no schema or RustDesk wire-contract change.
+- **Full Docker verification:** PHPUnit passed 538 tests / 3,051 assertions; Playwright passed 69
+  tests with 15 intentional screenshot/project skips; Pint passed 275 files; PHPStan passed 177
+  files; ESLint, 20-file vendor integrity, strict Composer validation, Composer/npm audits,
+  Compose rendering, Bash syntax, workflow/ShellCheck lint, action-pin auditing, changed-document
+  links, and diff checks passed.
+- Rebuilt the current runtime from warm layers in 7.3 seconds. Composer platform requirements
+  passed, and a fresh container migrated a disposable MariaDB/InnoDB database, answered `/up`,
+  served the themed admin login, and reported `1.0.1` from `/api/version`.
+- Native AMD64/ARM64 timing, digest smoke tests, and final manifest/provenance verification remain
+  the required GitHub `CI` gate before tagging and publishing the release.
+
 ## 2026-07-17 - v1.0.1 native image publication graph (locally validated)
 
 - Consolidated quality gates and runtime publication into one exact-commit GitHub Actions graph.
