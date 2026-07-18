@@ -8,13 +8,15 @@ Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 **Files Modified:**
 - `DevOps/logs/agent-changelog.md`, `DevOps/logs/version-history.md`
 - `DevOps/plans/https-proxy-mixed-content.md`
+- `docs/modernization/08-build-log.md`
 **Database/API Changes:** None. This delivery record changes no application behavior, database
 state, route, or RustDesk response contract.
 **Summary:** Pushed the separately revertible proxy-header security commit `52410f9` and HTTPS
 recovery-tooling commit `4c28f08` to `origin/main` after reconfirming a clean worktree, GitHub
-authentication, and the prior full Docker verification. No deployment was performed. The public
-smoke check still fails on the HTTP login redirect, so the active plan remains open for the
-production `TRUSTED_PROXIES` value, container recreation, and live verification.
+authentication, and the prior full Docker verification. GitHub CI run `29623089296` and Docker
+Publish run `29623089305` both completed successfully. No production deployment was performed.
+The public smoke check still fails on the HTTP login redirect, so the active plan remains open for
+the production `TRUSTED_PROXIES` value, container recreation, and live verification.
 
 ## [2026-07-15 22:41] - Add HTTPS proxy diagnosis and recovery tooling
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)

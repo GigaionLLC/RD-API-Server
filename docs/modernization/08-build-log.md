@@ -23,6 +23,10 @@ Chronological record of what was built and its verification state. Newest at top
   20-file vendor-integrity check passed; both Compose examples rendered; Bash syntax passed; and
   the runtime image built successfully. Empty and wildcard proxy trust produced the intended
   warning, while an exact IP did not.
+- **Delivered 2026-07-17:** commits `52410f9` and `4c28f08` were pushed to `origin/main`.
+  GitHub CI run `29623089296` passed JavaScript/vendor, PHP/Pint/PHPStan/PHPUnit/InnoDB, and
+  Playwright jobs. Docker Publish run `29623089305` completed successfully for the published
+  multi-architecture image.
 - **Production remains pending:** the public probe still fails on
   `http://api-rustdesk1.gigaion.com/admin/login`. The live deployment must set the proxy's
   application-observed exact IP or narrow isolated-network CIDR, recreate the API container, and
