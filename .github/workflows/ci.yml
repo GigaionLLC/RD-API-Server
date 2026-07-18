@@ -281,6 +281,20 @@ jobs:
                 echo "Release tag $GITHUB_REF_NAME does not point to the current main commit." >&2
                 exit 1
               fi
+
+              ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}")"
+              ref_type="$(jq -r '.object.type' <<< "$ref_json")"
+              ref_sha="$(jq -r '.object.sha' <<< "$ref_json")"
+              if [[ "$ref_type" != "tag" ]]; then
+                echo "Release tag $GITHUB_REF_NAME must be annotated; lightweight tags are rejected." >&2
+                exit 1
+              fi
+
+              tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")"
+              if [[ "$(jq -r '.object.type' <<< "$tag_json")" != "commit" || "$(jq -r '.object.sha' <<< "$tag_json")" != "$GITHUB_SHA" ]]; then
+                echo "Annotated release tag $GITHUB_REF_NAME must point directly to $GITHUB_SHA." >&2
+                exit 1
+              fi
               ;;
             *)
               echo "Ref $GITHUB_REF is not eligible for image publication." >&2
@@ -294,11 +308,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha
             type=raw,value=sha-${{ github.sha }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
@@ -455,26 +468,17 @@ jobs:
           fi
 
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            object_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}")"
-            object_type="$(jq -r '.object.type' <<< "$object_json")"
-            object_sha="$(jq -r '.object.sha' <<< "$object_json")"
+            ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}")"
+            ref_type="$(jq -r '.object.type' <<< "$ref_json")"
+            ref_sha="$(jq -r '.object.sha' <<< "$ref_json")"
+            if [[ "$ref_type" != "tag" ]]; then
+              echo "Release tag $GITHUB_REF_NAME is no longer annotated." >&2
+              exit 1
+            fi
 
-            for _ in {1..5}; do
-              if [[ "$object_type" == "commit" ]]; then
-                break
-              fi
-              if [[ "$object_type" != "tag" ]]; then
-                echo "Release ref resolved to unsupported object type $object_type." >&2
-                exit 1
-              fi
-
-              object_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}")"
-              object_type="$(jq -r '.object.type' <<< "$object_json")"
-              object_sha="$(jq -r '.object.sha' <<< "$object_json")"
-            done
-
-            if [[ "$object_type" != "commit" || "$object_sha" != "$GITHUB_SHA" ]]; then
-              echo "Release tag $GITHUB_REF_NAME no longer resolves to $GITHUB_SHA." >&2
+            tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")"
+            if [[ "$(jq -r '.object.type' <<< "$tag_json")" != "commit" || "$(jq -r '.object.sha' <<< "$tag_json")" != "$GITHUB_SHA" ]]; then
+              echo "Annotated release tag $GITHUB_REF_NAME no longer points directly to $GITHUB_SHA." >&2
               exit 1
             fi
           fi
@@ -517,9 +521,33 @@ jobs:
       - name: Publish final image tags
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           PUBLISH_TAGS: ${{ needs.publish_prepare.outputs.tags }}
         run: |
           set -euo pipefail
+
+          live_main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$live_main_sha" != "$GITHUB_SHA" ]]; then
+            echo "Current main is $live_main_sha; refusing to promote stale commit $GITHUB_SHA." >&2
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}")"
+            ref_type="$(jq -r '.object.type' <<< "$ref_json")"
+            ref_sha="$(jq -r '.object.sha' <<< "$ref_json")"
+            if [[ "$ref_type" != "tag" ]]; then
+              echo "Release tag $GITHUB_REF_NAME is no longer annotated." >&2
+              exit 1
+            fi
+
+            tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")"
+            if [[ "$(jq -r '.object.type' <<< "$tag_json")" != "commit" || "$(jq -r '.object.sha' <<< "$tag_json")" != "$GITHUB_SHA" ]]; then
+              echo "Annotated release tag $GITHUB_REF_NAME no longer points directly to $GITHUB_SHA." >&2
+              exit 1
+            fi
+          fi
+
           mapfile -t digests < <(find "$RUNNER_TEMP/digests" -maxdepth 1 -type f -printf '%f\n' | sort -u)
           mapfile -t tags < <(printf '%s\n' "$PUBLISH_TAGS" | sed '/^[[:space:]]*$/d')
 
