@@ -3,6 +3,29 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-17 18:55] - Prepare v1.0.0 and close HTTPS proxy recovery
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `config/app.php`, `.env.example`, `docker-compose.yml`, `docker-compose.dev.yml`
+- `app/Http/Controllers/Api/IndexController.php`, `app/Http/Controllers/Api/SystemController.php`
+- `tests/Feature/SmokeTest.php`, `examples/full-stack.docker-compose.yml`
+- `README.md`, `QUICKSTART.md`, `CHANGELOG.md`, `docs/releases/v1.0.0.md`
+- `Skills/Test-and-Deploy/SKILL.md`
+- `docs/modernization/08-build-log.md`, `DevOps/logs/version-history.md`
+- `DevOps/archive-plans/https-proxy-mixed-content.md`
+**Database/API Changes:** No schema or RustDesk wire-shape change. The existing `1.0.0` version
+response is now sourced from centralized, source-controlled `config('app.version')` instead of
+duplicated controller fallbacks. It is not operator-overridable, preventing stale version reports
+when retained deployment environments upgrade to a newer image.
+**Summary:** Prepared the first stable v1.0.0 release with public notes, standard Semantic
+Versioning policy, versioned-image and digest-pinning guidance, and synchronized version metadata. Expanded the
+1Panel/OpenResty setup procedure and closed the mixed-content incident after production supplied
+its exact application-observed proxy peer, enabled secure cookies, recreated the container, and
+passed the fail-closed public HTTPS checker. The release matrix passed 538 PHPUnit tests / 3,051
+assertions, 68 Playwright tests with 12 intentional screenshot-mode skips, Pint across 275 files,
+PHPStan across 177 files, JavaScript/vendor integrity, Composer, Compose, shell, documentation,
+runtime-image, and version-reporting checks.
+
 ## [2026-07-17 17:25] - Deliver HTTPS proxy source safeguards
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

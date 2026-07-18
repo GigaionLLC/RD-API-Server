@@ -19,6 +19,6 @@ class IndexController extends Controller
     public function version(): JsonResponse
     {
         // The client reads this to display/compare the server version.
-        return response()->json(['version' => config('app.version', '1.0.0')]);
+        return response()->json(['version' => (string) config('app.version')]);
     }
 }

@@ -4,10 +4,10 @@
 
 | Metric | Value |
 | :--- | :--- |
-| **Status** | `SOURCE PUSHED; WAITING FOR PRODUCTION PROXY INPUT` |
+| **Status** | `COMPLETE; PRODUCTION VERIFIED` |
 | **Version** | `v1.0.0` |
 | **Active Persona** | `Senior engineer / security reviewer` |
-| **Last Updated** | 2026-07-17 17:31 |
+| **Last Updated** | 2026-07-17 18:52 |
 
 ---
 
@@ -51,9 +51,9 @@
 * **Open Questions:**
   - `[x]` May the fix be committed and pushed? -> **Answer:** Yes; the user previously authorized
     a completion push and requested separated commits.
-  - `[ ]` What exact source IP or isolated shared-network CIDR does the API container observe for
-    OpenResty? -> **Answer:** Not discoverable from this local Docker context or unauthenticated
-    public responses; production logs/network inspection are required before setting it.
+  - `[x]` What exact source IP or isolated shared-network CIDR does the API container observe for
+    OpenResty? -> **Answer:** The production access log identified the exact immediate 1Panel peer;
+    the private deployment configuration now trusts that single address.
 
 ## 4. Phase 4: Detailed Execution Plan
 
@@ -81,7 +81,7 @@
 
 ## 5. Phase 5: Product Owner Review
 
-* **Status:** `SOURCE REVIEW PASSED; LIVE RECOVERY PENDING`
+* **Status:** `PASSED; LIVE RECOVERY VERIFIED`
 * **Findings:**
   - [x] **Vision & Scope** - Recovery targets the entire HTTPS request boundary, not only CSS.
   - [x] **Business Logic & Edge Cases** - Direct HTTP remains supported while public HTTPS is
@@ -89,7 +89,7 @@
   - [x] **Dependency & Functional Risk** - No dependency or database changes are planned.
   - [x] **Completeness & User Intent** - Code, operator guidance, and live smoke checks are covered.
 * **Required Fixes:**
-  - `[ ]` Confirm and apply the production proxy's application-observed IP/CIDR.
+  - `[x]` Confirm and apply the production proxy's application-observed IP/CIDR.
 
 ## 6. Phase 6: Senior Dev Hygiene Review
 
@@ -115,24 +115,25 @@
 - `[x]` Run focused and full Docker verification.
 - `[x]` Complete review records and create separately revertible source/security commits.
 - `[x]` Complete source-delivery records and push the reviewed commits to `origin/main`.
-- `[ ]` Archive this plan after production configuration and the live check pass.
-- `[ ]` Re-probe the public origin after the production environment is corrected/recreated.
+- `[x]` Archive this plan after production configuration and the live check pass.
+- `[x]` Re-probe the public origin after the production environment is corrected/recreated.
 
 ## 8. Phase 8: Verification Dashboard
 
-* **Verification Status:** `SOURCE VERIFIED; PUBLIC ORIGIN STILL FAILING`
+* **Verification Status:** `SOURCE AND PUBLIC ORIGIN VERIFIED`
 * **Report:**
   - `[x]` Focused proxy suite: 10 tests / 48 assertions.
   - `[x]` Pint (275 files), PHPStan, ESLint/vendor integrity, Bash syntax, and Compose checks pass.
   - `[x]` Full PHPUnit suite: 538 tests / 3,051 assertions.
   - `[x]` Runtime image builds; empty/wildcard trust warns and exact-IP trust does not.
   - `[x]` GitHub CI `29623089296` and Docker Publish `29623089305` completed successfully.
-  - `[ ]` Public HTML contains no insecure same-origin asset references after deployment.
+  - `[x]` Public HTML contains no insecure same-origin asset references after deployment.
 
 ## 9. Phase 9: User Verification
 
-* **Status:** `PENDING`
-* **User Feedback:** The screenshot and console errors establish the reported failure state.
+* **Status:** `ACCEPTED`
+* **User Feedback:** The operator supplied the proxy access log, applied the exact trust and secure
+  cookie settings, and confirmed the site recovered. The public checker independently passes.
 
 ## 10. Phase 10: Wrap Up & Archival
 
@@ -142,6 +143,5 @@
 ## Completion Note
 
 Source implementation, independent reviews, and the full local verification matrix are complete.
-The public origin still redirects HTTPS `/admin` to an HTTP login URL. Completion requires the
-actual application-observed production proxy IP/CIDR, container recreation, a passing public
-smoke check, plan archival, and the final live-resolution record.
+Production now trusts its exact immediate proxy peer, the API container has been recreated, and
+the public smoke check passes HTTPS redirects, assets, secure cookies, and stylesheet delivery.

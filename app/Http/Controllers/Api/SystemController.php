@@ -164,7 +164,7 @@ class SystemController extends Controller
      */
     public function sysinfoVer(): Response
     {
-        return response(config('app.version', '1.0.0'))->header('Content-Type', 'text/plain');
+        return response((string) config('app.version'))->header('Content-Type', 'text/plain');
     }
 
     /**

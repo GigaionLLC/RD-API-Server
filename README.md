@@ -12,10 +12,10 @@ command, backed by MariaDB.
 > compatibility with its open‑source client. This is a **separate implementation** of the
 > client's public API, maintained independently.
 
-> 🚧 **Beta — under heavy testing.** This is a young project and many features are still being
-> tested and refined, so expect rough edges and occasional breaking changes. If you need
-> something production‑ready today, we recommend the established, well‑tested RustDesk API
-> servers **`lejianwen/rustdesk-api`** and **`lantongxue/rustdesk-api-server-pro`**.
+> ✅ **Stable release: [v1.0.0](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.0.0).**
+> This is the first supported stable release. Review the
+> **[release notes](docs/releases/v1.0.0.md)** before upgrading, especially the MariaDB-only
+> database boundary and explicit HTTPS reverse-proxy requirements.
 
 > Implements the RustDesk client API contract and adds the features the client supports that
 > most open‑source API servers don't — including **Strategy (Security‑Settings) push** and
@@ -83,15 +83,27 @@ The bundled **[`docker-compose.yml`](docker-compose.yml)** runs the published im
 local `.env` file with a unique admin password (at least 12 characters), your DB password, and
 RustDesk endpoints. There is no production admin-password default.
 
+For a deployment that must remain on the first stable release, set
+`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.0.0`; the `latest` tag follows the
+current `main` branch.
+
 ```env
 ADMIN_PASS=<unique-admin-password-from-your-password-manager>
 DB_PASSWORD=<unique-database-password>
 DB_CONNECTION=mariadb
+APP_URL=https://api.your-domain.com
+TRUSTED_PROXIES=<exact-proxy-address-seen-by-the-application>
+SESSION_SECURE_COOKIE=true
 RUSTDESK_ID_SERVER=id.your-domain.com:21116
 RUSTDESK_RELAY_SERVER=relay.your-domain.com:21117
 RUSTDESK_API_SERVER=https://api.your-domain.com
 RUSTDESK_KEY=<contents of id_ed25519.pub>
 ```
+
+The `APP_URL`, `TRUSTED_PROXIES`, and `SESSION_SECURE_COOKIE` values above assume TLS terminates
+at a reverse proxy. `TRUSTED_PROXIES` must be the immediate proxy address observed in the API
+container's access log; it is not the public domain or backend address. Direct local HTTP setups
+should leave proxy trust empty and retain request-based cookie detection.
 
 Leave `DB_HOST` unset for the bundled stack: Compose then uses its internal `db` service. The
 current `.env.example` comments this setting deliberately. If an existing `.env` copied from an
@@ -214,6 +226,9 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 
 ## 📚 Documentation
 
+- **[CHANGELOG.md](CHANGELOG.md)** — public release history
+- **[v1.0.0 release notes](docs/releases/v1.0.0.md)** — first stable release, upgrade boundaries,
+  and versioned image tag
 - **[QUICKSTART.md](QUICKSTART.md)** — deployment & configuration
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — build, test, lint, contribute
 - **[docs/sqlite-to-mariadb.md](docs/sqlite-to-mariadb.md)** — breaking upgrade boundary for

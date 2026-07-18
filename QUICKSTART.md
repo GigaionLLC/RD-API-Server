@@ -62,8 +62,8 @@ argument is deprecated because shells can expose it in history and process listi
 
 ### Production HTTPS and reverse proxies
 
-When OpenResty, Nginx Proxy Manager, or another reverse proxy terminates TLS, configure the public
-origin and the inbound trust boundary together:
+When 1Panel/OpenResty, Nginx Proxy Manager, Nginx, or another reverse proxy terminates TLS,
+configure the public origin and the inbound trust boundary together:
 
 ```env
 APP_URL=https://api.example.com
@@ -88,6 +88,25 @@ Use one of these topologies instead of leaving the application port publicly rea
   `PORT=127.0.0.1:21114`; the Compose definition appends the container's `:80` target.
 - For a proxy on another host, firewall the application port so only that proxy can connect.
 
+#### 1Panel/OpenResty example
+
+In 1Panel, open **Websites → your site → Configuration → Basic → Reverse proxy**. A proxy on the
+same host can target `http://127.0.0.1:21114`; a proxy on another host can target a private backend
+such as `http://api-backend.lan:21114`. Use **View source** on the enabled `/` rule and confirm it
+overwrites the public host and scheme and supplies a trustworthy client address:
+
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-For $remote_addr;
+```
+
+For a single public edge, overwriting `X-Forwarded-For` prevents a client-supplied chain from
+becoming authoritative. A deployment with a trusted CDN in front of 1Panel must configure that
+CDN's real-IP boundary separately. When 1Panel is on another host, bind port 21114 only to the
+backend's private interface and add a host-firewall rule that permits the 1Panel source address
+and rejects other callers. Compose port binding alone does not filter source addresses.
+
 Do not trust a shared Docker bridge gateway or NAT address merely because it appears first in an
 access log when untrusted containers or callers can also reach the backend through it. Move a
 containerized application and proxy to an isolated direct network instead. A loopback-only
@@ -100,6 +119,10 @@ prevent URL poisoning; a nonstandard public HTTPS port must be present in the sa
 header. `APP_URL` alone does not make Laravel trust a forwarded HTTPS scheme. Missing or
 mismatched trust produces HTTP redirects and asset references, browser mixed-content errors,
 inaccurate client IPs, and cookies without request-derived `Secure` protection.
+
+The runtime logs an explicit warning when `APP_URL` uses HTTPS but no valid proxy entry survives
+configuration parsing. Pulling a newer image does not add missing deployment environment values;
+update the Compose or orchestrator configuration and recreate the API container.
 
 To identify the immediate peer, make one `/admin` request and correlate it with the application
 access log. The first address on that exact request line is what the application container sees;

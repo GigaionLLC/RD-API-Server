@@ -33,6 +33,7 @@ services:
       ARGON_TIME: "${ARGON_TIME:-4}"
       # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-null}"
 
       # This exercises the production bootstrap guard; there is deliberately no default.
       # Existing installations may remove ADMIN_PASS after the administrator has been created.

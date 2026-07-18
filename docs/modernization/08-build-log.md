@@ -2,7 +2,25 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
-## 2026-07-15 - HTTPS reverse-proxy hardening and recovery tooling (source verified; live pending)
+## 2026-07-17 - v1.0.0 first stable release candidate (verified locally)
+
+- Centralized the source-controlled application version as `config('app.version')`, removed
+  duplicated controller fallbacks, and asserted the exact public `/api/version` response. The
+  version is deliberately not operator-configurable, so retained deployment environments cannot
+  report a stale release after an image upgrade.
+- Added the public changelog and complete v1.0.0 release notes, changed the README status from
+  beta to stable, documented versioned image use with digest pinning, and replaced the stale padded-number
+  release policy with standard Semantic Versioning and annotated `vMAJOR.MINOR.PATCH` tags.
+- Expanded the 1Panel/OpenResty setup guide with local and routed-LAN proxy topologies, source-IP
+  discovery, header verification, container recreation, and the distinction between interface
+  binding and source-address firewalling.
+- **Verified in Docker:** PHPUnit passed 538 tests / 3,051 assertions; Playwright passed 68 tests
+  with 12 intentional screenshot-mode skips; Pint passed 275 files; PHPStan passed 177 files;
+  ESLint, 20-file vendor integrity, strict Composer validation, Compose rendering, Bash syntax,
+  local documentation links, and diff checks passed. A fresh runtime image built successfully
+  and reported application version `1.0.0`.
+
+## 2026-07-17 - HTTPS reverse-proxy hardening and production recovery (resolved)
 
 - Confirmed the public mixed-content outage is an inbound proxy-trust failure: the HTTPS admin
   request redirects to an HTTP login URL, and the login HTML emits HTTP stylesheets/scripts even
@@ -27,10 +45,13 @@ Chronological record of what was built and its verification state. Newest at top
   GitHub CI run `29623089296` passed JavaScript/vendor, PHP/Pint/PHPStan/PHPUnit/InnoDB, and
   Playwright jobs. Docker Publish run `29623089305` completed successfully for the published
   multi-architecture image.
-- **Production remains pending:** the public probe still fails on
-  `http://api-rustdesk1.gigaion.com/admin/login`. The live deployment must set the proxy's
-  application-observed exact IP or narrow isolated-network CIDR, recreate the API container, and
-  pass the public probe before this incident is marked resolved.
+- **Production resolved 2026-07-17:** the API container log identified the immediate 1Panel peer,
+  the deployment added that exact address to `TRUSTED_PROXIES` plus
+  `SESSION_SECURE_COOKIE=true`, and the container was recreated. The public edge checker now
+  passes the HTTPS admin redirect, login asset URLs, secure session/CSRF cookies, and stylesheet
+  reachability. The private deployment repository was updated to bind the backend listener to its
+  intended LAN interface and documents the still-required source firewall rule; live firewall
+  enforcement remains an operator verification item.
 
 ## 2026-07-15 - GitHub Actions Node 24 runtime migration (verified)
 
