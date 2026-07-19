@@ -3,6 +3,19 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-18 19:27] - Isolate trusted-proxy security tests from deployment defaults
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `app/Support/TrustedProxyConfiguration.php`
+- `config/trustedproxy.php`
+- `phpunit.xml`
+- `tests/Feature/TrustedProxySecurityTest.php`
+- `docs/modernization/08-build-log.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None.
+**Summary:** Forced an empty PHPUnit trusted-proxy baseline and extracted the parser into a pure
+helper so the wildcard-enabled deployment example cannot invalidate untrusted-header tests.
+
 ## [2026-07-18 19:12] - Add warned wildcard proxy-trust convenience mode
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

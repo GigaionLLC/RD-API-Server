@@ -11,10 +11,11 @@ Chronological record of what was built and its verification state. Newest at top
   possible; `**`, `REMOTE_ADDR`, and `/0` equivalents remain rejected.
 - **Wildcard proxy verification:** all 540 PHPUnit tests passed with 3,054 assertions, including
   the wildcard client-IP boundary and the existing forwarded-host/port/prefix rejection coverage.
-  Pint passed across 277 files, PHPStan passed across 177 files, Actionlint and ShellCheck passed,
+  Pint passed across 278 files, PHPStan passed across 178 files, Actionlint and ShellCheck passed,
   all three bundled Compose files rendered the wildcard default and exact override correctly, and
   the production runtime smoke passed its HTTP, HTTPS-proxy, FastCGI, failure, shutdown, and
-  wildcard-warning checks.
+  wildcard-warning checks. PHPUnit explicitly clears proxy trust so deployment defaults from a
+  copied `.env.example` cannot weaken tests that exercise the untrusted-caller baseline.
 - Reworked the production-image source into a single-container Nginx + PHP-FPM candidate while
   preserving container port `80`, `/var/www/html/storage`, the existing environment contract,
   MariaDB initialization, and reverse-proxy topology. FastCGI uses only the
