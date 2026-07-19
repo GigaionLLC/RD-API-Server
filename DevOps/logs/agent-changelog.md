@@ -11,6 +11,7 @@ Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 - `phpunit.xml`
 - `tests/Feature/TrustedProxySecurityTest.php`
 - `docs/modernization/08-build-log.md`
+- `DevOps/logs/version-history.md`
 - `DevOps/logs/agent-changelog.md`
 **Database/API Changes:** None.
 **Summary:** Forced an empty PHPUnit trusted-proxy baseline and extracted the parser into a pure
