@@ -12,11 +12,10 @@ command, backed by MariaDB.
 > compatibility with its open‑source client. This is a **separate implementation** of the
 > client's public API, maintained independently.
 
-> ✅ **Stable release: [v1.0.1](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.0.1).**
-> This patch defaults first visits to dark mode and substantially accelerates secure
-> multi-architecture image publishing. Review the **[release notes](docs/releases/v1.0.1.md)**
-> before upgrading; the MariaDB-only boundary and explicit HTTPS reverse-proxy requirements from
-> v1.0.0 remain in force.
+> ✅ **Stable release: [v1.1.0](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.1.0).**
+> This release moves the container runtime to Nginx/PHP-FPM and adds warned wildcard reverse-proxy
+> trust for convenient isolated deployments. Review the **[release notes](docs/releases/v1.1.0.md)**
+> before upgrading, especially the proxy boundary, capacity guidance, and v1.0.1 rollback pin.
 
 > Implements the RustDesk client API contract and adds the features the client supports that
 > most open‑source API servers don't — including **Strategy (Security‑Settings) push** and
@@ -85,8 +84,8 @@ local `.env` file with a unique admin password (at least 12 characters), your DB
 RustDesk endpoints. There is no production admin-password default.
 
 For a deployment that must remain on the current stable release, set
-`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.0.1`; `latest` is the rolling image
-channel for publish-eligible changes on `main`.
+`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.1.0`; `latest` moves only with a
+verified, annotated stable release tag.
 
 ```env
 ADMIN_PASS=<unique-admin-password-from-your-password-manager>
@@ -227,7 +226,7 @@ retention, metrics, updates).
 ## 🧱 Stack
 
 PHP 8.5 · Laravel 13 · Blade + jQuery + Bootstrap 5 (no SPA framework) · Eloquent ·
-**MariaDB/InnoDB** · Apache (runtime image) · Mailpit (dev SMTP) · Playwright (E2E).
+**MariaDB/InnoDB** · Nginx + PHP-FPM (runtime image) · Mailpit (dev SMTP) · Playwright (E2E).
 
 ## 🛠️ Development
 
@@ -238,6 +237,8 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 ## 📚 Documentation
 
 - **[CHANGELOG.md](CHANGELOG.md)** — public release history
+- **[v1.1.0 release notes](docs/releases/v1.1.0.md)** — Nginx/PHP-FPM runtime, proxy defaults,
+  capacity guidance, and rollback
 - **[v1.0.1 release notes](docs/releases/v1.0.1.md)** — dark-default patch and faster native image
   publishing
 - **[v1.0.0 release notes](docs/releases/v1.0.0.md)** — first stable release and upgrade boundaries

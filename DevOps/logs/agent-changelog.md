@@ -3,6 +3,27 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-18 20:17] - Prepare v1.1.0 stable release
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `config/app.php`
+- `tests/Feature/SmokeTest.php`
+- `CHANGELOG.md`
+- `README.md`
+- `docker/README.md`
+- `docs/releases/v1.1.0.md`
+- `docs/modernization/08-build-log.md`
+- `docs/modernization/09-port-status.md`
+- `DevOps/plans/nginx-php-fpm-runtime.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** No schema, route, storage, or RustDesk response-shape change. The public
+version response advances from `1.0.1` to `1.1.0`.
+**Summary:** Prepared the stable Nginx/PHP-FPM and wildcard-proxy release metadata, documented
+upgrade/rollback and the uncompleted fleet-scale qualification, and retained v1.0.1 as rollback.
+The exact metadata passed 540 PHPUnit tests / 3,054 assertions, 69 Playwright tests with 15 skips,
+Pint, PHPStan, JavaScript/vendor checks, dependency audits, workflow/shell lint, documentation
+links, and the complete production runtime smoke.
+
 ## [2026-07-18 19:27] - Isolate trusted-proxy security tests from deployment defaults
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

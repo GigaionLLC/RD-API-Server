@@ -54,7 +54,7 @@ CI duration guarantee or runtime-capacity evidence.
 
 ## Production HTTP runtime and tuning
 
-The Nginx/PHP-FPM candidate is a drop-in container replacement: it still listens for HTTP on
+The v1.1.0 Nginx/PHP-FPM runtime is a drop-in container replacement: it still listens for HTTP on
 container port `80`, serves the same Laravel routes, consumes the existing environment variables,
 and uses the same `/var/www/html/storage` persistence boundary. No Compose port, reverse-proxy
 target, database, storage mount, or application-key migration is required by the web-server
@@ -211,11 +211,9 @@ digests and never move `latest` or a version tag.
 ## First-party application image
 
 The published `ghcr.io/gigaionllc/rustdesk-api-server:latest` reference is intentionally the
-project's stable update channel. While the Nginx/PHP-FPM candidate is under capacity and canary
-validation, `latest` remains the Apache-based v1.0.1 image at manifest digest
-`sha256:65fdd380ab101ef8fcf40e8281aa303257559f3da4008dfb00782138e71268e2`.
-Main-branch candidate builds use full-commit SHA discovery tags plus content digests and do not
-move stable channels.
+project's stable update channel. The annotated v1.1.0 release moves `latest`, `1.1.0`, `1.1`, and
+`1` to the verified Nginx/PHP-FPM image. Main-branch builds continue to use full-commit SHA
+discovery tags plus content digests and do not move stable channels.
 Operators who require a fully locked deployment can set
 `RUSTDESK_API_IMAGE` to a published tag and digest before running Compose, for example:
 

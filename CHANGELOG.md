@@ -6,9 +6,11 @@ notes.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-18
+
 ### Changed
 
-- Added a benchmark-gated production runtime candidate using Nginx and PHP-FPM in one supervised
+- Replaced the production Apache runtime with Nginx and PHP-FPM in one supervised
   container. It preserves container port `80`, `/var/www/html/storage`, all existing application
   environment settings, the MariaDB startup/migration path, and reverse-proxy behavior as a
   drop-in replacement for the Apache runtime.
@@ -33,13 +35,13 @@ notes.
   publish TCP port `9000`. Nginx executes only Laravel's exact front controller, denies dotfiles
   and other PHP paths, hides runtime versions, preserves the restricted trusted-proxy header
   surface, and keeps streamed response buffering disabled.
-- Native AMD64 and ARM64 image gates now start each exact candidate digest with disposable
+- Native AMD64 and ARM64 image gates start each exact release digest with disposable
   MariaDB and verify runtime syntax, socket isolation, HTTPS proxy recovery, secure cookies,
   static assets and API behavior, request-size and protected-path boundaries, secret/build-tool
   removal, managed-process failure, and graceful `SIGQUIT`/`SIGTERM` handling.
 - Removed the C/C++ compiler drivers, `make`, and Linux header package after extension compilation.
   A same-database Trivy scan on 2026-07-18 found no fixable high/critical vulnerability in the
-  final candidate image; vulnerability databases and unfixed vendor findings remain time-sensitive.
+  final release candidate; vulnerability databases and unfixed vendor findings remain time-sensitive.
 
 ### Performance
 
@@ -54,13 +56,11 @@ notes.
   keep-alive and no-reuse profiles, fixed resource limits, payload-fingerprint parity checks, and
   machine-readable output. A short post-fix 300-RPS local run completed without failures, drops, or
   wire mismatches at about 7 ms p95 for both runtimes while the candidate used less sampled CPU and
-  app memory. The full capacity workloads and public reverse-proxy canary remain required before
-  release promotion.
+  app memory. This is useful tuning evidence, not certification for a 10,000-device fleet; large
+  operators should canary their own workload and retain the documented v1.0.1 rollback pin.
 
-The stable `latest` channel remains the published Apache-based v1.0.1 image while this candidate
-is evaluated. Main-branch builds publish full-commit SHA discovery tags, with the recorded content
-digest remaining the immutable deployment identity; no Nginx/PHP-FPM release or promotion is
-claimed here.
+See the [complete v1.1.0 release notes](docs/releases/v1.1.0.md) for upgrade, proxy-security,
+capacity, rollback, and verification details.
 
 ## [1.0.1] - 2026-07-17
 
@@ -114,6 +114,7 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.1.0...HEAD
+[1.1.0]: docs/releases/v1.1.0.md
 [1.0.1]: docs/releases/v1.0.1.md
 [1.0.0]: docs/releases/v1.0.0.md

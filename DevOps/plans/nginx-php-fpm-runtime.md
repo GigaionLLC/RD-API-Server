@@ -4,10 +4,10 @@
 
 | Metric | Value |
 | :--- | :--- |
-| **Status** | `CANDIDATE IMPLEMENTED - FULL CAPACITY AND PUBLIC CANARY PENDING` |
+| **Status** | `V1.1.0 RELEASE AUTHORIZED - FLEET CAPACITY QUALIFICATION PENDING` |
 | **Target Version** | `v1.1.0` |
 | **Active Persona** | `Runtime architect` |
-| **Last Updated** | 2026-07-18 12:27 PDT |
+| **Last Updated** | 2026-07-18 20:17 PDT |
 
 ## 1. Decision
 
@@ -21,8 +21,10 @@ depends on the bounded PHP worker pool and MariaDB work performed by every reque
 
 Treat this as the operationally significant `v1.1.0` release. Keep the published `v1.0.1` image
 at manifest digest `sha256:65fdd380ab101ef8fcf40e8281aa303257559f3da4008dfb00782138e71268e2`
-as the immediate rollback path. Do not move `latest` to the candidate until native AMD64/ARM64
-integration, capacity, public-proxy canary, and user review all pass.
+as the immediate rollback path. Native AMD64/ARM64 integration and user review are hard release
+requirements. The preferred promotion sequence also completes the fleet-capacity matrix and
+public-proxy canary; the user explicitly authorized v1.1.0 promotion on 2026-07-18 with those two
+qualification items still outstanding and required transparent release notes.
 
 ## 2. Evidence
 
@@ -178,29 +180,31 @@ Implement as separate, independently revertible commits:
    independently.
 5. **Documentation and tuning:** document optional FPM/body/log controls, memory/DB sizing,
    canary deployment, one-service rollback, and the unchanged proxy settings.
-6. **Canary and release:** deploy the recorded full-SHA-tagged digest to one API instance, run the
-   public HTTPS checker and workload gate, obtain user approval, then create an annotated tag and
-   publish `v1.1.0`.
+6. **Canary and release:** the preferred path deploys the recorded full-SHA-tagged digest to one
+   API instance, runs the public HTTPS checker and workload gate, obtains user approval, then
+   creates an annotated tag and publishes `v1.1.0`. For this release the user approved promotion
+   before the public canary and fleet-scale workload; those remain explicit post-release
+   qualification work rather than completed evidence.
 
 ## 6. Functional verification matrix
 
 - [x] Full PHPUnit, Pint, PHPStan, ESLint, vendor-integrity, dependency-audit, and Playwright gates.
-- [ ] Nginx and FPM syntax pass on native AMD64 and ARM64 images.
+- [x] Nginx and FPM syntax pass on native AMD64 and ARM64 images.
 - [x] Both managed processes start, stop gracefully, reap children, and fail the container when
       either process exits unexpectedly. Test the image's real `SIGQUIT` stop path and an explicit
       `SIGTERM` path.
-- [ ] `/up`, `/api/version`, admin login, static CSS/JS/fonts, 404, 405, query strings, and
+- [x] `/up`, `/api/version`, admin login, static CSS/JS/fonts, 404, 405, query strings, and
       trailing-slash behavior match the Apache image.
-- [ ] Authorization, X-XSRF-Token, API-key, recording-token, JSON, form, and raw binary requests
+- [x] Authorization, X-XSRF-Token, API-key, recording-token, JSON, form, and raw binary requests
       reach Laravel unchanged.
-- [ ] HTTPS forwarded scheme, secure cookies, generated asset URLs, proxy IP, and client IP match
+- [x] HTTPS forwarded scheme, secure cookies, generated asset URLs, proxy IP, and client IP match
       the existing narrow trusted-proxy contract.
-- [ ] Four-megabyte CSV import, configured recording chunks, oversized-body errors, slow uploads,
+- [x] Four-megabyte CSV import, configured recording chunks, oversized-body errors, slow uploads,
       streamed exports, and large recording downloads retain expected status/body behavior.
 - [x] The final image contains no Composer, extension installer, C/C++ compiler driver, `make`,
       `linux-libc-dev`, listening or published FPM TCP socket, or unintended public PHP entry point.
       Inherited `EXPOSE 9000` metadata is documented and is not treated as a listener.
-- [ ] The entrypoint still blocks unsupported databases, unsafe bootstrap credentials, broken
+- [x] The entrypoint still blocks unsupported databases, unsafe bootstrap credentials, broken
       application-key state, and invalid proxy configuration before serving traffic.
 
 ## 7. Capacity benchmark and promotion gate
@@ -289,7 +293,8 @@ considering an optional Redis cache/limiter tier for large installations.
   are hard gates.
 - Capacity review: Nginx is approved only as a benchmarked web-tier improvement. It is not accepted
   as the sole answer to a 10,000-device fleet.
-- Stable promotion remains blocked on the exact three-trial 1,800-RPS workload, the 3,333-RPS
-  recovery workload, background-route coverage, native CI results, and the public 1Panel canary.
-  User approval is required before deleting the tracked Apache compatibility configuration or
-  promoting the candidate to `latest`.
+- The exact three-trial 1,800-RPS workload, 3,333-RPS recovery workload, background-route coverage,
+  and public 1Panel canary remain incomplete. The user authorized v1.1.0 stable promotion with
+  those limits documented rather than represented as passing evidence. They remain follow-up
+  qualification for large fleets; the tracked Apache compatibility configuration and immutable
+  v1.0.1 rollback image are retained.

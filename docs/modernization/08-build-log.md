@@ -2,6 +2,27 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-18 - v1.1.0 release candidate
+
+- Advanced the source-controlled application version and exact API assertion to `1.1.0`, promoted
+  the Nginx/PHP-FPM runtime and wildcard trusted-proxy behavior into the public changelog, and
+  added upgrade, rollback, capacity-scope, and proxy-security release notes. No schema, storage,
+  route, or RustDesk response-shape change is included.
+- The pre-release main candidate passed
+  [CI run 29670381387](https://github.com/GigaionLLC/RD-API-Server/actions/runs/29670381387):
+  540 PHPUnit tests / 3,054 assertions, Pint across 278 files, PHPStan across 178 files,
+  JavaScript/vendor checks, 69 Playwright tests with 15 intentional skips, native AMD64/ARM64
+  build and live-runtime smoke, and final multi-architecture manifest/provenance verification.
+- **Exact v1.1.0 metadata verification:** the isolated MariaDB suite again passed 540 tests / 3,054
+  assertions; Playwright passed 69 tests with 15 intentional skips; Pint, PHPStan, ESLint, the
+  20-file vendor check, strict Composer validation, Composer/npm audits, Actionlint, ShellCheck,
+  changed-document links, and diff checks passed. A cached source build completed in 35.4 seconds
+  including the production smoke, which passed HTTP, proxy, FastCGI, security, managed-process
+  failure, graceful shutdown, and the `1.1.0` version assertion.
+- The full 10,000-device capacity matrix and public 1Panel canary were not completed. The user
+  explicitly authorized stable v1.1.0 promotion with that limitation documented; the immutable
+  v1.0.1 image remains the one-service rollback path for operators that need more canary time.
+
 ## 2026-07-18 - Nginx/PHP-FPM runtime candidate (capacity and canary pending)
 
 - Added explicit `TRUSTED_PROXIES=*` support and made it the bundled Compose default when the
