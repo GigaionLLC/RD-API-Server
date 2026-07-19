@@ -33,8 +33,9 @@ services:
       ARGON_MEMORY: "${ARGON_MEMORY:-65536}"
       ARGON_THREADS: "${ARGON_THREADS:-1}"
       ARGON_TIME: "${ARGON_TIME:-4}"
-      # Set only when a reverse proxy is in front; use its exact container IP or network CIDR.
-      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      # Convenience default for Docker development. Use the proxy's exact IP/CIDR when this
+      # application port is reachable by other hosts or containers.
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES-*}"
       SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-null}"
 
       # The image itself defaults to 8 seconds for compatibility with unchanged custom stacks.

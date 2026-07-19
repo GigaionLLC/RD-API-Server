@@ -150,6 +150,7 @@ master_pid() {
 start_app() {
     local name="$1"
     local publish_port="${2:-false}"
+    local trusted_proxies="${3:-$network_gateway}"
     local -a publish_args=()
 
     [ "$publish_port" = true ] && publish_args=(-p '127.0.0.1::80')
@@ -180,7 +181,7 @@ start_app() {
         -e MAIL_MAILER=log \
         -e RUSTDESK_REQUIRE_DEPLOYMENT=false \
         -e RUSTDESK_AUTO_REGISTER=true \
-        -e TRUSTED_PROXIES="$network_gateway" \
+        -e TRUSTED_PROXIES="$trusted_proxies" \
         -e SESSION_SECURE_COOKIE=true \
         -e NGINX_ACCESS_LOG_ENABLED=false \
         "$image" >/dev/null
@@ -370,7 +371,10 @@ wait_for_exit "$app_name"
     || fail 'The container exited successfully after PHP-FPM was killed.'
 
 readonly nginx_failure_name="rd-runtime-nginx-failure-${suffix}"
-start_app "$nginx_failure_name"
+start_app "$nginx_failure_name" false '*'
+docker logs "$nginx_failure_name" 2>&1 \
+    | grep -Fq 'warning: TRUSTED_PROXIES=* trusts forwarded client IP and HTTPS scheme from every immediate caller.' \
+    || fail 'Wildcard proxy trust did not emit the expected runtime warning.'
 nginx_pid="$(master_pid "$nginx_failure_name" 'nginx: master process')"
 docker exec "$nginx_failure_name" sh -eu -c "kill -KILL $nginx_pid"
 wait_for_exit "$nginx_failure_name"

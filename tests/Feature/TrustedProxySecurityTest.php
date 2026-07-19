@@ -67,6 +67,22 @@ class TrustedProxySecurityTest extends TestCase
         $this->assertSame('203.0.113.7', $key->refresh()->last_used_ip);
     }
 
+    public function test_explicit_wildcard_trusts_the_immediate_callers_forwarded_ip(): void
+    {
+        config(['trustedproxy.proxies' => '*']);
+
+        [$plain, $key] = $this->makeKey('203.0.113.7');
+        Device::create(['rustdesk_id' => 'wildcard-proxy-device', 'uuid' => 'wildcard-proxy-uuid']);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.10'])
+            ->withHeader('X-Forwarded-For', '203.0.113.7')
+            ->withHeader('Authorization', 'Bearer '.$plain)
+            ->getJson('/api/v1/devices')
+            ->assertOk();
+
+        $this->assertSame('203.0.113.7', $key->refresh()->last_used_ip);
+    }
+
     public function test_trusted_https_proxy_generates_https_admin_assets(): void
     {
         config(['trustedproxy.proxies' => ['10.0.0.2']]);
@@ -199,10 +215,24 @@ class TrustedProxySecurityTest extends TestCase
             ->assertHeader('Location', 'https://admin.example.test:8443/admin/login');
     }
 
-    public function test_proxy_configuration_rejects_wildcards_and_invalid_networks(): void
+    public function test_proxy_configuration_accepts_an_explicit_wildcard(): void
     {
         $repository = Env::getRepository();
-        $repository->set('TRUSTED_PROXIES', '*,**,REMOTE_ADDR,0.0.0.0/0,::/0,10.0.0.2,10.20.0.0/16,2001:db8::1');
+        $repository->set('TRUSTED_PROXIES', '10.0.0.2,*');
+
+        try {
+            $configuration = require config_path('trustedproxy.php');
+        } finally {
+            $repository->clear('TRUSTED_PROXIES');
+        }
+
+        $this->assertSame('*', $configuration['proxies']);
+    }
+
+    public function test_proxy_configuration_rejects_implicit_wildcards_and_invalid_networks(): void
+    {
+        $repository = Env::getRepository();
+        $repository->set('TRUSTED_PROXIES', '**,REMOTE_ADDR,0.0.0.0/0,::/0,10.0.0.2,10.20.0.0/16,2001:db8::1');
 
         try {
             $configuration = require config_path('trustedproxy.php');

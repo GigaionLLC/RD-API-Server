@@ -236,10 +236,9 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# The bundled application runtime accepts HTTP internally. An HTTPS origin therefore needs an explicitly
-# trusted TLS proxy so Laravel can safely honor its sanitized forwarded headers.
-# Check the parsed configuration rather than the raw environment value because wildcard, /0,
-# and malformed entries are intentionally discarded by config/trustedproxy.php.
+# The bundled application runtime accepts HTTP internally. An HTTPS origin therefore needs a
+# trusted TLS proxy so Laravel can honor its sanitized forwarded headers. Check parsed configuration
+# because malformed values and wildcard-equivalent /0 networks are intentionally discarded.
 proxy_configuration_status=""
 if ! proxy_configuration_status="$(php -r '
     require "vendor/autoload.php";
@@ -247,8 +246,13 @@ if ! proxy_configuration_status="$(php -r '
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     $scheme = strtolower((string) parse_url((string) config("app.url"), PHP_URL_SCHEME));
     $proxies = config("trustedproxy.proxies");
-    $missing = $scheme === "https" && (!is_array($proxies) || count($proxies) === 0);
-    echo $missing ? "missing" : "ok";
+    if ($proxies === "*") {
+        echo "wildcard";
+    } elseif (is_array($proxies) && count($proxies) > 0) {
+        echo "restricted";
+    } else {
+        echo $scheme === "https" ? "missing" : "none";
+    }
 ')"; then
     echo "[entrypoint] unable to inspect the trusted-proxy configuration after caching; aborting startup." >&2
     exit 1
@@ -257,7 +261,10 @@ if [ "$proxy_configuration_status" = "missing" ]; then
     echo "[entrypoint] warning: APP_URL uses HTTPS but no valid TRUSTED_PROXIES entry is configured." >&2
     echo "[entrypoint] Laravel will emit HTTP redirects/assets and cannot recover the client IP unless the TLS proxy is explicitly trusted." >&2
     echo "[entrypoint] Set the proxy's application-observed IP or narrow isolated-network CIDR, ensure it overwrites forwarded headers, and recreate this container." >&2
-elif [ "$proxy_configuration_status" != "ok" ]; then
+elif [ "$proxy_configuration_status" = "wildcard" ]; then
+    echo "[entrypoint] warning: TRUSTED_PROXIES=* trusts forwarded client IP and HTTPS scheme from every immediate caller." >&2
+    echo "[entrypoint] This convenience mode is not recommended when the application port can be reached directly; use exact proxy IPs/CIDRs to restrict trust." >&2
+elif [ "$proxy_configuration_status" != "restricted" ] && [ "$proxy_configuration_status" != "none" ]; then
     echo "[entrypoint] trusted-proxy configuration probe returned an unexpected result; aborting startup." >&2
     exit 1
 fi

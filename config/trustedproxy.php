@@ -3,6 +3,10 @@
 $proxies = array_values(array_filter(array_map(
     static function (string $proxy): ?string {
         $proxy = trim($proxy);
+        if ($proxy === '*') {
+            return $proxy;
+        }
+
         if (filter_var($proxy, FILTER_VALIDATE_IP) !== false) {
             return $proxy;
         }
@@ -23,7 +27,7 @@ $proxies = array_values(array_filter(array_map(
 ), static fn (?string $proxy): bool => $proxy !== null));
 
 return [
-    // Forwarded headers affect security controls that use the client IP. Trust only the
-    // explicit IP addresses or CIDR ranges of reverse proxies that sanitize those headers.
-    'proxies' => $proxies,
+    // A wildcard deliberately trusts the immediate caller and therefore overrides narrower
+    // entries. Exact proxy IP addresses/CIDRs remain the recommended production boundary.
+    'proxies' => in_array('*', $proxies, true) ? '*' : $proxies,
 ];

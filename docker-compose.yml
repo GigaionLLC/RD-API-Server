@@ -43,8 +43,9 @@ services:
       ARGON_MEMORY: "${ARGON_MEMORY:-65536}"
       ARGON_THREADS: "${ARGON_THREADS:-1}"
       ARGON_TIME: "${ARGON_TIME:-4}"
-      # Set only for a reverse proxy; use its exact peer IP or narrow isolated-network CIDR.
-      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      # Convenience default: trust the immediate caller. Restrict this to the proxy's exact peer
+      # IP/CIDR whenever the application port can be reached by anything except that proxy.
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES-*}"
       # Set true for a public HTTPS origin. Null preserves request-based detection for local HTTP.
       SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-null}"
 

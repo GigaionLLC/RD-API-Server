@@ -117,6 +117,10 @@ jobs:
           PERF_IMAGE: ghcr.io/gigaionllc/rustdesk-api-server:1.0.1@sha256:65fdd380ab101ef8fcf40e8281aa303257559f3da4008dfb00782138e71268e2
           PERF_RESULTS_DIR: /tmp/rustdesk-api-performance-results
         run: |
+          for compose_file in docker-compose.yml docker-compose.dev.yml examples/full-stack.docker-compose.yml; do
+            rendered="$(env -u TRUSTED_PROXIES docker compose -f "$compose_file" config --format json)"
+            jq -e '[.services[].environment.TRUSTED_PROXIES?] | any(. == "*")' <<< "$rendered" >/dev/null
+          done
           docker compose -f docker/compose.performance.yml --profile load config --quiet
           docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
             -v "$PWD/tests/Performance:/performance:ro" \
