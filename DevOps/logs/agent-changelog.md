@@ -3,6 +3,33 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-18 19:12] - Add warned wildcard proxy-trust convenience mode
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `.env.example`
+- `.github/workflows/ci.yml`
+- `config/trustedproxy.php`
+- `docker/entrypoint.sh`
+- `docker-compose.yml`
+- `docker-compose.dev.yml`
+- `examples/full-stack.docker-compose.yml`
+- `scripts/ci-runtime-smoke.sh`
+- `tests/Feature/TrustedProxySecurityTest.php`
+- `README.md`
+- `QUICKSTART.md`
+- `docker/README.md`
+- `Wiki/core/15-security.md`
+- `CHANGELOG.md`
+- `docs/modernization/08-build-log.md`
+- `docs/modernization/09-port-status.md`
+- `DevOps/plans/nginx-php-fpm-runtime.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Docker deployment defaults now use explicit wildcard proxy trust
+when `TRUSTED_PROXIES` is unset; exact IP/CIDR restrictions remain supported and recommended.
+**Summary:** Added explicit `*` parsing and regression coverage, a visible runtime warning, and
+operator guidance explaining that wildcard convenience is unsafe when callers can bypass the
+sanitizing reverse proxy.
+
 ## [2026-07-18 13:10] - Record Nginx candidate publication
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

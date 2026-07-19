@@ -74,9 +74,14 @@ SESSION_SECURE_COOKIE=true
 
 `TRUSTED_PROXIES` is the proxy address **as seen by the application container**, not the proxy's
 public address. Prefer that exact address. If container addresses can change, use only the narrow
-CIDR of an isolated network shared exclusively by the application and trusted proxies. Never use
-`*`, `/0`, all of `172.16.0.0/12`, or another network reachable by untrusted clients. Prevent
-direct access to the application port, too.
+CIDR of an isolated network shared exclusively by the application and trusted proxies.
+
+The bundled Compose files default an unset `TRUSTED_PROXIES` to `*` for convenience, and an
+explicit `*` is supported. Wildcard mode trusts the forwarded client IP and HTTPS scheme supplied
+by every immediate caller, so it is not recommended unless the application port is reachable only
+by a sanitizing proxy. A direct caller could otherwise rotate its apparent IP to evade login
+throttles or satisfy an API-key IP allowlist. Prefer an exact IP/CIDR, never substitute `/0` or a
+broad shared private range, and prevent direct access to the application port.
 
 Use one of these topologies instead of leaving the application port publicly reachable:
 

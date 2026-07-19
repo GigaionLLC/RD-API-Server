@@ -4,6 +4,17 @@ Chronological record of what was built and its verification state. Newest at top
 
 ## 2026-07-18 - Nginx/PHP-FPM runtime candidate (capacity and canary pending)
 
+- Added explicit `TRUSTED_PROXIES=*` support and made it the bundled Compose default when the
+  variable is unset, as a convenience for isolated LAN/reverse-proxy deployments. Startup emits a
+  warning because wildcard mode trusts forwarded client IP and scheme values from every immediate
+  caller. Exact proxy IPs/CIDRs remain the recommended restriction when direct port access is
+  possible; `**`, `REMOTE_ADDR`, and `/0` equivalents remain rejected.
+- **Wildcard proxy verification:** all 540 PHPUnit tests passed with 3,054 assertions, including
+  the wildcard client-IP boundary and the existing forwarded-host/port/prefix rejection coverage.
+  Pint passed across 277 files, PHPStan passed across 177 files, Actionlint and ShellCheck passed,
+  all three bundled Compose files rendered the wildcard default and exact override correctly, and
+  the production runtime smoke passed its HTTP, HTTPS-proxy, FastCGI, failure, shutdown, and
+  wildcard-warning checks.
 - Reworked the production-image source into a single-container Nginx + PHP-FPM candidate while
   preserving container port `80`, `/var/www/html/storage`, the existing environment contract,
   MariaDB initialization, and reverse-proxy topology. FastCGI uses only the

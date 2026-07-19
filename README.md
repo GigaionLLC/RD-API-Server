@@ -102,9 +102,12 @@ RUSTDESK_KEY=<contents of id_ed25519.pub>
 ```
 
 The `APP_URL`, `TRUSTED_PROXIES`, and `SESSION_SECURE_COOKIE` values above assume TLS terminates
-at a reverse proxy. `TRUSTED_PROXIES` must be the immediate proxy address observed in the API
-container's access log; it is not the public domain or backend address. Direct local HTTP setups
-should leave proxy trust empty and retain request-based cookie detection.
+at a reverse proxy. The exact `TRUSTED_PROXIES` value is the immediate proxy address observed in
+the API container's access log; it is not the public domain or backend address. Bundled Compose
+defaults an unset value to `*` for convenient LAN/proxy deployments, but that trusts forwarded
+client IP and scheme values from every immediate caller. Override it with exact IPs/CIDRs whenever
+the application port is reachable by anything except the sanitizing proxy. Direct local HTTP
+setups can set it explicitly empty and retain request-based cookie detection.
 
 Leave `DB_HOST` unset for the bundled stack: Compose then uses its internal `db` service. The
 current `.env.example` comments this setting deliberately. If an existing `.env` copied from an
@@ -147,7 +150,8 @@ services:
       # Leave APP_KEY empty for the persistent generated key. Replicas must share explicit keys.
       APP_KEY: "${APP_KEY:-}"
       APP_PREVIOUS_KEYS: "${APP_PREVIOUS_KEYS:-}"
-      TRUSTED_PROXIES: CHANGE_ME_proxy_ip_or_cidr  # omit when clients connect directly
+      # Convenience default only; exact proxy IP/CIDR is recommended outside an isolated topology.
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES-*}"
       ADMIN_USER: admin
       ADMIN_PASS: "${ADMIN_PASS:-}"          # required only while creating the first admin
       DB_CONNECTION: mariadb
@@ -189,14 +193,18 @@ are not rewritten; if an earlier deployment used a default password, reset it in
 with `php artisan rustdesk:user admin --admin`; the command prompts twice without echoing the
 password. Automation can pipe one line to `--password-stdin`.
 
-If TLS terminates at a reverse proxy, set `TRUSTED_PROXIES` to that proxy's exact IP address or
-network CIDR as seen by the application container (comma-separated when there is more than one).
-Use the public HTTPS origin for `APP_URL` and set `SESSION_SECURE_COOKIE=true`. The application
-ignores `X-Forwarded-*` headers by default because trusting arbitrary senders would let a direct
-client spoof the address used by login throttles and API-key IP allowlists. Never set this value
-to a wildcard, and do not expose the application port through a path that bypasses the trusted
-proxy. See [Production HTTPS and reverse proxies](QUICKSTART.md#production-https-and-reverse-proxies)
-for safe network topologies, diagnosis, recovery, and the executable post-deployment check.
+If TLS terminates at a reverse proxy, preferably set `TRUSTED_PROXIES` to that proxy's exact IP
+address or network CIDR as seen by the application container (comma-separated when there is more
+than one). Use the public HTTPS origin for `APP_URL` and set `SESSION_SECURE_COOKIE=true`.
+
+An explicit `*` is supported and is the bundled Compose default when the variable is unset. It
+trusts `X-Forwarded-For` and `X-Forwarded-Proto` from every immediate caller. This is convenient
+for an isolated LAN or proxy-only network, but it is **not recommended** when a client can reach
+the application port directly: that client could spoof the address used by login throttles,
+API-key IP allowlists, and audit records. Restrict the port to the proxy or replace `*` with its
+exact observed IP/CIDR. See
+[Production HTTPS and reverse proxies](QUICKSTART.md#production-https-and-reverse-proxies) for safe
+network topologies, diagnosis, recovery, and the executable post-deployment check.
 
 **Full stack** — to run the RustDesk `hbbs`/`hbbr` rendezvous + relay alongside the API, copy
 **[examples/full-stack.docker-compose.yml](examples/full-stack.docker-compose.yml)** and follow

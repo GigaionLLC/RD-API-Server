@@ -78,9 +78,10 @@ The candidate must remain a drop-in replacement. Existing installations must not
   optional and have safe defaults.
 - Keep the MariaDB/InnoDB-only entrypoint checks, persistent application key, install marker,
   migrations, first-run seeding, production caches, and CLI access unchanged.
-- Preserve `TRUSTED_PROXIES` semantics. Nginx must pass the immediate proxy address as
-  `REMOTE_ADDR` and pass incoming `X-Forwarded-For` and `X-Forwarded-Proto` unchanged; it must not
-  enable `real_ip` rewriting or replace the public forwarded scheme with internal HTTP.
+- Preserve the configured `TRUSTED_PROXIES` boundary. Nginx must pass the immediate proxy address
+  as `REMOTE_ADDR` and pass incoming `X-Forwarded-For` and `X-Forwarded-Proto` unchanged; it must
+  not enable `real_ip` rewriting or replace the public forwarded scheme with internal HTTP. The
+  application supports warned wildcard convenience mode and recommended exact IP/CIDR restrictions.
 - Preserve access-log output to stdout with the immediate peer address first, and error output to
   stderr, so existing proxy diagnostics continue to work.
 - Keep the normal upgrade operation limited to pulling and recreating the API service. No schema

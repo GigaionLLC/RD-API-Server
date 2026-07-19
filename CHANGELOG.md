@@ -22,13 +22,17 @@ notes.
 - The image keeps an eight-second shutdown default for compatibility with unchanged Compose files.
   Bundled Compose examples pair a 30-second runtime drain with a 35-second
   `stop_grace_period` so in-flight work has more time to complete.
+- Explicit `TRUSTED_PROXIES=*` is supported, and bundled Compose files use it when the variable is
+  unset for convenient LAN/reverse-proxy deployment. Runtime logs warn that wildcard mode trusts
+  forwarded client IP and scheme values from every immediate caller. Exact proxy IPs/CIDRs remain
+  the recommended setting whenever direct application-port access is possible.
 
 ### Security
 
 - FastCGI is restricted to a permission-controlled Unix socket; PHP-FPM does not listen on or
   publish TCP port `9000`. Nginx executes only Laravel's exact front controller, denies dotfiles
-  and other PHP paths, hides runtime versions, preserves the existing explicit trusted-proxy
-  boundary, and keeps streamed response buffering disabled.
+  and other PHP paths, hides runtime versions, preserves the restricted trusted-proxy header
+  surface, and keeps streamed response buffering disabled.
 - Native AMD64 and ARM64 image gates now start each exact candidate digest with disposable
   MariaDB and verify runtime syntax, socket isolation, HTTPS proxy recovery, secure cookies,
   static assets and API behavior, request-size and protected-path boundaries, secret/build-tool

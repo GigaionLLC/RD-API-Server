@@ -12,8 +12,13 @@
 
 The application source now contains a benchmark-gated Nginx + PHP-FPM container candidate. It is
 a drop-in runtime change rather than a RustDesk API port change: container port `80`, persistent
-`/var/www/html/storage`, MariaDB initialization, application environment variables, reverse-proxy
-trust, client paths, JSON keys, and response shapes remain unchanged.
+`/var/www/html/storage`, MariaDB initialization, client paths, JSON keys, and response shapes
+remain unchanged.
+
+The proxy configuration now accepts an explicit `*`, and bundled Compose files default an unset
+value to that convenience mode. Startup warns that wildcard mode trusts forwarded client IP and
+scheme values from every immediate caller. Exact application-observed proxy IPs/CIDRs remain the
+recommended production restriction whenever another caller can reach the application HTTP port.
 
 Nginx talks to PHP-FPM only through the permission-restricted
 `/run/php/rustdesk-api.sock`; there is no live or published TCP FastCGI port. Startup rejects

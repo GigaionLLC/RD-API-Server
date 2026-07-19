@@ -84,13 +84,17 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 
 ## Inbound Proxy Boundary
 
-- Forwarded headers are ignored by default. A deployment behind a reverse proxy must set
-  `TRUSTED_PROXIES` to that proxy's explicit IP address or CIDR; multiple entries are separated
-  with commas.
+- The bundled Compose files default an unset `TRUSTED_PROXIES` to the supported `*` convenience
+  mode. It trusts `X-Forwarded-For` and `X-Forwarded-Proto` from every immediate caller and emits
+  a startup warning. It is safe only when network policy makes the application port reachable
+  exclusively through a sanitizing proxy.
+- The recommended production boundary sets `TRUSTED_PROXIES` to the proxy's exact
+  application-observed IP address or a narrow isolated CIDR; multiple entries are comma-separated.
+  An explicitly empty value disables forwarded-header trust for direct HTTP operation.
 - Public HTTPS deployments use their external HTTPS origin for `APP_URL` and set
   `SESSION_SECURE_COOKIE=true` as defense in depth. Neither setting replaces explicit proxy
   trust: the request scheme and client address still come through the inbound proxy boundary.
-- Never trust a wildcard or a network that untrusted clients can reach directly. The proxy must
+- Do not use wildcard mode or a network that untrusted clients can reach directly. The proxy must
   overwrite the public `Host` and forwarded scheme and construct a trustworthy client chain
   instead of passing client-supplied headers through unchanged. The application accepts only
   `X-Forwarded-For` and `X-Forwarded-Proto` from trusted peers; forwarded host, port, and prefix
@@ -100,8 +104,8 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   this boundary. Never trust a shared bridge gateway/NAT peer when it also represents callers
   that are outside the deployment's trusted host boundary.
 - Mixed-content errors, HTTP redirects from a public HTTPS origin, or cookies missing `Secure`
-  indicate a broken proxy trust boundary. Do not mask that boundary with wildcard trust,
-  hard-coded secure asset helpers, or a globally forced URL scheme.
+  indicate a broken proxy trust boundary. Confirm the proxy and configured trust mode instead of
+  masking the issue with hard-coded secure asset helpers or a globally forced URL scheme.
 - Client IPs feed login and 2FA throttles, API-key IP allowlists, audit records, and last-seen
   metadata. Any new IP-based security control must use the framework request IP and retain this
   trusted-proxy boundary.
@@ -130,7 +134,7 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   per-source and global one-minute registration ceilings plus a total-device quota. Defaults are
   30 per source, 100 globally, and 5,000 total devices.
 - The framework request IP is authoritative for enrollment limits, so reverse proxies must obey
-  the explicit trusted-proxy boundary above.
+  the configured trusted-proxy boundary above.
 
 ## Audit Ingestion Boundary
 

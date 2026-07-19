@@ -105,6 +105,20 @@ keep the Compose grace period longer than the internal runtime deadline. The sup
 stops Nginx from accepting new work, drains it, then gracefully stops PHP-FPM; both the declared
 `SIGQUIT` stop path and an explicit `SIGTERM` use that sequence.
 
+## Reverse-proxy trust default
+
+The bundled Compose files default an unset `TRUSTED_PROXIES` to `*`. This convenience setting
+trusts `X-Forwarded-For` and `X-Forwarded-Proto` from every immediate caller and emits a startup
+warning. It is suitable only when network policy ensures that the application HTTP port is
+reachable exclusively through a proxy that overwrites those headers. It is not the recommended
+production boundary.
+
+Set `TRUSTED_PROXIES` to the proxy's exact application-observed IP or a narrow isolated CIDR to
+restrict trust. Multiple restricted entries are comma-separated. An explicitly empty value
+disables proxy trust for direct HTTP operation; `**`, `REMOTE_ADDR`, IPv4/IPv6 `/0`, malformed
+values, and implicit wildcard equivalents remain rejected. Use `*` alone when selecting wildcard
+mode; if it appears in a comma-separated list, it overrides every narrower entry.
+
 ## Supported database
 
 RD-API-Server supports **MariaDB with InnoDB only**. Runtime startup, PHPUnit, browser tests,
