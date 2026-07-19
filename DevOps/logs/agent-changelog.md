@@ -3,6 +3,23 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-18 20:45] - Publish and record v1.1.0
+**Agent:** rustdesk-api (OpenAI Codex / GPT-5)
+**Files Modified:**
+- `docs/releases/v1.1.0.md`
+- `docs/modernization/08-build-log.md`
+- `docs/modernization/09-port-status.md`
+- `DevOps/plans/nginx-php-fpm-runtime.md`
+- `DevOps/logs/version-history.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. This follow-up records the already-published release and does not
+alter its image, schema, routes, storage, or RustDesk wire contract.
+**Summary:** Published annotated tag and GitHub Release `v1.1.0`, verified all stable and immutable
+image aliases at AMD64/ARM64 digest
+`sha256:7ed0b357f2ab3d27a793f851cfc5458f2a16b0f1c00693b5eb6da373aafe90a0`, and recorded the
+successful main/tag CI evidence plus the explicitly outstanding fleet-capacity and public-canary
+qualification.
+
 ## [2026-07-18 20:17] - Prepare v1.1.0 stable release
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

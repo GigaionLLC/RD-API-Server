@@ -4,10 +4,10 @@
 
 | Metric | Value |
 | :--- | :--- |
-| **Status** | `V1.1.0 RELEASE AUTHORIZED - FLEET CAPACITY QUALIFICATION PENDING` |
+| **Status** | `V1.1.0 RELEASED - FLEET CAPACITY QUALIFICATION PENDING` |
 | **Target Version** | `v1.1.0` |
 | **Active Persona** | `Runtime architect` |
-| **Last Updated** | 2026-07-18 20:17 PDT |
+| **Last Updated** | 2026-07-18 20:45 PDT |
 
 ## 1. Decision
 
@@ -286,6 +286,9 @@ considering an optional Redis cache/limiter tier for large installations.
 
 ### Decision state
 
+- Release state: annotated tag `v1.1.0` at commit `3755425` passed main run `29671761606` and
+  release run `29671977593`. The stable GitHub Release and AMD64/ARM64 aliases are published at
+  manifest digest `sha256:7ed0b357f2ab3d27a793f851cfc5458f2a16b0f1c00693b5eb6da373aafe90a0`.
 - Product intent: satisfied by a drop-in candidate, stable-channel protection, and one-command
   rollback.
 - Runtime/security review: no blocker to a single-container Nginx/FPM candidate when FastCGI stays

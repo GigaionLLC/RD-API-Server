@@ -2,7 +2,7 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
-## 2026-07-18 - v1.1.0 release candidate
+## 2026-07-18 - v1.1.0 stable release
 
 - Advanced the source-controlled application version and exact API assertion to `1.1.0`, promoted
   the Nginx/PHP-FPM runtime and wildcard trusted-proxy behavior into the public changelog, and
@@ -22,6 +22,18 @@ Chronological record of what was built and its verification state. Newest at top
 - The full 10,000-device capacity matrix and public 1Panel canary were not completed. The user
   explicitly authorized stable v1.1.0 promotion with that limitation documented; the immutable
   v1.0.1 image remains the one-service rollback path for operators that need more canary time.
+- Release-preparation commit `3755425` passed
+  [main CI run 29671761606](https://github.com/GigaionLLC/RD-API-Server/actions/runs/29671761606).
+  Annotated tag `v1.1.0` then passed
+  [release run 29671977593](https://github.com/GigaionLLC/RD-API-Server/actions/runs/29671977593)
+  and published `1.1.0`, `1.1`, `1`, `latest`, and the full-SHA tag for AMD64 and ARM64 at
+  `sha256:7ed0b357f2ab3d27a793f851cfc5458f2a16b0f1c00693b5eb6da373aafe90a0`.
+  The first ARM64 attempt hit a log-visibility race while checking the wildcard startup warning;
+  its failure diagnostics already contained the expected warning, and the failed-job retry passed
+  the unchanged image before the final manifest was promoted.
+- Published the [v1.1.0 GitHub Release](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.1.0)
+  as a stable release. Every public alias was independently inspected after publication and
+  resolved to the recorded manifest digest.
 
 ## 2026-07-18 - Nginx/PHP-FPM runtime candidate (capacity and canary pending)
 

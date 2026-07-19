@@ -15,6 +15,10 @@ a drop-in runtime change rather than a RustDesk API port change: container port 
 `/var/www/html/storage`, MariaDB initialization, client paths, JSON keys, and response shapes
 remain unchanged.
 
+Stable release `v1.1.0` is published from commit `3755425`. Container aliases `1.1.0`, `1.1`,
+`1`, `latest`, and the full-SHA tag resolve to the verified AMD64/ARM64 manifest digest
+`sha256:7ed0b357f2ab3d27a793f851cfc5458f2a16b0f1c00693b5eb6da373aafe90a0`.
+
 The proxy configuration now accepts an explicit `*`, and bundled Compose files default an unset
 value to that convenience mode. Startup warns that wildcard mode trusts forwarded client IP and
 scheme values from every immediate caller. Exact application-observed proxy IPs/CIDRs remain the
