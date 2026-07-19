@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\ApiKey;
 use App\Models\Device;
 use App\Models\User;
+use App\Support\TrustedProxyConfiguration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Env;
 use Tests\TestCase;
 
 class TrustedProxySecurityTest extends TestCase
@@ -217,32 +217,20 @@ class TrustedProxySecurityTest extends TestCase
 
     public function test_proxy_configuration_accepts_an_explicit_wildcard(): void
     {
-        $repository = Env::getRepository();
-        $repository->set('TRUSTED_PROXIES', '10.0.0.2,*');
+        $proxies = TrustedProxyConfiguration::parse('10.0.0.2,*');
 
-        try {
-            $configuration = require config_path('trustedproxy.php');
-        } finally {
-            $repository->clear('TRUSTED_PROXIES');
-        }
-
-        $this->assertSame('*', $configuration['proxies']);
+        $this->assertSame('*', $proxies);
     }
 
     public function test_proxy_configuration_rejects_implicit_wildcards_and_invalid_networks(): void
     {
-        $repository = Env::getRepository();
-        $repository->set('TRUSTED_PROXIES', '**,REMOTE_ADDR,0.0.0.0/0,::/0,10.0.0.2,10.20.0.0/16,2001:db8::1');
-
-        try {
-            $configuration = require config_path('trustedproxy.php');
-        } finally {
-            $repository->clear('TRUSTED_PROXIES');
-        }
+        $proxies = TrustedProxyConfiguration::parse(
+            '**,REMOTE_ADDR,0.0.0.0/0,::/0,10.0.0.2,10.20.0.0/16,2001:db8::1'
+        );
 
         $this->assertSame(
             ['10.0.0.2', '10.20.0.0/16', '2001:db8::1'],
-            $configuration['proxies']
+            $proxies
         );
     }
 
