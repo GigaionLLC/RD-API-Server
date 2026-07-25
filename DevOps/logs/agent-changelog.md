@@ -3,6 +3,34 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-25 21:15] - Candidate release channel, publish and record v1.3.0
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `.github/workflows/ci.yml`
+- `scripts/ci-runtime-smoke.sh`
+- `config/app.php`
+- `tests/Feature/SmokeTest.php`
+- `docs/releases/v1.3.0.md`
+- `CHANGELOG.md`
+- `README.md`
+- `docker/README.md`
+- `DevOps/logs/version-history.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None beyond the v1.3.0 application version, which `/api/version` reports.
+The publication validator now accepts prerelease tags; stable behaviour is unchanged.
+**Summary:** Added a candidate channel so a Docker release can be tested before it becomes what
+unpinned deployments receive. Prerelease tags publish their exact version and move a new `next`
+alias while `latest`, `1` and `1.3` stay on the last stable release; the validator change and the
+`latest` condition had to land together, because relaxing the validator alone would have pointed
+every unpinned deployment at a candidate. The major and major.minor patterns are gated explicitly
+rather than trusting docker/metadata-action to skip them for prereleases. Verified by publishing
+`v1.3.0-rc.1` for real and confirming `latest`, `1`, `1.2` and `1.2.0` were byte-for-byte unmoved and
+`1.3` absent. Also fixed the runtime smoke racing `docker logs`, which had failed twice on a message
+that was present moments later and once blocked a release tag. The maintainer has no FreeIPA or
+Authentik available, so v1.3.0 was promoted from the same commit without live-directory
+verification; that limitation is stated in the release notes, and the group-mapping feature is inert
+until an operator creates a mapping.
+
 ## [2026-07-25 12:40] - Break-glass administrator, generated bootstrap password, CLI recovery
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
