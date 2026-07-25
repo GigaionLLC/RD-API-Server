@@ -20,7 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class EnsureCredentialVersion
 {
-    private const SESSION_KEY = 'auth.credential_version';
+    public const SESSION_KEY = 'auth.credential_version';
 
     public function __construct(private readonly RecentAdminAuthentication $recentAuthentication) {}
 

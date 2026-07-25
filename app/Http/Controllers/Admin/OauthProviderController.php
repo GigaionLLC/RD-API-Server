@@ -121,6 +121,7 @@ class OauthProviderController extends Controller
             'client_id' => ['required', 'string', 'max:255'],
             'client_secret' => [$secretRequired, 'string', 'max:255'],
             'scopes' => ['nullable', 'string', 'max:255'],
+            'groups_claim' => ['nullable', 'string', 'max:191'],
             'issuer' => ['nullable', 'string', 'max:255'],
             'pkce_method' => ['nullable', Rule::in(['S256', 'plain'])],
         ]);

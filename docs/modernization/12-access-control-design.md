@@ -135,6 +135,17 @@ experience.
   while deletion requires the corresponding edit permission. Existing delegated roles are
   not automatically granted this new destructive capability; legacy `is_admin` and global
   roles retain full access.
+- **Layer 3 membership may be federated.** A role assignment now carries provenance: `manual`
+  when a human assigned it, or `idp:<kind>:<provider>` when an identity-provider group mapping
+  did. A sign-in reconciles only the grants its own provider owns, which is what lets
+  authoritative revocation and hand-assigned roles coexist without either destroying the other.
+  Federation never reaches Layer 3's escape hatch: a mapping cannot write `is_admin`, and an
+  account holding `is_admin` is skipped by synchronization entirely, so the unconditional-access
+  path documented above remains outside every external system's reach. A `global` role is the
+  one target that would be equivalent to full authority, and conferring it from a group claim
+  requires a host-level opt-in rather than a console session. Authoring a mapping is
+  full-administrator-only for the same reason role mutation is: an editor could otherwise point
+  a mapping at a role more privileged than their own and sign in through the provider.
 - **Shared address books — fail closed when sharing is paused.** Owners retain full access and
   collaborator rows remain available for a later re-enable, but non-owner read/write grants are
   dormant while `is_shared` is false. Disabled books are omitted from shared-profile discovery,

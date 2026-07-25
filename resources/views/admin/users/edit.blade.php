@@ -69,6 +69,23 @@
                             @endif
                         </span>
                     </div>
+                    @if ($federatedRoles->isNotEmpty())
+                        <div class="rd-field">
+                            <div class="rd-label" id="federated-roles-label">Roles from an identity provider</div>
+                            <div class="rd-actions rd-actions--wrap" role="group" aria-labelledby="federated-roles-label">
+                                @foreach ($federatedRoles as $federated)
+                                    <span class="rd-badge" title="Granted by {{ $federated->origin }}">
+                                        <i class="ri-git-merge-line" aria-hidden="true"></i> {{ $federated->name }}
+                                    </span>
+                                @endforeach
+                            </div>
+                            <span class="rd-help">
+                                Granted by group membership and reconciled at each sign-in, so they cannot be
+                                changed here. Adjust them under People &amp; Access / SSO role mappings, or by
+                                changing the user's group in the identity provider.
+                            </span>
+                        </div>
+                    @endif
                     @endif
                     <div class="rd-field">
                         <label class="rd-label" for="status">Status</label>

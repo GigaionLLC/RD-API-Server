@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\LdapService;
 use App\Services\LocalPasswordHashService;
 use App\Services\OauthService;
+use App\Services\SsoRoleSyncService;
 use App\Services\TwoFactorService;
 use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,7 @@ class LoginController extends Controller
         private readonly OauthService $oauth,
         private readonly LdapService $ldap,
         private readonly LocalPasswordHashService $passwordHashes,
+        private readonly SsoRoleSyncService $ssoRoleSync,
     ) {}
 
     /**
@@ -89,6 +91,7 @@ class LoginController extends Controller
             $attrs = $this->ldap->authenticate($username, $password);
             if ($attrs !== null) {
                 $ldapUser = $this->ldap->syncUser($attrs);
+                $this->ssoRoleSync->syncFromLdap($ldapUser, $attrs, 'client_ldap', $request->ip());
                 $ldapAuthenticated = true;
             }
         }

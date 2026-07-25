@@ -6,6 +6,24 @@ notes.
 
 ## [Unreleased]
 
+### Added
+
+- Identity-provider groups can grant console admin roles. A new **SSO role mappings** screen
+  declares "membership of this LDAP/FreeIPA or OIDC group grants this role", and membership is
+  reconciled at every sign-in across all four login paths. Role assignments now carry provenance,
+  so federated grants are revoked when a user leaves a group while hand-assigned roles are left
+  alone. A mapping never writes the legacy full-administrator flag, and mapping a group to a
+  `global` role requires `SSO_ROLE_MAPPING_ALLOW_GLOBAL=true` on the server.
+- OIDC providers gained a configurable group claim, read from the userinfo response, with dot
+  notation for nested claims. Providers that emit groups only in the ID token (Entra ID) or not
+  at all (Google) are not supported, because no ID token is parsed anywhere in this application.
+
+### Fixed
+
+- Active Directory truncating an oversized `memberOf` into `memberOf;range=` chunks is now
+  detected and reported as an unreadable group list rather than as an empty one, so a truncated
+  answer can never look like a removal.
+
 ## [1.2.0] - 2026-07-24
 
 ### Added

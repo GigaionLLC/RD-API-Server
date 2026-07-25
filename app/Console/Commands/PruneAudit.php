@@ -6,6 +6,7 @@ use App\Models\Alarm;
 use App\Models\AuditConn;
 use App\Models\AuditFile;
 use App\Models\LoginLog;
+use App\Models\SsoRoleSyncLog;
 use Illuminate\Console\Command;
 
 /**
@@ -35,7 +36,9 @@ class PruneAudit extends Command
         $cutoff = now()->subDays($days);
         $total = 0;
 
-        foreach ([AuditConn::class, AuditFile::class, LoginLog::class, Alarm::class] as $model) {
+        // Role synchronization writes a row per effective change or diagnosable skip, at login
+        // rate, so it grows with the same shape as the audit feeds and prunes on the same window.
+        foreach ([AuditConn::class, AuditFile::class, LoginLog::class, Alarm::class, SsoRoleSyncLog::class] as $model) {
             $total += $model::where('created_at', '<', $cutoff)->delete();
         }
 

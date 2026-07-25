@@ -95,6 +95,39 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   IPv6 form of the name-service lookup, so a host published only as an IPv6 `/etc/hosts` entry
   still needs a real `AAAA` record.
 
+## Federated Role Grants
+
+- An identity-provider group may grant a console admin role (Admin → SSO role mappings). A
+  mapping never writes `users.is_admin`, so a local full administrator always remains the way
+  back into a console whose provider is broken, and accounts holding `is_admin` are skipped by
+  synchronization entirely.
+- Authoring a mapping decides who becomes an administrator, which is the same escalation surface
+  as rewriting a role. Mutation is full-administrator-only in the controller;
+  `sso_mappings.view` grants inspection only and no `.edit` counterpart exists.
+- A `global` role grants every permission, including `settings.edit`, which can rewrite the SMTP
+  configuration that delivers email sign-in codes. Mapping a group to one therefore requires
+  `SSO_ROLE_MAPPING_ALLOW_GLOBAL=true`, an env setting needing host access rather than a console
+  session. The flag is re-checked at sign-in, so disabling it revokes what it granted.
+- Mappings are scoped to one provider and matched exactly against a normalized key. LDAP values
+  are distinguished names, where whitespace around `,` and `=` is insignificant; OIDC values are
+  opaque provider strings. There are no wildcards or regular expressions, and no cross-provider
+  fallback matching.
+- Role assignments carry provenance. A sign-in reconciles only the grants its own provider owns;
+  hand-assigned roles and another provider's grants are never read, written, or deleted. The
+  user form edits manual grants only.
+- Synchronization never revokes on uncertainty. A directory or userinfo request that failed, a
+  provider with no configured group claim, and a truncated Active Directory `memberOf;range=`
+  answer all leave existing grants untouched. Only an explicitly empty group list revokes.
+- Synchronization runs outside the identity transaction and can never fail a login. A change in
+  effective authority bumps `credential_version` and revokes the account's client bearer tokens,
+  whose `is_admin` value is a snapshot taken when they were issued.
+- Group claims are read from the OIDC userinfo response only. No ID token is parsed anywhere in
+  this application, so reading groups from one would trust an unverified assertion. Providers
+  that emit groups exclusively in the ID token (Entra ID) or not at all (Google) are unsupported.
+- Every effective change is recorded in `sso_role_sync_logs` with the provider, matched groups,
+  roles granted and revoked, and the login channel. Skips are recorded as deliberately as
+  changes, because a silent no-op is this feature's most likely failure.
+
 ## Identity Provider Trust Boundary
 
 - OAuth/OIDC issuer, client, and provider-type configuration is an authentication trust root.

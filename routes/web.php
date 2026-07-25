@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\OauthProviderController;
 use App\Http\Controllers\Admin\RecordingController;
 use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SsoRoleMappingController;
 use App\Http\Controllers\Admin\StrategyController;
 use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Controllers\Admin\UserController;
@@ -200,4 +201,13 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::get('/admin/roles/{role}/edit', [AdminRoleController::class, 'edit'])->middleware('permission:roles.view')->name('admin.roles.edit');
     Route::put('/admin/roles/{role}', [AdminRoleController::class, 'update'])->middleware('permission:roles.edit')->name('admin.roles.update');
     Route::delete('/admin/roles/{role}', [AdminRoleController::class, 'destroy'])->middleware('permission:roles.edit')->name('admin.roles.destroy');
+
+    // SSO role mappings (identity-provider group grants a console role). Viewing is delegable;
+    // authoring decides who becomes an administrator and stays full-admin-only in the controller.
+    Route::get('/admin/sso-role-mappings', [SsoRoleMappingController::class, 'index'])->middleware('permission:sso_mappings.view')->name('admin.sso-role-mappings.index');
+    Route::get('/admin/sso-role-mappings/create', [SsoRoleMappingController::class, 'create'])->middleware('permission:sso_mappings.view')->name('admin.sso-role-mappings.create');
+    Route::post('/admin/sso-role-mappings', [SsoRoleMappingController::class, 'store'])->middleware('permission:sso_mappings.view')->name('admin.sso-role-mappings.store');
+    Route::get('/admin/sso-role-mappings/{ssoRoleMapping}/edit', [SsoRoleMappingController::class, 'edit'])->middleware('permission:sso_mappings.view')->name('admin.sso-role-mappings.edit');
+    Route::put('/admin/sso-role-mappings/{ssoRoleMapping}', [SsoRoleMappingController::class, 'update'])->middleware('permission:sso_mappings.view')->name('admin.sso-role-mappings.update');
+    Route::delete('/admin/sso-role-mappings/{ssoRoleMapping}', [SsoRoleMappingController::class, 'destroy'])->middleware('permission:sso_mappings.view')->name('admin.sso-role-mappings.destroy');
 });

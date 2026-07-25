@@ -100,6 +100,21 @@ return [
         'allow_private_networks' => (bool) env('RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS', false),
     ],
 
+    // Identity-provider group membership can grant console admin roles (see the SSO role
+    // mappings screen). A mapping never touches the legacy `is_admin` column, so a full
+    // administrator always remains the way back into a console whose provider is broken.
+    'sso_role_mapping' => [
+        // A `global` role grants every permission, including ones absent from the permission
+        // catalogue, so letting an identity-provider group confer one is equivalent to handing
+        // out full console authority. It therefore requires host-level access to enable, not
+        // merely a console session.
+        'allow_global_roles' => (bool) env('SSO_ROLE_MAPPING_ALLOW_GLOBAL', false),
+
+        // Ceiling on how many asserted group values are considered per sign-in. A compromised or
+        // misconfigured provider can return an unbounded list.
+        'max_groups' => (int) env('SSO_ROLE_MAPPING_MAX_GROUPS', 200),
+    ],
+
     // Audit feeds are unauthenticated at the HTTP layer because the upstream RustDesk client
     // does not send an account bearer. The controller instead binds each write to an existing
     // approved device's id + UUID and applies both aggregate-IP and per-device burst limits.

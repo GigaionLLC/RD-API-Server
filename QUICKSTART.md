@@ -293,6 +293,36 @@ The provider's hostname is resolved through DNS first and the container's `/etc/
 so Compose `extra_hosts` and Kubernetes `hostAliases` entries work — but only for IPv4. An
 identity provider published solely at an IPv6 address needs a real `AAAA` record.
 
+**Granting console roles from a directory or SSO group.** Under **People & Access → SSO role
+mappings** you can declare that membership of an identity-provider group grants a console role.
+Roles are reconciled at every sign-in: joining the group grants the role, leaving it revokes the
+role. Hand-assigned roles are never touched.
+
+For FreeIPA or another LDAP directory, use the group's full distinguished name; whitespace around
+the `,` and `=` separators is ignored, so a DN pasted from a directory browser matches one typed by
+hand. For OIDC, first set the provider's **groups claim** (usually `groups`) on the OAuth providers
+screen — most identity providers emit nothing until you add a mapper for it:
+
+| Provider | Claim | What you must configure |
+|---|---|---|
+| Keycloak | `groups` | Add a Group Membership mapper and tick **Add to userinfo** |
+| Authentik | `groups` | Add the `groups` scope mapping to the provider |
+| Authelia | `groups` | Request the `groups` scope |
+| Zitadel | `urn:zitadel:iam:org:project:roles` | Enable **Assert Roles on Authentication** |
+
+Two limits are worth knowing before you plan around this. **Entra ID and Google are not
+supported**: Entra emits groups only in the ID token and Google has no groups claim at all, while
+this server reads groups from the userinfo response only. And **Active Directory nested groups are
+not expanded** — FreeIPA reports indirect membership so it works as expected, but AD reports only
+direct membership.
+
+A mapping never grants the legacy full-administrator flag, and accounts that already hold it are
+skipped entirely, so a local administrator is always the way back in if your provider breaks. A
+`global` role grants every permission, so mapping a group to one additionally requires
+`SSO_ROLE_MAPPING_ALLOW_GLOBAL=true` on the server. If a mapping seems not to apply, the SSO role
+mappings screen lists recent sign-in reconciliations and the reason each one did or did not change
+anything.
+
 **Webhooks** (Slack / Telegram / generic) are configured in the console under **Webhooks** — no
 env needed. Failed deliveries retry automatically if the scheduler cron is running; add it to
 keep retries flowing:

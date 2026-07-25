@@ -11,6 +11,7 @@
     $canGroups = $u?->hasPermission('groups.view');
     $canAddressBooks = $u?->hasPermission('address_books.view');
     $canRoles = $u?->hasPermission('roles.view');
+    $canSsoMappings = $u?->hasPermission('sso_mappings.view');
     $canStrategies = $u?->hasPermission('strategies.view');
     $canSessions = $u?->hasPermission('sessions.view');
     $canAudit = $u?->hasPermission('audit.view');
@@ -28,7 +29,8 @@
     $peopleActive = str_starts_with($nav, 'admin/users')
         || str_starts_with($nav, 'admin/groups')
         || str_starts_with($nav, 'admin/address-books')
-        || str_starts_with($nav, 'admin/roles');
+        || str_starts_with($nav, 'admin/roles')
+        || str_starts_with($nav, 'admin/sso-role-mappings');
     $controlActive = str_starts_with($nav, 'admin/strategies')
         || str_starts_with($nav, 'admin/sessions');
     $auditActive = str_starts_with($nav, 'admin/audit')
@@ -112,7 +114,7 @@
             </section>
         @endif
 
-        @if ($canUsers || $canGroups || $canAddressBooks || $canRoles)
+        @if ($canUsers || $canGroups || $canAddressBooks || $canRoles || $canSsoMappings)
             <section class="rd-nav__group">
                 <button class="rd-nav__group-toggle" type="button" aria-expanded="true"
                         aria-controls="nav-people-items">
@@ -145,6 +147,13 @@
                            class="rd-nav__item {{ str_starts_with($nav, 'admin/roles') ? 'active' : '' }}"
                            @if (str_starts_with($nav, 'admin/roles')) aria-current="page" @endif>
                             <i class="ri-shield-user-line" aria-hidden="true"></i><span>Admin roles</span>
+                        </a>
+                    @endif
+                    @if ($canSsoMappings)
+                        <a href="/admin/sso-role-mappings"
+                           class="rd-nav__item {{ str_starts_with($nav, 'admin/sso-role-mappings') ? 'active' : '' }}"
+                           @if (str_starts_with($nav, 'admin/sso-role-mappings')) aria-current="page" @endif>
+                            <i class="ri-git-merge-line" aria-hidden="true"></i><span>SSO role mappings</span>
                         </a>
                     @endif
                 </div>

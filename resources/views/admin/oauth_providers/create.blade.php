@@ -107,6 +107,18 @@
                     <span class="rd-help" id="scopes-help">Comma-separated. Defaults to <code>openid,profile,email</code> when blank.</span>
                     @error('scopes')<span class="rd-help rd-help--error" id="scopes-error">{{ $message }}</span>@enderror
                 </div>
+                <div class="rd-field">
+                    <label class="rd-label" for="groups_claim">Groups claim</label>
+                    <input class="rd-input rd-input--mono" id="groups_claim" name="groups_claim" value="{{ old('groups_claim') }}" placeholder="groups" aria-describedby="groups-claim-help"
+                           @error('groups_claim') aria-invalid="true" aria-errormessage="groups-claim-error" @enderror>
+                    <span class="rd-help" id="groups-claim-help">
+                        Userinfo claim carrying group membership, for SSO role mappings. Blank means this
+                        provider grants no roles. Usually <code>groups</code>; use dot notation for a nested
+                        claim such as <code>realm_access.roles</code>. Most providers emit nothing until you
+                        add a mapper for it.
+                    </span>
+                    @error('groups_claim')<span class="rd-help rd-help--error" id="groups-claim-error">{{ $message }}</span>@enderror
+                </div>
 
                 <div class="rd-field">
                     <label class="rd-label" for="pkce_method">PKCE method</label>

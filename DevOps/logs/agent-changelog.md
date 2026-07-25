@@ -3,6 +3,62 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-24 17:05] - Identity-provider group to console role mapping
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `database/migrations/2026_07_24_1000{01,02,03,04}_*.php` (new)
+- `app/Support/SsoGroupKey.php` (new)
+- `app/Models/{SsoRoleMapping,SsoRoleSyncLog}.php` (new)
+- `app/Services/SsoRoleSyncService.php` (new)
+- `app/Http/Controllers/Admin/SsoRoleMappingController.php` (new)
+- `resources/views/admin/sso_role_mappings/{index,create,edit,_form}.blade.php` (new)
+- `app/Models/{AdminRole,OauthProvider}.php`
+- `app/Services/{LdapService,OauthService}.php`
+- `app/Http/Controllers/Admin/{AuthController,OauthProviderController,UserController}.php`
+- `app/Http/Middleware/EnsureCredentialVersion.php`
+- `app/Console/Commands/PruneAudit.php`
+- `resources/views/admin/oauth_providers/{create,edit}.blade.php`
+- `app/Http/Controllers/Api/LoginController.php`
+- `resources/views/admin/partials/sidebar.blade.php`
+- `routes/web.php`
+- `config/rustdesk.php`
+- `.env.example`
+- `tests/Feature/{SsoRoleMappingTest,SsoRoleMappingConsoleTest}.php` (new)
+- `resources/views/admin/users/edit.blade.php`
+- `e2e/gui.spec.ts`
+- `Wiki/core/15-security.md`
+- `QUICKSTART.md`
+- `docs/modernization/12-access-control-design.md`
+- `CHANGELOG.md`
+- `DevOps/plans/sso-group-role-mapping.md` (new)
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** Four migrations: `sso_role_mappings`, `sso_role_sync_logs`,
+`admin_role_user.origin` + `.sso_role_mapping_id`, and `oauth_providers.groups_claim`. Adds
+`SSO_ROLE_MAPPING_ALLOW_GLOBAL` (default false) and `SSO_ROLE_MAPPING_MAX_GROUPS` (default 200),
+plus a `sso_mappings.view` permission. No RustDesk wire-contract change; existing role assignments
+are backfilled as `manual` so behaviour is unchanged until a mapping is created.
+**Summary:** An LDAP/FreeIPA or OIDC group can now grant a console admin role, reconciled at
+sign-in through one service invoked from all four login paths. Role assignments carry provenance so
+federated grants revoke on group departure while hand-assigned roles are untouched; a mapping never
+writes `is_admin`; accounts holding `is_admin` are skipped so the break-glass path survives a broken
+provider; a `global` target needs a host-level opt-in that is re-checked at sign-in; and an
+unreadable group list (including an Active Directory `memberOf;range=` truncation) never revokes.
+The user form shows provider-owned grants as read-only badges naming their source instead of
+editable checkboxes that silently revert. An adversarial review across six lenses ran over the
+finished change before it was committed, with every finding independently refuted before
+acceptance; 13 distinct defects survived and were fixed, including two that would have shipped
+broken: `revokeGrantsFor()` read `getOriginal()` after `save()`, so editing a mapping revoked its
+new target instead of the old one while stripping a sibling mapping's grants, and
+`oauth_providers.groups_claim` had no write path anywhere, leaving the entire OIDC half inert
+behind documentation telling operators to set a field that did not exist. Also fixed: the LDAP
+provider key was derived from `config('ldap.port')` rather than the transport's effective port, so
+an `ldaps://` host would never match its own mappings; a role already held manually could never
+receive its federated row, making every sign-in believe it had granted it and delete the account's
+client tokens; and an over-long group list was treated as authoritative rather than unreadable,
+revoking roles for exactly the users in the most groups. Verified in Docker: Pint across 292 files,
+PHPStan across 188 files, 622 PHPUnit tests / 3,242 assertions on the isolated MariaDB schema (up
+from 590 / 3,176), and 71 Playwright tests with 21 intentional project skips.
+
 ## [2026-07-24 15:40] - Publish and record v1.2.0
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**

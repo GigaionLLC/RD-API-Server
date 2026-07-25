@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  * An OAuth / OIDC identity provider configuration.
  */
 #[Fillable([
-    'op', 'type', 'client_id', 'client_secret', 'scopes', 'issuer', 'auto_register',
+    'op', 'type', 'client_id', 'client_secret', 'scopes', 'groups_claim', 'issuer', 'auto_register',
     'pkce_enable', 'pkce_method', 'enabled',
 ])]
 #[Hidden(['client_secret'])]

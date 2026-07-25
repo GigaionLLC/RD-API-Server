@@ -203,9 +203,21 @@ class UserController extends Controller
         $adminRoles = $canManageAdminAccess
             ? AdminRole::orderBy('name')->get(['id', 'name'])
             : collect();
+        // The selector edits hand-assigned roles only. Offering a checkbox for a grant that an
+        // identity provider owns would accept a change and then silently restore it at the
+        // user's next sign-in, so provider-owned grants are shown separately and read-only.
         $assignedRoleIds = $canManageAdminAccess
-            ? $user->adminRoles()->pluck('admin_roles.id')->map(static fn ($id): int => (int) $id)->all()
+            ? DB::table('admin_role_user')->where('user_id', $user->id)->where('origin', 'manual')
+                ->pluck('admin_role_id')->map(static fn ($id): int => (int) $id)->all()
             : [];
+        $federatedRoles = $canManageAdminAccess
+            ? DB::table('admin_role_user')
+                ->join('admin_roles', 'admin_roles.id', '=', 'admin_role_user.admin_role_id')
+                ->where('admin_role_user.user_id', $user->id)
+                ->where('admin_role_user.origin', '!=', 'manual')
+                ->orderBy('admin_roles.name')
+                ->get(['admin_roles.name', 'admin_role_user.origin'])
+            : collect();
         $isFederated = LdapIdentity::query()->where('user_id', $user->id)->exists()
             || UserThird::query()->where('user_id', $user->id)->exists();
         $hasActiveTotp = $user->hasActiveTotp();
@@ -215,6 +227,7 @@ class UserController extends Controller
             'groups',
             'adminRoles',
             'assignedRoleIds',
+            'federatedRoles',
             'canEdit',
             'canManageAdminAccess',
             'isFederated',
@@ -296,7 +309,10 @@ class UserController extends Controller
             return $locked;
         });
         if ($canManageAdminAccess) {
-            $user->adminRoles()->sync($this->parseRoleIds($request->input('admin_role_ids')));
+            // Only hand-assigned grants are editable here. Grants owned by an identity provider
+            // are reconciled at sign-in, so clearing one in this form would silently reappear at
+            // the user's next login, which is worse than not offering the control at all.
+            $this->syncManualRoles($user, $this->parseRoleIds($request->input('admin_role_ids')));
         }
 
         return response()->json([]);
@@ -321,6 +337,56 @@ class UserController extends Controller
         return AdminRole::whereIn('id', array_unique($ids))->pluck('id')
             ->map(static fn ($id): int => (int) $id)
             ->all();
+    }
+
+    /**
+     * Replace the user's hand-assigned roles, leaving identity-provider grants alone.
+     *
+     * A plain sync() would delete federated grants too. They would return at the user's next
+     * sign-in, so the console would appear to accept a change it silently discards.
+     *
+     * @param  list<int>  $roleIds
+     */
+    private function syncManualRoles(User $user, array $roleIds): void
+    {
+        $manual = DB::table('admin_role_user')
+            ->where('user_id', $user->id)
+            ->where('origin', 'manual')
+            ->pluck('admin_role_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        $federated = DB::table('admin_role_user')
+            ->where('user_id', $user->id)
+            ->where('origin', '!=', 'manual')
+            ->pluck('admin_role_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        // A role already granted by a provider needs no duplicate manual row.
+        $desired = array_values(array_diff(array_unique($roleIds), $federated));
+
+        $remove = array_values(array_diff($manual, $desired));
+        if ($remove !== []) {
+            DB::table('admin_role_user')
+                ->where('user_id', $user->id)
+                ->where('origin', 'manual')
+                ->whereIn('admin_role_id', $remove)
+                ->delete();
+        }
+
+        foreach (array_diff($desired, $manual) as $roleId) {
+            DB::table('admin_role_user')->insertOrIgnore([
+                'admin_role_id' => $roleId,
+                'user_id' => $user->id,
+                'origin' => 'manual',
+                'sso_role_mapping_id' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $user->unsetRelation('adminRoles');
     }
 
     public function resetPassword(Request $request, User $user): JsonResponse

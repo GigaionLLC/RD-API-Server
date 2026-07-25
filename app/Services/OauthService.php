@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuthToken;
 use App\Models\OauthProvider;
 use App\Models\OauthSession;
+use App\Models\SsoRoleMapping;
 use App\Models\User;
 use App\Models\UserThird;
 use Illuminate\Http\Client\PendingRequest;
@@ -51,7 +52,10 @@ class OauthService
 
     private const POLL_RETRY_WINDOW_SECONDS = 15;
 
-    public function __construct(private readonly OidcDestinationGuard $oidcDestinationGuard) {}
+    public function __construct(
+        private readonly OidcDestinationGuard $oidcDestinationGuard,
+        private readonly SsoRoleSyncService $ssoRoleSync,
+    ) {}
 
     /**
      * The list of supported provider types.
@@ -231,6 +235,16 @@ class OauthService
             return ['ok' => false, 'error' => 'This account is disabled'];
         }
 
+        // Reconcile before the AuthBody is issued: the bearer token below carries an is_admin
+        // snapshot, and a sync revokes outstanding tokens.
+        $this->ssoRoleSync->sync(
+            $user,
+            SsoRoleMapping::KIND_OIDC,
+            (string) $provider->op,
+            $oauthUser['groups'] ?? null,
+            'client_oidc',
+        );
+
         // Store the AuthBody as a raw JSON string so its exact bytes (incl. empty {} objects)
         // reach the client's strict serde parser unchanged.
         $session->auth_body = (string) json_encode($this->authBody($user, $provider->op, [
@@ -307,6 +321,8 @@ class OauthService
             'email' => $email,
             'verified_email' => (bool) ($raw['email_verified'] ?? false),
             'picture' => (string) ($su->getAvatar() ?? ''),
+            // GitHub and Google expose no group claim; org/team membership needs a separate API.
+            'groups' => null,
         ];
     }
 
@@ -401,7 +417,68 @@ class OauthService
             'email' => $email,
             'verified_email' => (bool) ($info['email_verified'] ?? false),
             'picture' => (string) ($info['picture'] ?? ''),
+            'groups' => $this->extractGroupClaim($provider, $info),
         ];
+    }
+
+    /**
+     * Pull the configured group claim out of a userinfo response.
+     *
+     * Returns null when this provider is not configured to contribute groups, or when the claim
+     * is absent, so role synchronization can tell "no groups" apart from "never asked". Only the
+     * userinfo response is consulted: the ID token is never parsed anywhere in this application,
+     * and reading groups from an unverified token would trust an unauthenticated assertion.
+     *
+     * Dot notation addresses a nested claim, e.g. `realm_access.roles`.
+     *
+     * @param  array<string, mixed>  $info
+     * @return list<string>|null
+     */
+    private function extractGroupClaim(OauthProvider $provider, array $info): ?array
+    {
+        $claim = trim((string) ($provider->groups_claim ?? ''));
+        if ($claim === '') {
+            return null;
+        }
+
+        $value = $info;
+        foreach (explode('.', $claim) as $segment) {
+            if (! is_array($value) || ! array_key_exists($segment, $value)) {
+                return null;
+            }
+
+            $value = $value[$segment];
+        }
+
+        // A provider that models group membership as an object keyed by group name (Zitadel does
+        // this for project roles) is read by its keys; a plain list is read by its values.
+        if (is_array($value) && $value !== [] && array_keys($value) !== range(0, count($value) - 1)) {
+            $value = array_keys($value);
+        }
+
+        if (is_string($value)) {
+            // Some providers emit a single group as a bare string rather than a one-element list.
+            $value = [$value];
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        $groups = [];
+        foreach ($value as $entry) {
+            if (is_string($entry)) {
+                $groups[] = $entry;
+            }
+        }
+
+        // A claim that held entries but none this server can read is a shape we do not understand,
+        // not a statement that the user belongs to nothing. Reporting it as empty would revoke.
+        if ($groups === [] && $value !== []) {
+            return null;
+        }
+
+        return $groups;
     }
 
     /**
@@ -759,10 +836,19 @@ class OauthService
         }
 
         $user = $this->findOrCreateUser($provider, $oauthUser);
+        if ($user === null) {
+            return ['user' => null, 'failure' => 'unlinked'];
+        }
 
-        return $user === null
-            ? ['user' => null, 'failure' => 'unlinked']
-            : ['user' => $user, 'failure' => ''];
+        $this->ssoRoleSync->sync(
+            $user,
+            SsoRoleMapping::KIND_OIDC,
+            (string) $provider->op,
+            $oauthUser['groups'] ?? null,
+            'console_oidc',
+        );
+
+        return ['user' => $user, 'failure' => ''];
     }
 
     /**

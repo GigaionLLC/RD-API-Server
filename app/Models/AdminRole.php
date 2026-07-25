@@ -64,6 +64,9 @@ class AdminRole extends Model
         // formal role hierarchy. Delegated administrators may inspect roles but cannot
         // rewrite a role assigned to themselves into a more privileged one.
         'Admin Roles' => ['roles.view'],
+        // A mapping decides who becomes an administrator, so authoring one is full-admin-only
+        // for the same reason role mutation is. Delegates may inspect the configuration.
+        'SSO Role Mappings' => ['sso_mappings.view'],
     ];
 
     /**

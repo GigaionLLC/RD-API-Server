@@ -391,3 +391,63 @@ test('flagship pages contain wide content without page-level overflow', async ({
         }
     }
 });
+
+test('sso role mapping screen creates a mapping and shows it in the list', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-dark', 'One project is enough for a CRUD walkthrough.');
+
+    await signIn(page);
+
+    // A mapping needs a role to point at, so create one first.
+    const roleName = `E2E Mapping Target ${Date.now()}`;
+    await page.goto('/admin/roles/create', { waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+    await page.fill('#name', roleName);
+    // The role form defaults to the global type, which a mapping deliberately cannot target
+    // unless the server opts in. Pick a delegated type so this test exercises the normal path.
+    await page.selectOption('#type', 'individual');
+    await page.getByRole('button', { name: /create role/i }).click();
+    await page.waitForURL(/\/admin\/roles$/, { waitUntil: 'domcontentloaded' });
+
+    await page.goto('/admin/sso-role-mappings', { waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+    await expect(page.locator('.rd-page-header__title')).toHaveText('SSO role mappings');
+    await expectNoPageOverflow(page);
+
+    await page.getByRole('link', { name: /new mapping/i }).click();
+    await page.waitForURL(/\/admin\/sso-role-mappings\/create$/, { waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+
+    const groupDn = `cn=e2e-${Date.now()},cn=groups,dc=example,dc=com`;
+    await page.selectOption('#provider_kind', 'ldap');
+    await page.fill('#provider_key', 'e2e-directory');
+    await page.fill('#group_value', groupDn);
+    await page.selectOption('#admin_role_id', { label: roleName });
+    await page.getByRole('button', { name: /create mapping/i }).click();
+
+    await page.waitForURL(/\/admin\/sso-role-mappings$/, { waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+    await expect(page.locator('.rd-table')).toContainText(groupDn);
+    await expect(page.locator('.rd-table')).toContainText(roleName);
+    await expectNoPageOverflow(page);
+});
+
+test('a global role cannot be selected as a mapping target while the opt-in is off', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-dark', 'Server-configuration dependent; one project suffices.');
+
+    await signIn(page);
+
+    const roleName = `E2E Global ${Date.now()}`;
+    await page.goto('/admin/roles/create', { waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+    await page.fill('#name', roleName);
+    await page.selectOption('#type', 'global');
+    await page.getByRole('button', { name: /create role/i }).click();
+    await page.waitForURL(/\/admin\/roles$/, { waitUntil: 'domcontentloaded' });
+
+    await page.goto('/admin/sso-role-mappings/create', { waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+
+    // The default build ships SSO_ROLE_MAPPING_ALLOW_GLOBAL unset, so the option must be inert.
+    const globalOption = page.locator('#admin_role_id option', { hasText: roleName });
+    await expect(globalOption).toBeDisabled();
+});

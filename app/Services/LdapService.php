@@ -54,7 +54,7 @@ class LdapService
      * Returns null on any failure (bad credentials, user not found, not in allow-group,
      * connection/search error). Never throws.
      *
-     * @return array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}|null
+     * @return array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,groups_known:bool,provider:string,subject_hash:string}|null
      */
     public function authenticate(string $username, string $password): ?array
     {
@@ -137,6 +137,7 @@ class LdapService
                 'dn' => $userDn,
                 'is_admin' => $this->isAdmin($groups),
                 'groups' => $groups,
+                'groups_known' => $this->membershipIsComplete($entry),
                 'provider' => $provider,
                 'subject_hash' => hash('sha256', $subject),
             ];
@@ -158,7 +159,7 @@ class LdapService
      * upgrade fail secure: the first login for an LDAP subject creates a separate collision-safe
      * local account, while only a persisted provider/subject link can resolve future logins.
      *
-     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}  $attrs
+     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,groups_known:bool,provider:string,subject_hash:string}  $attrs
      */
     public function syncUser(array $attrs): User
     {
@@ -193,7 +194,7 @@ class LdapService
     }
 
     /**
-     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}  $attrs
+     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,groups_known:bool,provider:string,subject_hash:string}  $attrs
      */
     private function syncUserInTransaction(array $attrs, string $provider, string $subjectHash): User
     {
@@ -232,7 +233,7 @@ class LdapService
     }
 
     /**
-     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,provider:string,subject_hash:string}  $attrs
+     * @param  array{username:string,email:string,display_name:string,dn:string,is_admin:bool,groups:array<int,string>,groups_known:bool,provider:string,subject_hash:string}  $attrs
      */
     private function syncLinkedAttributes(User $user, array $attrs): User
     {
@@ -562,6 +563,28 @@ class LdapService
      * derive one from the connection host, port, and search base. Configuration changes therefore
      * fail closed into a new namespace instead of silently reusing another directory's subjects.
      */
+    /**
+     * The provider namespace an SSO role mapping must be keyed on, or '' when the directory is
+     * not configured well enough to have one.
+     *
+     * Deliberately derived the same way as the identity link, so a directory reconfiguration
+     * moves both into a new namespace together rather than silently re-binding old mappings to a
+     * different directory.
+     */
+    public function identityProviderKey(): string
+    {
+        // The effective port must come from the same derivation the login path uses. A scheme or
+        // embedded port in LDAP_HOST overrides LDAP_PORT, so reading the config value directly
+        // would produce a key that never matches the one written at sign-in, and every mapping
+        // would silently fail to apply.
+        $transport = $this->transportConfiguration();
+        if (($transport['error'] ?? null) !== null) {
+            return '';
+        }
+
+        return (string) ($this->identityProvider((int) $transport['port']) ?? '');
+    }
+
     private function identityProvider(int $effectivePort): ?string
     {
         $configured = trim((string) config('ldap.provider_id', ''));
@@ -808,6 +831,27 @@ class LdapService
         }
 
         return false;
+    }
+
+    /**
+     * Whether the directory returned a group list this server can act on authoritatively.
+     *
+     * Active Directory splits an oversized `memberOf` into `memberOf;range=0-1499` chunks, which
+     * `extractGroups()` does not read: the result would be an empty list that looks identical to
+     * "this user is in no groups". Role synchronization must not revoke on that, so an incomplete
+     * answer is reported as unknown rather than as empty.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private function membershipIsComplete(array $entry): bool
+    {
+        foreach (array_keys($entry) as $attribute) {
+            if (str_starts_with(strtolower((string) $attribute), 'memberof;range=')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

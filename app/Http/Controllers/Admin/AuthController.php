@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureCredentialVersion;
 use App\Models\User;
 use App\Services\LdapService;
 use App\Services\LocalPasswordHashService;
 use App\Services\OauthService;
+use App\Services\SsoRoleSyncService;
 use App\Support\AccountPasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,6 +28,7 @@ class AuthController extends Controller
         private readonly LdapService $ldap,
         private readonly OauthService $oauth,
         private readonly LocalPasswordHashService $passwordHashes,
+        private readonly SsoRoleSyncService $ssoRoleSync,
     ) {}
 
     public function showLogin(): View|RedirectResponse
@@ -116,6 +119,10 @@ class AuthController extends Controller
         // enforce any MFA requirement at the identity provider.
         Auth::login($user, (bool) ($stash['remember'] ?? false));
         $request->session()->regenerate();
+        // Role synchronization above may have bumped the credential version. This route is
+        // reachable while a session already exists, in which case the middleware's seed-on-login
+        // branch never runs and the stale marker would sign the user out on their next click.
+        $request->session()->put(EnsureCredentialVersion::SESSION_KEY, max(1, (int) $user->credential_version));
         $user->forceFill(['last_login_at' => now(), 'last_login_ip' => $request->ip()])->save();
 
         return redirect()->intended(route('admin.dashboard'));
@@ -155,7 +162,11 @@ class AuthController extends Controller
                 // Authenticate only the persisted provider/subject-linked user returned by LDAP.
                 // The submitted username is never used to select an existing local account.
                 $linkedUser = $this->ldap->syncUser($attrs);
+                // Reconcile before establishing the session: a grant or revocation bumps the
+                // credential version, and the session must be seeded with the value that results.
+                $this->ssoRoleSync->syncFromLdap($linkedUser, $attrs, 'console_ldap', $request->ip());
                 Auth::login($linkedUser, $request->boolean('remember'));
+                $request->session()->put(EnsureCredentialVersion::SESSION_KEY, max(1, (int) $linkedUser->credential_version));
                 $authenticated = true;
             }
         }
