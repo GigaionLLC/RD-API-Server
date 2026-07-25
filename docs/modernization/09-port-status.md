@@ -8,7 +8,14 @@
 > status and remaining roadmap, see **[04-gap-analysis.md](04-gap-analysis.md)** (top section).
 > This file is kept for history only.
 
-## Current production runtime (v1.1.0, 2026-07-18)
+## Current production runtime (v1.2.0, 2026-07-24)
+
+`v1.2.0` is an application-only minor release over `v1.1.0`; the runtime, image contract, client
+paths, JSON keys, and response shapes below are unchanged by it. It adds a deny-by-default
+trusted-network opt-in so a self-hosted OIDC provider on a private network can be reached
+(`RUSTDESK_OIDC_ALLOWED_NETWORKS`, `RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS`), reports the real
+reason an OIDC sign-in was rejected, and fixes two host-resolution defects shared by the OIDC and
+webhook destination guards. No schema migration and no required configuration change.
 
 The v1.1.0 application uses an Nginx + PHP-FPM container runtime. It is
 a drop-in runtime change rather than a RustDesk API port change: container port `80`, persistent

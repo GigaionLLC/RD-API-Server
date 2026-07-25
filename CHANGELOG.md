@@ -6,6 +6,8 @@ notes.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-24
+
 ### Added
 
 - Generic OIDC egress can now reach a self-hosted identity provider on a private network.
@@ -144,7 +146,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.2.0...HEAD
+[1.2.0]: docs/releases/v1.2.0.md
 [#1]: https://github.com/GigaionLLC/RD-API-Server/issues/1
 [1.1.0]: docs/releases/v1.1.0.md
 [1.0.1]: docs/releases/v1.0.1.md

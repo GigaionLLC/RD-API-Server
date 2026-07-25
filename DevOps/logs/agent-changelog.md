@@ -3,6 +3,24 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-24 14:55] - Prepare v1.2.0
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `config/app.php`
+- `tests/Feature/SmokeTest.php`
+- `CHANGELOG.md`
+- `docs/releases/v1.2.0.md`
+- `README.md`
+- `docs/modernization/09-port-status.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. `/api/version` advances from `1.1.0` to `1.2.0`, which is the only
+wire-visible change; no schema migration, route, or RustDesk response-shape change.
+**Summary:** Advanced the source-controlled application version and its exact `/api/version`
+assertion to `1.2.0`, promoted the OIDC private-network opt-in and discovery diagnostics into the
+public changelog, and wrote release notes covering the upgrade path (no configuration change
+required), the v1.1.0 rollback pin, what the trusted-network opt-in deliberately never permits, and
+the outstanding live private-network verification.
+
 ## [2026-07-24 14:20] - Opt-in trusted private networks for OIDC egress (issue #1)
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
