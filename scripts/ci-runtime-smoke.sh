@@ -105,6 +105,24 @@ wait_for_app() {
     fail "$container did not serve /up within ${attempts}s."
 }
 
+# `docker logs` lags behind what the container has already written to stderr, so a single read
+# taken immediately after readiness can miss a line that exists. This gate has failed twice on a
+# message that was present in the logs captured moments later at failure-dump time.
+wait_for_log() {
+    local container="$1"
+    local needle="$2"
+    local attempts="${3:-30}"
+
+    for _ in $(seq 1 "$attempts"); do
+        if docker logs "$container" 2>&1 | grep -Fq "$needle"; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    return 1
+}
+
 wait_for_exit() {
     local container="$1"
     local attempts="${2:-45}"
@@ -372,8 +390,8 @@ wait_for_exit "$app_name"
 
 readonly nginx_failure_name="rd-runtime-nginx-failure-${suffix}"
 start_app "$nginx_failure_name" false '*'
-docker logs "$nginx_failure_name" 2>&1 \
-    | grep -Fq 'warning: TRUSTED_PROXIES=* trusts forwarded client IP and HTTPS scheme from every immediate caller.' \
+wait_for_log "$nginx_failure_name" \
+    'warning: TRUSTED_PROXIES=* trusts forwarded client IP and HTTPS scheme from every immediate caller.' \
     || fail 'Wildcard proxy trust did not emit the expected runtime warning.'
 nginx_pid="$(master_pid "$nginx_failure_name" 'nginx: master process')"
 docker exec "$nginx_failure_name" sh -eu -c "kill -KILL $nginx_pid"
