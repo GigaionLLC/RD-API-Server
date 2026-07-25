@@ -59,7 +59,11 @@ class AuthController extends Controller
 
         $url = $this->oauth->webAuthorizationUrl($provider, $state, Str::random(20), $this->ssoCallbackUri($op), $verifier ?: null);
         if ($url === '') {
-            return redirect()->route('admin.login')->withErrors(['username' => 'Could not start SSO (provider misconfigured).']);
+            // The reason is deliberately not shown here: it can name internal addresses, and
+            // this route is reachable before authentication. The server log carries the detail.
+            return redirect()->route('admin.login')->withErrors([
+                'username' => 'Could not start SSO. The provider could not be reached or validated; see the server log for the reason.',
+            ]);
         }
 
         return redirect()->away($url);
@@ -87,9 +91,17 @@ class AuthController extends Controller
             return redirect()->route('admin.login')->withErrors(['username' => 'Unknown or disabled SSO provider.']);
         }
 
-        $user = $this->oauth->webResolveUser($provider, $code, $this->ssoCallbackUri($op), (string) ($stash['code_verifier'] ?? ''));
+        $resolved = $this->oauth->webResolveUser($provider, $code, $this->ssoCallbackUri($op), (string) ($stash['code_verifier'] ?? ''));
+        $user = $resolved['user'];
         if (! $user) {
-            return redirect()->route('admin.login')->withErrors(['username' => 'No console account is linked to that identity (and auto-register is off for this provider).']);
+            // An exchange that never completed is not an account-linking problem, and saying so
+            // sends the operator hunting through linked identities for a transport or credential
+            // failure the log already explains.
+            return redirect()->route('admin.login')->withErrors([
+                'username' => $resolved['failure'] === 'exchange'
+                    ? 'SSO sign-in could not be completed. The provider exchange failed; see the server log for the reason.'
+                    : 'No console account is linked to that identity (and auto-register is off for this provider).',
+            ]);
         }
 
         // Console access: full admins and delegated (role-holding) admins only.

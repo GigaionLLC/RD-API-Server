@@ -3,6 +3,46 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-24 14:20] - Opt-in trusted private networks for OIDC egress (issue #1)
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `app/Support/TrustedPrivateNetworks.php` (new)
+- `app/Services/{OauthService,OidcDestinationGuard,OidcDnsResolver,WebhookDnsResolver}.php`
+- `app/Http/Controllers/Admin/AuthController.php`
+- `config/rustdesk.php`
+- `.env.example`
+- `phpunit.xml`
+- `docker/entrypoint.sh`
+- `docker-compose.yml`
+- `docker-compose.dev.yml`
+- `examples/full-stack.docker-compose.yml`
+- `tests/Feature/{OidcDestinationSecurityTest,WebhookDestinationSecurityTest,AdminSsoLoginTest}.php`
+- `tests/Feature/OidcDiscoveryDiagnosticsTest.php` (new)
+- `tests/Unit/OidcDnsResolverTest.php` (new)
+- `README.md`
+- `QUICKSTART.md`
+- `docker/README.md`
+- `Wiki/core/15-security.md`
+- `CHANGELOG.md`
+- `docs/modernization/08-build-log.md`
+- `DevOps/plans/oidc-private-network-egress.md` (new)
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. Adds optional `RUSTDESK_OIDC_ALLOWED_NETWORKS` (empty) and
+`RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS` (`false`) configuration. No schema, route, or RustDesk wire
+contract change; the `/api/oidc/*` and `/api/oauth/*` response shapes and error strings the client
+matches on are untouched, and the admin SSO failure messages are console-only text.
+**Summary:** Made a self-hosted identity provider on a private network usable through two
+deny-by-default opt-ins whose trusted addresses are narrowed by a non-overridable block set
+(loopback, link-local, multicast, IPv4-mapped IPv6, NAT64/6to4/Teredo, cloud instance metadata)
+and by only accepting a private address for the issuer's own host; replaced the silent
+`catch (\Throwable) { return null; }` in OIDC discovery with a reported reason that names the
+offending address, the rejected endpoint, and the allowlist state without ever carrying a
+credential; and fixed two resolver defects that would have kept an internal provider unreachable
+anyway — a combined `dns_get_record()` bitmask discarding collected answers when any record type
+hard-fails, and its complete blindness to `/etc/hosts`. Verified in Docker: Pint across 281 files,
+PHPStan across 179 files, and 590 PHPUnit tests / 3,176 assertions on the isolated MariaDB schema,
+with all 18 pre-existing deny-by-default guard data sets passing unmodified.
+
 ## [2026-07-18 20:45] - Publish and record v1.1.0
 **Agent:** rustdesk-api (OpenAI Codex / GPT-5)
 **Files Modified:**

@@ -71,13 +71,33 @@ return [
         ),
     ],
 
-    // Generic OIDC discovery/token/userinfo calls require HTTPS and public DNS. Standard TLS
-    // port 443 is allowed by default; list an additional public port only when an IdP needs it.
+    // Generic OIDC discovery/token/userinfo calls require HTTPS and, by default, a globally
+    // routable address. Standard TLS port 443 is allowed by default; list an additional public
+    // port only when an IdP needs it.
+    //
+    // A self-hosted identity provider on a LAN, VPN, or container network is supported through
+    // the two opt-ins below, both off by default so the boundary stays closed unless an
+    // operator deliberately relaxes it. Every trusted address is an address a compromised or
+    // spoofed provider could aim this server at, and the token endpoint receives the client
+    // secret, so list the narrowest range that covers the provider. Loopback, link-local,
+    // multicast, NAT64/6to4/Teredo, and cloud instance-metadata addresses are refused in every
+    // mode and cannot be overridden.
     'oidc' => [
         'allowed_ports' => array_map(
             'intval',
             explode(',', (string) env('RUSTDESK_OIDC_ALLOWED_PORTS', '443'))
         ),
+
+        // Comma-separated CIDR ranges, or bare addresses for a single host. Empty means only
+        // globally routable addresses are accepted.
+        'allowed_networks' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('RUSTDESK_OIDC_ALLOWED_NETWORKS', ''))
+        ))),
+
+        // Shorthand for the RFC 1918 ranges plus IPv6 unique-local space. An explicit
+        // allowed_networks entry is narrower and preferred.
+        'allow_private_networks' => (bool) env('RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS', false),
     ],
 
     // Audit feeds are unauthenticated at the HTTP layer because the upstream RustDesk client

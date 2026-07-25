@@ -269,6 +269,27 @@ elif [ "$proxy_configuration_status" != "restricted" ] && [ "$proxy_configuratio
     exit 1
 fi
 
+# Generic OIDC egress is restricted to globally routable addresses unless an operator trusts a
+# private network. Report what was accepted so a relaxed boundary is never silent, and name
+# anything that had to be discarded so a typo does not read as an unexplained sign-in failure.
+# This probe is advisory only and must never abort startup.
+oidc_network_status="$(php -r '
+    require "vendor/autoload.php";
+    $app = require "bootstrap/app.php";
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    $allowlist = App\Support\TrustedPrivateNetworks::forOidc();
+    echo $allowlist->count(), "|", implode(" ", $allowlist->rejectedEntries());
+' 2>/dev/null || true)"
+oidc_trusted_count="${oidc_network_status%%|*}"
+oidc_rejected_entries="${oidc_network_status#*|}"
+if [ -n "$oidc_trusted_count" ] && [ "$oidc_trusted_count" != "0" ]; then
+    echo "[entrypoint] warning: generic OIDC egress trusts $oidc_trusted_count private network range(s)." >&2
+    echo "[entrypoint] Those addresses can be reached by endpoints taken from the provider's discovery document; keep the ranges as narrow as possible." >&2
+fi
+if [ -n "$oidc_rejected_entries" ] && [ "$oidc_rejected_entries" != "$oidc_network_status" ]; then
+    echo "[entrypoint] warning: unusable RUSTDESK_OIDC_ALLOWED_NETWORKS entries ignored: $oidc_rejected_entries" >&2
+fi
+
 chown -R www-data:www-data storage bootstrap/cache || true
 
 # PHP-FPM starts only after ADMIN_PASS has been removed above. It intentionally inherits the

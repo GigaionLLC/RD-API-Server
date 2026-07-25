@@ -6,6 +6,36 @@ notes.
 
 ## [Unreleased]
 
+### Added
+
+- Generic OIDC egress can now reach a self-hosted identity provider on a private network.
+  `RUSTDESK_OIDC_ALLOWED_NETWORKS` trusts specific CIDR ranges (or a bare address for one host)
+  and `RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS` is a shorthand for the RFC 1918 ranges plus
+  `fd00::/8`. Both are empty/false by default, so existing deployments are unchanged.
+
+### Fixed
+
+- OIDC discovery failures are now logged with the reason, the offending address, which discovered
+  endpoint was rejected, the issuer, and the state of the trusted-network allowlist. Previously
+  every exception was discarded and the sign-in screen reported a misconfigured provider
+  regardless of the real cause, which made a correctly configured identity provider look
+  broken ([#1]).
+- The console SSO callback no longer reports a failed code exchange as an unlinked account. A
+  wrong client secret or a rejected token endpoint now says the exchange failed and points at
+  the log, instead of sending operators to look at linked identities and auto-registration.
+- Host resolution no longer discards answers it had already collected when one DNS record type
+  returns a server failure, which internal and split-horizon resolvers routinely do for `CNAME`
+  or `AAAA`. Hosts published only through `/etc/hosts` (Compose `extra_hosts`, Kubernetes
+  `hostAliases`) are now visible to destination validation instead of failing to resolve.
+
+### Security
+
+- Loopback, link-local, multicast, IPv4-mapped IPv6, NAT64/6to4/Teredo translation prefixes, and
+  cloud instance-metadata addresses are refused for OIDC egress even when an operator lists
+  them, and a trusted private address is accepted only for the issuer's own host. Unusable
+  allowlist entries are discarded and named rather than silently widening or closing the
+  boundary. Outbound webhooks are deliberately unaffected by the OIDC opt-ins.
+
 ## [1.1.0] - 2026-07-18
 
 ### Changed
@@ -115,6 +145,7 @@ See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installatio
 security, and verification details.
 
 [Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.1.0...HEAD
+[#1]: https://github.com/GigaionLLC/RD-API-Server/issues/1
 [1.1.0]: docs/releases/v1.1.0.md
 [1.0.1]: docs/releases/v1.0.1.md
 [1.0.0]: docs/releases/v1.0.0.md

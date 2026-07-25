@@ -25,7 +25,8 @@ command, backed by MariaDB.
 
 **Client API (what the RustDesk client talks to)**
 - Account login with **2FA** (TOTP + email codes), **OIDC/OAuth** (GitHub, Google, generic
-  OIDC) and **LDAP/AD**
+  OIDC — including self-hosted providers on an explicitly trusted private network) and
+  **LDAP/AD**
 - **Heartbeat Strategy push** — remotely manage client security settings (the Pro
   "Settings sync"), with `modified_at` change‑detection and live force‑disconnect
 - **Sysinfo + preset auto‑registration** — devices auto‑file into a strategy / device group /

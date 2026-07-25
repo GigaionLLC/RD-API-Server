@@ -108,6 +108,9 @@ services:
       # Recording upload is disabled by default. Stock clients need an explicit trusted CIDR:
       # - RUSTDESK_RECORDING_UPLOAD_ENABLED=true
       # - RUSTDESK_RECORDING_UPLOAD_ALLOWED_IPS=CHANGE_ME_device_network_cidr
+      # A self-hosted OIDC provider (Authentik, Keycloak, Authelia) on a private network needs
+      # its address trusted explicitly. Use the narrowest range that covers the provider:
+      # - RUSTDESK_OIDC_ALLOWED_NETWORKS=CHANGE_ME_identity_provider_cidr
       # Optional SMTP (2FA email codes, invitations, alarms):
       # - MAIL_MAILER=smtp
       # - MAIL_HOST=smtp.example.com

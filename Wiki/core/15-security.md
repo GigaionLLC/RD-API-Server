@@ -28,6 +28,9 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   loopback, link-local, reserved, or otherwise non-public, and pins the request to a validated
   address. Redirects, inherited proxies, and connection reuse are disabled so the HTTP
   transport cannot perform a second, unvalidated route selection.
+- Webhooks have no private-network opt-in. The OIDC trusted-network settings do not apply here,
+  deliberately: webhook destinations permit plain HTTP, so they have no TLS name binding to fall
+  back on, and their URLs are per-row and admin-editable rather than one provider configuration.
 - Destination validation is authoritative at send time, including retries. Admin form
   validation is only an earlier usability check and must not replace the egress guard.
 - Treat the complete webhook URL and shared secret as write-only credentials. Admin list and
@@ -45,6 +48,29 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Generic OIDC issuers and every discovered authorization, token, and userinfo endpoint must
   use HTTPS, resolve entirely to globally routable addresses, and use an allowed port (`443` by
   default; configure `RUSTDESK_OIDC_ALLOWED_PORTS` for an intentional public custom port).
+- A self-hosted identity provider on a private network is supported through two opt-ins that
+  are both off by default, so the boundary stays closed unless a deployment relaxes it:
+  `RUSTDESK_OIDC_ALLOWED_NETWORKS` (comma-separated CIDR ranges, or a bare address for a single
+  host) and `RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS` (shorthand for `10.0.0.0/8`,
+  `172.16.0.0/12`, `192.168.0.0/16`, and `fd00::/8`). Neither relaxes the HTTPS, port, issuer,
+  redirect, or DNS-pinning rules, and neither applies to outbound webhooks.
+- The trusted set is exactly the set of internal addresses a compromised or spoofed provider
+  could aim this server at, and the token endpoint receives the OIDC client secret. Two
+  narrowing rules therefore always hold. A private address is accepted only for the issuer's
+  own host, so a discovery document cannot redirect a login to a different internal service.
+  And loopback, link-local, multicast, IPv4-mapped IPv6, NAT64/6to4/Teredo translation
+  prefixes, and cloud instance-metadata addresses (`169.254.169.254`, `fd00:ec2::254`,
+  `100.100.100.200`) are refused in every mode and cannot be overridden.
+- Allowlist entries are either understood completely or discarded. Catch-all ranges, prefixes
+  shorter than `/8` (IPv4) or `/7` (IPv6), entries with host bits set, and entries that fall
+  wholly inside a permanently blocked range are rejected at parse time, named in the startup
+  log, and repeated in the failure log when a sign-in stops. One bad entry never disables the
+  others, and a mixed public/private answer set for one host is still rejected outright.
+- Trusting a private range changes which addresses are permitted; it does not weaken TLS. The
+  provider must still present a certificate valid for the hostname in its issuer URL. Install
+  an internal CA into the container trust store rather than disabling verification --
+  certificate validation is what stops a hostile DNS answer from redirecting a login to
+  another machine inside an allowed range.
 - Discovery must assert the configured issuer. A missing or mismatched `issuer`, unsafe URL, or
   unsafe endpoint aborts the login before an authorization URL is returned.
 - Discovery, token, and userinfo requests resolve immediately before use and pin the validated
@@ -52,7 +78,22 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   token and userinfo destinations are resolved again after discovery to prevent DNS rebinding.
 - Cross-host endpoints remain supported when each endpoint independently passes the public
   network checks. The guard does not assume that every standards-compliant provider uses one
-  hostname.
+  hostname. The issuer-host rule applies only to private addresses, so a public cross-host
+  provider is unaffected by a configured allowlist.
+- Every rejection is logged with the reason, the offending address, the issuer, and the state of
+  the trusted-network allowlist. A discovery failure is otherwise indistinguishable from a wrong
+  client secret, which makes a correctly configured provider look broken. Log context carries no
+  client secret, authorization code, or bearer token, and transport messages are stripped of URL
+  userinfo and query strings before they are written.
+- Sign-in screens keep a generic failure message. Rejection reasons can name internal addresses
+  and the SSO routes are reachable before authentication, so the detail stays in the server log.
+- Host resolution unions DNS answers with the name service switch so hosts published only
+  through `/etc/hosts` (Compose `extra_hosts`, Kubernetes `hostAliases`) are validated rather
+  than invisible. Every record type is queried separately, because one failing type would
+  otherwise discard answers already collected. Both changes only widen the answer set, and the
+  guard rejects a host when any answer fails, so neither can weaken the boundary. PHP offers no
+  IPv6 form of the name-service lookup, so a host published only as an IPv6 `/etc/hosts` entry
+  still needs a real `AAAA` record.
 
 ## Identity Provider Trust Boundary
 

@@ -142,7 +142,7 @@ class OauthService
         }
 
         // Generic OIDC: discover the authorization endpoint and build the URL by hand.
-        $config = $this->discoverOidc($provider->issuer ?? '');
+        $config = $this->discoverOidc($provider->issuer ?? '', $provider->op);
         if (! $config || empty($config['authorization_endpoint'])) {
             return '';
         }
@@ -317,7 +317,7 @@ class OauthService
      */
     private function oidcExchange(OauthProvider $provider, string $code, ?string $redirectUri = null, string $codeVerifier = ''): ?array
     {
-        $config = $this->discoverOidc($provider->issuer ?? '');
+        $config = $this->discoverOidc($provider->issuer ?? '', $provider->op);
         if (! $config || empty($config['token_endpoint']) || empty($config['userinfo_endpoint'])) {
             Log::warning('OIDC discovery failed validation', ['op' => $provider->op]);
 
@@ -325,6 +325,12 @@ class OauthService
         }
 
         try {
+            // Trusted private networks are scoped to the issuer's own host, so every hop after
+            // discovery has to know which host that is.
+            $issuerHost = $this->oidcDestinationGuard->issuerHost(
+                $this->oidcDestinationGuard->normalizeIssuer((string) ($provider->issuer ?? ''))
+            );
+
             $form = [
                 'grant_type' => 'authorization_code',
                 'code' => $code,
@@ -338,7 +344,7 @@ class OauthService
             }
 
             $tokenEndpoint = (string) $config['token_endpoint'];
-            $tokenResponse = $this->oidcRequest($tokenEndpoint)
+            $tokenResponse = $this->oidcRequest($tokenEndpoint, $issuerHost)
                 ->asForm()
                 ->acceptJson()
                 ->post($tokenEndpoint, $form);
@@ -360,7 +366,7 @@ class OauthService
             }
 
             $userinfoEndpoint = (string) $config['userinfo_endpoint'];
-            $userResponse = $this->oidcRequest($userinfoEndpoint)
+            $userResponse = $this->oidcRequest($userinfoEndpoint, $issuerHost)
                 ->withToken($accessToken)
                 ->acceptJson()
                 ->get($userinfoEndpoint);
@@ -376,6 +382,7 @@ class OauthService
             Log::warning('OIDC exchange threw', [
                 'op' => $provider->op,
                 'exception' => $e::class,
+                'reason' => $this->safeFailureReason($e),
             ]);
 
             return null;
@@ -400,49 +407,134 @@ class OauthService
     /**
      * Discover an OIDC provider's endpoints from its issuer's well-known document.
      *
+     * Every rejection is reported. A discovery failure is indistinguishable from a wrong
+     * client secret at the sign-in screen, so the reason has to reach the operator's log or a
+     * correctly configured provider looks broken with nothing to act on.
+     *
      * @return array<string, mixed>|null
      */
-    private function discoverOidc(string $issuer): ?array
+    private function discoverOidc(string $issuer, string $op = ''): ?array
     {
         try {
             $issuer = $this->oidcDestinationGuard->normalizeIssuer($issuer);
+            $issuerHost = $this->oidcDestinationGuard->issuerHost($issuer);
             $url = $issuer.'/.well-known/openid-configuration';
-            $response = $this->oidcRequest($url)->acceptJson()->get($url);
+            $response = $this->oidcRequest($url, $issuerHost)->acceptJson()->get($url);
             if (! $response->successful()) {
-                return null;
+                return $this->reportDiscoveryFailure($op, $issuer, 'the well-known document request failed', [
+                    'status' => $response->status(),
+                ]);
             }
 
             $config = $response->json();
-            if (! is_array($config)
-                || ! is_string($config['issuer'] ?? null)
-                || ! $this->oidcDestinationGuard->issuerMatches($issuer, $config['issuer'])) {
-                return null;
+            if (! is_array($config) || ! is_string($config['issuer'] ?? null)) {
+                return $this->reportDiscoveryFailure($op, $issuer, 'the well-known document has no usable issuer');
+            }
+
+            if (! $this->oidcDestinationGuard->issuerMatches($issuer, $config['issuer'])) {
+                return $this->reportDiscoveryFailure(
+                    $op,
+                    $issuer,
+                    'the well-known document asserts a different issuer than the one configured'
+                );
             }
 
             foreach (['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint'] as $endpoint) {
                 if (! is_string($config[$endpoint] ?? null) || trim($config[$endpoint]) === '') {
-                    return null;
+                    return $this->reportDiscoveryFailure($op, $issuer, 'the well-known document is missing '.$endpoint);
                 }
 
                 // Validate every discovered endpoint now so a malicious document cannot even
                 // start a login flow. Token and userinfo are resolved again immediately before
                 // their requests to close the DNS-rebinding window.
-                $this->oidcDestinationGuard->resolve($config[$endpoint]);
+                //
+                // Which endpoint was rejected is caught here rather than in the outer handler:
+                // a rejected endpoint is otherwise reported against an issuer that is itself
+                // perfectly valid, which sends the operator looking in the wrong place.
+                try {
+                    $this->oidcDestinationGuard->resolve($config[$endpoint], $issuerHost);
+                } catch (\Throwable $e) {
+                    return $this->reportDiscoveryFailure($op, $issuer, $this->safeFailureReason($e), [
+                        'exception' => $e::class,
+                        'endpoint' => $endpoint,
+                        'endpoint_url' => $this->safeUrl((string) $config[$endpoint]),
+                    ]);
+                }
             }
 
             return $config;
         } catch (\Throwable $e) {
-            return null;
+            return $this->reportDiscoveryFailure($op, $issuer, $this->safeFailureReason($e), [
+                'exception' => $e::class,
+            ]);
         }
+    }
+
+    /**
+     * Log why discovery stopped, with enough context to fix it and nothing that could disclose
+     * a credential. Always returns null so callers can return this directly.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function reportDiscoveryFailure(string $op, string $issuer, string $reason, array $context = []): null
+    {
+        Log::warning('OIDC discovery failed', array_merge([
+            'op' => $op,
+            // The issuer is reported in its safe form because this is also the failure path for
+            // an issuer that was rejected for carrying userinfo or a query string, where the
+            // value still holds whatever the operator configured.
+            'issuer' => $this->safeUrl($issuer),
+            'reason' => $reason,
+        ], $context, $this->oidcDestinationGuard->trustedNetworkDiagnostics()));
+
+        return null;
+    }
+
+    /**
+     * Reduce a URL to the part an operator needs to identify it: scheme, host, port, and path.
+     * Userinfo and the query string are the components that can carry a credential, and an
+     * issuer is only ever rejected for containing them, so they never reach the log.
+     */
+    private function safeUrl(string $url): string
+    {
+        $parts = @parse_url(trim($url));
+        if (! is_array($parts) || ! isset($parts['host'])) {
+            return '[unparseable URL]';
+        }
+
+        $scheme = isset($parts['scheme']) ? strtolower((string) $parts['scheme']).'://' : '';
+        $port = isset($parts['port']) ? ':'.(int) $parts['port'] : '';
+
+        return Str::limit(
+            $scheme.strtolower((string) $parts['host']).$port.((string) ($parts['path'] ?? '')),
+            200,
+            ''
+        );
+    }
+
+    /**
+     * Reduce a transport failure to something safe to log. The destination guard raises fixed
+     * messages, but client and TLS errors can quote the full request URL, which may carry
+     * credentials in its userinfo or query string.
+     */
+    private function safeFailureReason(\Throwable $e): string
+    {
+        $reason = preg_replace(
+            '#\b(https?://)(?:[^/\s@]*@)?([^/\s?\#]*)\S*#i',
+            '$1$2',
+            $e->getMessage()
+        );
+
+        return Str::limit(trim((string) $reason), 300, '');
     }
 
     /**
      * Build a secure request for one generic OIDC hop. Resolution happens immediately before
      * the request and is pinned into cURL; redirects and environment proxies stay disabled.
      */
-    private function oidcRequest(string $url): PendingRequest
+    private function oidcRequest(string $url, ?string $issuerHost = null): PendingRequest
     {
-        $destination = $this->oidcDestinationGuard->resolve($url);
+        $destination = $this->oidcDestinationGuard->resolve($url, $issuerHost);
 
         return Http::connectTimeout(self::OIDC_CONNECT_TIMEOUT_SECONDS)
             ->timeout(self::OIDC_TIMEOUT_SECONDS)
@@ -650,17 +742,27 @@ class OauthService
 
     /**
      * Interactive (admin-console) SSO: exchange the callback `code` and resolve/create the
-     * local user. Returns null when the exchange fails or no user is linked and auto-register
-     * is off. The same `redirectUri` (and PKCE verifier, if used) from the start must be passed.
+     * local user. The same `redirectUri` (and PKCE verifier, if used) from the start must be
+     * passed.
+     *
+     * The two ways this fails need different advice, so they are reported separately: an
+     * exchange that never completed is an operator problem visible in the log, while a
+     * completed exchange with no local user is an account-linking decision.
+     *
+     * @return array{user: ?User, failure: ''|'exchange'|'unlinked'}
      */
-    public function webResolveUser(OauthProvider $provider, string $code, string $redirectUri, string $codeVerifier = ''): ?User
+    public function webResolveUser(OauthProvider $provider, string $code, string $redirectUri, string $codeVerifier = ''): array
     {
         $oauthUser = $this->fetchOauthUser($provider, $code, $redirectUri, $codeVerifier);
         if ($oauthUser === null) {
-            return null;
+            return ['user' => null, 'failure' => 'exchange'];
         }
 
-        return $this->findOrCreateUser($provider, $oauthUser);
+        $user = $this->findOrCreateUser($provider, $oauthUser);
+
+        return $user === null
+            ? ['user' => null, 'failure' => 'unlinked']
+            : ['user' => $user, 'failure' => ''];
     }
 
     /**

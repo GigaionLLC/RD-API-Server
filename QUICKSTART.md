@@ -268,6 +268,31 @@ real client address. A trusted proxy or custom client can instead send a random 
 limits are 8 MiB per chunk, 2 GiB per file, 10 GiB total, 5,000 files, four active uploads per
 source, and 600 requests per source/minute; each has a matching setting in `.env.example`.
 
+**A self-hosted OIDC provider on a private network** (Authentik, Keycloak, Authelia, Zitadel on
+a LAN, VPN, Docker network, or Kubernetes cluster) needs its address trusted explicitly.
+Otherwise SSO stops with *"Could not start SSO"* and the log records `OIDC discovery failed`
+with the reason `OIDC host resolves to a non-public network`, even though the issuer, client ID,
+secret, redirect URI, and PKCE settings are all correct. Trust the narrowest range that covers
+the provider:
+
+```env
+RUSTDESK_OIDC_ALLOWED_NETWORKS=10.169.169.253/32
+```
+
+Use `/32` (or `/128`) for a single host wherever possible; `RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS=true`
+is available as a shorthand for all RFC 1918 ranges plus `fd00::/8`, but it trusts every host on
+those networks. Treat the value as the list of hosts you are willing to have your OIDC client
+secret sent to: the token endpoint comes from the provider's own discovery document. Private
+addresses are accepted only for the issuer's own host, and cloud metadata, loopback, and
+link-local addresses stay blocked no matter what you configure. The provider still needs HTTPS
+on port 443 and a certificate valid for its issuer hostname — install an internal CA into the
+container trust store rather than disabling verification. If SSO still fails, the reason is in
+the application log; unusable allowlist entries are named there and at container startup.
+
+The provider's hostname is resolved through DNS first and the container's `/etc/hosts` second,
+so Compose `extra_hosts` and Kubernetes `hostAliases` entries work — but only for IPv4. An
+identity provider published solely at an IPv6 address needs a real `AAAA` record.
+
 **Webhooks** (Slack / Telegram / generic) are configured in the console under **Webhooks** — no
 env needed. Failed deliveries retry automatically if the scheduler cron is running; add it to
 keep retries flowing:

@@ -323,6 +323,245 @@ class OidcDestinationSecurityTest extends TestCase
         Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'profile.example.net'));
     }
 
+    public function test_private_networks_are_denied_until_an_operator_opts_in(): void
+    {
+        $this->assertSame([], config('rustdesk.oidc.allowed_networks'));
+        $this->assertFalse((bool) config('rustdesk.oidc.allow_private_networks'));
+    }
+
+    public function test_an_allowlisted_private_issuer_host_resolves_and_pins(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->once()->with('authentik.lan')->andReturn(['10.169.169.253']);
+        });
+        $guard = new OidcDestinationGuard($resolver);
+
+        $destination = $guard->resolve('https://authentik.lan/application/o/rustdesk', 'authentik.lan');
+
+        $this->assertSame([
+            'host' => 'authentik.lan',
+            'port' => 443,
+            'ip' => '10.169.169.253',
+            'is_ip_literal' => false,
+        ], $destination);
+        $this->assertSame(
+            ['authentik.lan:443:10.169.169.253'],
+            $guard->requestOptions($destination)['curl'][constant('CURLOPT_RESOLVE')]
+        );
+    }
+
+    public function test_an_allowlisted_bare_address_entry_covers_a_single_host(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.253']);
+        $resolver = $this->mock(OidcDnsResolver::class);
+        $guard = new OidcDestinationGuard($resolver);
+
+        $destination = $guard->resolve('https://10.169.169.253/oidc', '10.169.169.253');
+
+        $this->assertSame('10.169.169.253', $destination['ip']);
+        $this->assertTrue($destination['is_ip_literal']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('non-public');
+        $guard->resolve('https://10.169.169.254/oidc', '10.169.169.254');
+    }
+
+    public function test_the_blanket_private_switch_admits_rfc1918_and_unique_local_space(): void
+    {
+        config()->set('rustdesk.oidc.allow_private_networks', true);
+        $resolver = $this->mock(OidcDnsResolver::class);
+        $guard = new OidcDestinationGuard($resolver);
+
+        foreach (['10.169.169.253', '172.16.5.4', '192.168.1.10'] as $address) {
+            $this->assertSame($address, $guard->resolve('https://'.$address.'/oidc', $address)['ip']);
+        }
+
+        $this->assertSame('fd00::1', $guard->resolve('https://[fd00::1]/oidc', 'fd00::1')['ip']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function neverTrustableAddressProvider(): iterable
+    {
+        yield 'loopback IPv4' => ['127.0.0.1'];
+        yield 'loopback IPv6' => ['::1'];
+        yield 'link-local IPv4' => ['169.254.1.1'];
+        yield 'link-local IPv6' => ['fe80::1'];
+        yield 'AWS instance metadata' => ['169.254.169.254'];
+        yield 'AWS IPv6 instance metadata' => ['fd00:ec2::254'];
+        yield 'Alibaba instance metadata' => ['100.100.100.200'];
+        yield 'IPv4-mapped IPv6' => ['::ffff:10.169.169.253'];
+        yield 'NAT64 translation' => ['64:ff9b::a9fe:a9fe'];
+        yield '6to4 translation' => ['2002:a9fe:a9fe::1'];
+        yield 'multicast' => ['224.0.0.1'];
+    }
+
+    #[DataProvider('neverTrustableAddressProvider')]
+    public function test_hard_blocked_addresses_survive_every_opt_in(string $address): void
+    {
+        // Every entry here is deliberately one bit wider than a hard-blocked range, so it parses
+        // and covers the address. Only the match-time refusal can stop these.
+        config()->set('rustdesk.oidc.allow_private_networks', true);
+        config()->set('rustdesk.oidc.allowed_networks', [
+            '10.0.0.0/8', 'fd00::/8', '100.64.0.0/10', '169.254.0.0/15', '2002::/15', '64:ff9b::/95',
+        ]);
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock) use ($address): void {
+            $mock->shouldReceive('resolve')->andReturn([$address]);
+        });
+        $guard = new OidcDestinationGuard($resolver);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $guard->resolve('https://idp.example.com/oidc', 'idp.example.com');
+    }
+
+    public function test_a_trusted_private_address_is_refused_for_a_host_other_than_the_issuer(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->with('vault.internal.lan')->andReturn(['10.169.169.9']);
+        });
+        $guard = new OidcDestinationGuard($resolver);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('must be served by the issuer host');
+
+        $guard->resolve('https://vault.internal.lan/v1/token', 'authentik.lan');
+    }
+
+    public function test_an_address_outside_the_allowlist_is_still_rejected(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->once()->andReturn(['10.20.30.40']);
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('non-public');
+
+        (new OidcDestinationGuard($resolver))->resolve('https://authentik.lan/oidc', 'authentik.lan');
+    }
+
+    public function test_the_allowlist_does_not_rescue_a_split_dns_answer(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->once()->andReturn(['10.169.169.253', '127.0.0.1']);
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('non-public');
+
+        (new OidcDestinationGuard($resolver))->resolve('https://authentik.lan/oidc', 'authentik.lan');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unusableAllowlistEntryProvider(): iterable
+    {
+        yield 'all IPv4 addresses' => ['0.0.0.0/0'];
+        yield 'all IPv6 addresses' => ['::/0'];
+        yield 'prefix above the family maximum' => ['10.169.169.0/33'];
+        yield 'empty prefix' => ['10.169.169.0/'];
+        yield 'non-numeric prefix' => ['10.169.169.0/eight'];
+        yield 'host bits set' => ['10.169.169.5/24'];
+        yield 'not an address' => ['authentik.lan/24'];
+        yield 'prefix below the IPv4 floor' => ['10.0.0.0/4'];
+        yield 'loopback' => ['127.0.0.0/8'];
+        yield 'link-local' => ['169.254.0.0/16'];
+        yield 'NAT64 translation' => ['64:ff9b::/96'];
+        yield 'IPv4-mapped space' => ['::ffff:0:0/96'];
+    }
+
+    #[DataProvider('unusableAllowlistEntryProvider')]
+    public function test_an_unusable_allowlist_entry_is_discarded_rather_than_honoured(string $entry): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', [$entry]);
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->andReturn(['10.169.169.253']);
+        });
+        $guard = new OidcDestinationGuard($resolver);
+
+        $this->assertSame([$entry], $guard->trustedNetworkDiagnostics()['rejected']);
+        $this->assertSame(0, $guard->trustedNetworkDiagnostics()['trusted']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('non-public');
+        $guard->resolve('https://authentik.lan/oidc', 'authentik.lan');
+    }
+
+    public function test_one_unusable_entry_does_not_disable_the_usable_ones(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24', 'not-a-network']);
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->andReturn(['10.169.169.253']);
+        });
+        $guard = new OidcDestinationGuard($resolver);
+
+        $this->assertSame('10.169.169.253', $guard->resolve('https://authentik.lan/oidc', 'authentik.lan')['ip']);
+        $this->assertSame(['not-a-network'], $guard->trustedNetworkDiagnostics()['rejected']);
+    }
+
+    public function test_the_allowlist_does_not_loosen_the_allowed_port_boundary(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        $resolver = $this->mock(OidcDnsResolver::class);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('port that is not allowed');
+
+        (new OidcDestinationGuard($resolver))->resolve('https://10.169.169.253:9443/oidc', '10.169.169.253');
+    }
+
+    public function test_an_allowlisted_private_issuer_completes_discovery(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->with('authentik.lan')->andReturn(['10.169.169.253']);
+        });
+        $this->provider('https://authentik.lan/application/o/rustdesk');
+        Http::fake([
+            'https://authentik.lan/application/o/rustdesk/.well-known/openid-configuration' => Http::response([
+                'issuer' => 'https://authentik.lan/application/o/rustdesk',
+                'authorization_endpoint' => 'https://authentik.lan/application/o/authorize/',
+                'token_endpoint' => 'https://authentik.lan/application/o/token/',
+                'userinfo_endpoint' => 'https://authentik.lan/application/o/userinfo/',
+            ]),
+        ]);
+
+        [$code, $url] = app(OauthService::class)->beginAuth('security-oidc', 'device', 'uuid', []);
+
+        $this->assertNotSame('', $code);
+        $this->assertStringStartsWith('https://authentik.lan/application/o/authorize/?', $url);
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_private_discovered_endpoint_on_another_host_still_aborts_the_login(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->andReturn(['10.169.169.253']);
+        });
+        $this->provider('https://authentik.lan/application/o/rustdesk');
+        Http::fake([
+            'https://authentik.lan/application/o/rustdesk/.well-known/openid-configuration' => Http::response([
+                'issuer' => 'https://authentik.lan/application/o/rustdesk',
+                'authorization_endpoint' => 'https://authentik.lan/application/o/authorize/',
+                'token_endpoint' => 'https://vault.internal.lan/v1/token',
+                'userinfo_endpoint' => 'https://authentik.lan/application/o/userinfo/',
+            ]),
+        ]);
+
+        $this->assertSame(
+            ['', ''],
+            app(OauthService::class)->beginAuth('security-oidc', 'device', 'uuid', [])
+        );
+        Http::assertSentCount(1);
+    }
+
     private function provider(string $issuer = 'https://issuer.example.com/tenant'): OauthProvider
     {
         return OauthProvider::create([

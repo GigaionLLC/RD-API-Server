@@ -119,6 +119,28 @@ disables proxy trust for direct HTTP operation; `**`, `REMOTE_ADDR`, IPv4/IPv6 `
 values, and implicit wildcard equivalents remain rejected. Use `*` alone when selecting wildcard
 mode; if it appears in a comma-separated list, it overrides every narrower entry.
 
+## OIDC egress default
+
+Generic OIDC discovery, token, and userinfo calls are restricted to HTTPS destinations that
+resolve to globally routable addresses. A self-hosted identity provider on a LAN, VPN, Docker
+network, or Kubernetes cluster is therefore refused until its address is trusted explicitly:
+
+```env
+RUSTDESK_OIDC_ALLOWED_NETWORKS=10.169.169.253/32
+```
+
+Both `RUSTDESK_OIDC_ALLOWED_NETWORKS` (CIDR ranges, or a bare address for one host) and the
+`RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS=true` shorthand for RFC 1918 plus `fd00::/8` are forwarded
+by the bundled Compose files and default to closed. The container logs how many ranges are
+trusted at startup and names any entry it could not use.
+
+Keep the range as narrow as the provider allows. The endpoints used during a login come from the
+provider's own discovery document, and the token endpoint receives the OIDC client secret, so
+every trusted address is an address a compromised provider could aim this server at. A private
+address is only accepted for the issuer's own host, and loopback, link-local, and cloud
+instance-metadata addresses are refused whatever is configured. Trusting a range does not relax
+TLS: install an internal CA into the container trust store rather than disabling verification.
+
 ## Supported database
 
 RD-API-Server supports **MariaDB with InnoDB only**. Runtime startup, PHPUnit, browser tests,

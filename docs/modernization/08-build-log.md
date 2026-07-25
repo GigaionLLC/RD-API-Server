@@ -2,6 +2,45 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-07-24 - Opt-in trusted private networks for OIDC egress (verified)
+
+- Added `App\Support\TrustedPrivateNetworks`, the parser and matcher behind
+  `RUSTDESK_OIDC_ALLOWED_NETWORKS` and `RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS`. Both default to
+  closed, so a deployment that does not set them keeps the previous globally-routable-only
+  boundary exactly. Reported in [issue #1](https://github.com/GigaionLLC/RD-API-Server/issues/1)
+  by an operator whose Authentik instance resolved to `10.169.169.253`.
+- Trusting a range is deliberately narrow. A permanently blocked set (loopback, link-local,
+  multicast, IPv4-mapped IPv6, NAT64/6to4/Teredo, cloud instance metadata) is evaluated before
+  the allowlist and cannot be overridden; entries that fall wholly inside it, carry host bits,
+  use a catch-all or sub-`/8`/`/7` prefix, or fail to parse are discarded and named; and a
+  private address is accepted only for the issuer's own host, so a hostile discovery document
+  cannot aim a token POST at another internal service. The opt-ins do not apply to webhooks.
+- Replaced the silent `catch (\Throwable) { return null; }` in `OauthService::discoverOidc()`
+  with a reported failure carrying the reason, issuer, offending address, rejected endpoint,
+  HTTP status, and allowlist state. Both the issuer and any transport message are reduced to a
+  form that cannot carry userinfo or a query string, and the sign-in screen keeps a generic
+  message because the SSO routes precede authentication.
+- Split the console SSO callback's single null branch, which previously reported every failed
+  code exchange as an unlinked account and sent operators hunting through linked identities for
+  a wrong client secret. `OauthService::webResolveUser()` now returns which of the two occurred.
+- Fixed two resolver defects shared by `OidcDnsResolver` and `WebhookDnsResolver`: a combined
+  `dns_get_record()` bitmask discards every record already collected when any single record type
+  hard-fails (internal and split-horizon resolvers routinely SERVFAIL on `CNAME`/`AAAA`), and it
+  never enters the name service switch, so `/etc/hosts` publications were invisible to
+  validation. Both sources are now unioned, which can only widen the answer set the guards must
+  approve.
+- Name resolution is IPv4-only for the name-service half, because PHP has no IPv6 form of that
+  lookup. An identity provider published solely as an IPv6 hosts entry still needs an `AAAA`
+  record; this is stated in the resolver, the security wiki, and QUICKSTART rather than pulling
+  `ext-sockets` into the runtime image for it.
+- **Verified in Docker:** Pint across 281 files, PHPStan across 179 files, and the isolated
+  MariaDB PHPUnit suite at 590 tests / 3,176 assertions (up from 586 / 3,163).
+  `OidcDestinationSecurityTest` grew from 15 to 29 methods and all 18 pre-existing
+  deny-by-default data sets still pass untouched, alongside new `OidcDiscoveryDiagnosticsTest`
+  and `Tests\Unit\OidcDnsResolverTest` files, two `AdminSsoLoginTest` cases for the split
+  callback message, and a `WebhookDestinationSecurityTest` case proving the OIDC opt-ins never
+  widen webhook egress.
+
 ## 2026-07-18 - v1.1.0 stable release
 
 - Advanced the source-controlled application version and exact API assertion to `1.1.0`, promoted

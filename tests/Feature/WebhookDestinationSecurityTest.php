@@ -112,6 +112,20 @@ class WebhookDestinationSecurityTest extends TestCase
         $this->assertSame(443, $guard->resolve('https://hooks.example.com/events')['port']);
     }
 
+    public function test_the_oidc_private_network_opt_in_does_not_widen_webhook_egress(): void
+    {
+        config()->set('rustdesk.oidc.allowed_networks', ['10.169.169.0/24']);
+        config()->set('rustdesk.oidc.allow_private_networks', true);
+        $resolver = $this->mock(WebhookDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->once()->andReturn(['10.169.169.253']);
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('non-public');
+
+        (new WebhookDestinationGuard($resolver))->resolve('https://hooks.internal.lan/events');
+    }
+
     public function test_custom_public_port_must_be_explicitly_allowed(): void
     {
         config()->set('rustdesk.webhooks.allowed_ports', [80, 443, 8443]);

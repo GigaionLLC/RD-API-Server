@@ -90,6 +90,11 @@ services:
       RUSTDESK_RECORDING_UPLOAD_MAX_TOTAL_FILES: "${RUSTDESK_RECORDING_UPLOAD_MAX_TOTAL_FILES:-5000}"
       RUSTDESK_RECORDING_UPLOAD_MAX_ACTIVE_PER_SOURCE: "${RUSTDESK_RECORDING_UPLOAD_MAX_ACTIVE_PER_SOURCE:-4}"
 
+      # Generic OIDC endpoints must be globally routable unless a self-hosted identity provider
+      # network is trusted here. Prefer the narrowest CIDR over the blanket switch.
+      RUSTDESK_OIDC_ALLOWED_NETWORKS: "${RUSTDESK_OIDC_ALLOWED_NETWORKS:-}"
+      RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS: "${RUSTDESK_OIDC_ALLOW_PRIVATE_NETWORKS:-false}"
+
       # LDAP / Active Directory (optional; disabled and securely fail-closed by default).
       LDAP_ENABLED: "${LDAP_ENABLED:-false}"
       LDAP_HOST: "${LDAP_HOST:-ldap.example.com}"

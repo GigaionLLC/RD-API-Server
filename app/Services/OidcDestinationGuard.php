@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\TrustedPrivateNetworks;
 use InvalidArgumentException;
 use RuntimeException;
 use ValueError;
@@ -12,6 +13,11 @@ use ValueError;
  * Discovery metadata is attacker-controlled until it has been validated. Every URL selected
  * from that metadata is therefore resolved again immediately before use, and the resulting IP
  * is pinned into the request so DNS rebinding cannot redirect credentials to an internal host.
+ *
+ * A self-hosted identity provider on a LAN, VPN, or container network is supported through the
+ * opt-in trusted-network allowlist, which is empty by default. Because that allowlist is
+ * exactly the set of internal addresses a hostile discovery document could aim this server at,
+ * a private address is additionally accepted only for the issuer's own host.
  */
 class OidcDestinationGuard
 {
@@ -52,6 +58,8 @@ class OidcDestinationGuard
         'ff00::/8',
     ];
 
+    private ?TrustedPrivateNetworks $trustedNetworks = null;
+
     public function __construct(private readonly OidcDnsResolver $resolver) {}
 
     /**
@@ -91,11 +99,39 @@ class OidcDestinationGuard
     }
 
     /**
+     * The host an issuer is served from, used to scope trusted-private-network access to the
+     * identity provider itself rather than to every host in an allowed range.
+     */
+    public function issuerHost(string $issuer): string
+    {
+        return strtolower($this->validatedHost($this->parseUrl($issuer)));
+    }
+
+    /**
+     * Configured state of the trusted-network allowlist, for operator-facing diagnostics.
+     *
+     * @return array{trusted: int, rejected: list<string>}
+     */
+    public function trustedNetworkDiagnostics(): array
+    {
+        $networks = $this->trustedNetworks();
+
+        return [
+            'trusted' => $networks->count(),
+            'rejected' => $networks->rejectedEntries(),
+        ];
+    }
+
+    /**
      * Resolve a destination immediately before sending and return the connection pin.
+     *
+     * $issuerHost names the host the configured issuer is served from. Addresses inside the
+     * trusted-network allowlist are accepted only for that host, so an allowlist never widens
+     * beyond the identity provider it was configured for.
      *
      * @return array{host: string, port: int, ip: string, is_ip_literal: bool}
      */
-    public function resolve(string $url): array
+    public function resolve(string $url, ?string $issuerHost = null): array
     {
         $parts = $this->parseUrl($url);
         if (isset($parts['fragment'])) {
@@ -118,12 +154,26 @@ class OidcDestinationGuard
         }
 
         if ($addresses === []) {
-            throw new InvalidArgumentException('OIDC host could not be resolved.');
+            throw new InvalidArgumentException('OIDC host could not be resolved: '.strtolower($host));
         }
 
+        $isIssuerHost = $issuerHost !== null && strtolower($host) === strtolower($issuerHost);
+
         foreach ($addresses as $address) {
-            if (! $this->isPublicIp($address)) {
-                throw new InvalidArgumentException('OIDC host resolves to a non-public network.');
+            if ($this->isPublicIp($address)) {
+                continue;
+            }
+
+            if (! $this->trustedNetworks()->permits($address)) {
+                throw new InvalidArgumentException(
+                    'OIDC host resolves to a non-public network: '.$address
+                );
+            }
+
+            if (! $isIssuerHost) {
+                throw new InvalidArgumentException(
+                    'OIDC endpoint on a trusted private network must be served by the issuer host.'
+                );
             }
         }
 
@@ -249,6 +299,18 @@ class OidcDestinationGuard
         return $port;
     }
 
+    /**
+     * The configured allowlist, memoized so evaluating it never triggers extra work per address.
+     */
+    private function trustedNetworks(): TrustedPrivateNetworks
+    {
+        return $this->trustedNetworks ??= TrustedPrivateNetworks::forOidc();
+    }
+
+    /**
+     * Whether an address is globally routable. Unchanged by the trusted-network allowlist,
+     * which is consulted separately and only for the issuer's own host.
+     */
     private function isPublicIp(string $ip): bool
     {
         if (filter_var($ip, FILTER_VALIDATE_IP) === false) {

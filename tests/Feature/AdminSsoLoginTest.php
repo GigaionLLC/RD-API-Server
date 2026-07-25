@@ -220,4 +220,43 @@ class AdminSsoLoginTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_callback_separates_a_failed_exchange_from_an_unlinked_identity(): void
+    {
+        $this->provider();
+        $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->andReturn(['8.8.8.8']);
+        });
+
+        // A token endpoint that rejects the client secret is not an account-linking problem.
+        Http::fake([
+            'kc.example.com/realms/test/.well-known/openid-configuration' => Http::response([
+                'issuer' => 'https://kc.example.com/realms/test',
+                'authorization_endpoint' => 'https://kc.example.com/auth',
+                'token_endpoint' => 'https://kc.example.com/token',
+                'userinfo_endpoint' => 'https://kc.example.com/userinfo',
+            ], 200),
+            'kc.example.com/token' => Http::response(['error' => 'invalid_client'], 401),
+        ]);
+
+        $this->withSession(['admin_sso' => ['state' => 'st4te', 'op' => 'keycloak', 'remember' => false]])
+            ->get(route('admin.sso.callback', ['op' => 'keycloak', 'state' => 'st4te', 'code' => 'abc']))
+            ->assertRedirect(route('admin.login'))
+            ->assertSessionHasErrors(['username' => 'SSO sign-in could not be completed. The provider exchange failed; see the server log for the reason.']);
+
+        $this->assertGuest();
+    }
+
+    public function test_callback_still_reports_an_unlinked_identity_as_such(): void
+    {
+        $this->fakeOidc();
+        $this->provider();
+
+        $this->withSession(['admin_sso' => ['state' => 'st4te', 'op' => 'keycloak', 'remember' => false]])
+            ->get(route('admin.sso.callback', ['op' => 'keycloak', 'state' => 'st4te', 'code' => 'abc']))
+            ->assertRedirect(route('admin.login'))
+            ->assertSessionHasErrors(['username' => 'No console account is linked to that identity (and auto-register is off for this provider).']);
+
+        $this->assertGuest();
+    }
 }
