@@ -3,6 +3,24 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-24 15:40] - Publish and record v1.2.0
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `docs/releases/v1.2.0.md`
+- `DevOps/logs/version-history.md`
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** None. This follow-up records the already-published release and does not
+alter its image, schema, routes, storage, or RustDesk wire contract.
+**Summary:** Published annotated tag and GitHub Release `v1.2.0` from commit `0d64a79`, verified
+the `1.2.0`, `1.2`, `1`, and `latest` aliases all resolve to the AMD64/ARM64 manifest digest
+`sha256:75d3b0e07af71c2c5e68be0b1bb86a5341cff298a50e297ed9e23995d25bd823` before announcing it, and
+answered issue #1 asking the reporter to confirm against their live Authentik deployment. The tag
+run's AMD64 runtime-smoke job failed once on a pre-existing `docker logs` flush race in the
+wildcard-proxy warning assertion (`scripts/ci-runtime-smoke.sh:377`); the expected string was
+present in the logs captured at failure time, and the job passed on re-run against the same commit
+that had already passed the identical job on `main`, so the publication proceeded on evidence
+rather than assumption. That race is a real flake in the release gate and is worth hardening.
+
 ## [2026-07-24 14:55] - Prepare v1.2.0
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
