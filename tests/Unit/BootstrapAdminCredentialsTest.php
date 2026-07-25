@@ -32,8 +32,6 @@ class BootstrapAdminCredentialsTest extends TestCase
     public static function unsafeProductionPasswords(): array
     {
         return [
-            'missing' => [null],
-            'blank' => ['   '],
             'too short' => ['short-pass'],
             'known default' => ['admin123456'],
             'current development default' => [BootstrapAdminCredentials::DEVELOPMENT_PASSWORD],
@@ -48,6 +46,35 @@ class BootstrapAdminCredentialsTest extends TestCase
             'repeated common word' => ['passwordpassword'],
             'repeated username' => ['fleet-admin-fleet-admin'],
             'username plus year' => ['fleet-admin-2026'],
+        ];
+    }
+
+    #[DataProvider('absentProductionPasswords')]
+    public function test_production_generates_a_password_when_none_is_configured(?string $password): void
+    {
+        // An unset ADMIN_PASS used to abort startup. Generating instead keeps the boundary closed
+        // while removing the requirement to invent a credential before the first boot.
+        $generated = BootstrapAdminCredentials::resolvePassword($password, 'fleet-admin', true);
+
+        $this->assertNotSame('', $generated);
+        $this->assertGreaterThanOrEqual(
+            BootstrapAdminCredentials::MINIMUM_PASSWORD_LENGTH,
+            mb_strlen($generated)
+        );
+        $this->assertNotSame(BootstrapAdminCredentials::DEVELOPMENT_PASSWORD, $generated);
+        // Two boots must never produce the same credential.
+        $this->assertNotSame(
+            $generated,
+            BootstrapAdminCredentials::resolvePassword($password, 'fleet-admin', true)
+        );
+    }
+
+    /** @return array<string, array{0: string|null}> */
+    public static function absentProductionPasswords(): array
+    {
+        return [
+            'missing' => [null],
+            'blank' => ['   '],
         ];
     }
 

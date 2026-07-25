@@ -10,6 +10,8 @@ use App\Services\LocalPasswordHashService;
 use App\Services\OauthService;
 use App\Services\SsoRoleSyncService;
 use App\Support\AccountPasswordPolicy;
+use App\Support\InitialAdminPassword;
+use App\Support\ProtectedAdministrator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -124,6 +126,7 @@ class AuthController extends Controller
         // branch never runs and the stale marker would sign the user out on their next click.
         $request->session()->put(EnsureCredentialVersion::SESSION_KEY, max(1, (int) $user->credential_version));
         $user->forceFill(['last_login_at' => now(), 'last_login_ip' => $request->ip()])->save();
+        $this->retireInitialPasswordFile($user);
 
         return redirect()->intended(route('admin.dashboard'));
     }
@@ -131,6 +134,19 @@ class AuthController extends Controller
     /**
      * The absolute console SSO callback URL for a provider (register this with the IdP).
      */
+    /**
+     * Drop the bootstrap credential file once its account has actually signed in.
+     *
+     * Until that happens the file is the only recovery path for an operator who missed the boot
+     * banner, so it is removed on proof of use rather than on a timer.
+     */
+    private function retireInitialPasswordFile(User $user): void
+    {
+        if (ProtectedAdministrator::isProtected($user)) {
+            InitialAdminPassword::forget();
+        }
+    }
+
     private function ssoCallbackUri(string $op): string
     {
         return route('admin.sso.callback', ['op' => $op]);
@@ -251,6 +267,7 @@ class AuthController extends Controller
             'last_login_at' => now(),
             'last_login_ip' => $request->ip(),
         ])->save();
+        $this->retireInitialPasswordFile($user);
 
         return redirect()->intended(route('admin.dashboard'));
     }

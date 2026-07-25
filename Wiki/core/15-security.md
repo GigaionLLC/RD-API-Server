@@ -95,6 +95,46 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   IPv6 form of the name-service lookup, so a host published only as an IPv6 `/etc/hosts` entry
   still needs a real `AAAA` record.
 
+## Break-Glass Administrator
+
+- One account carries `is_protected_admin`. It grants no permission of its own: `is_admin` already
+  confers unconditional access, and this flag only refuses the writes that would take that access
+  away. A stored generated column with a unique index makes "at most one" a database fact rather
+  than an application convention, so concurrent writes cannot produce two.
+- The designated account cannot be demoted, disabled, deleted, or restricted to SSO-only sign-in,
+  from the console, from the bulk actions, or from `/api/v1`. Bulk actions use mass builder writes
+  that fire no model events, so they carry their own explicit exclusion.
+- It is also exempt from LDAP attribute synchronization. Before this existed, `LDAP_SYNC=true`
+  wrote `is_admin` from directory group membership on every sign-in, and that membership test
+  returns false whenever `LDAP_ADMIN_GROUP` is unset -- so the default configuration silently
+  demoted a linked administrator. Ordinary administrators are still synchronized.
+- The designation is never fillable and is never reachable over HTTP. It moves only through
+  `php artisan rustdesk:admin:protect`, which refuses any account that could not actually be used
+  to recover access: not a full administrator, not active, SSO-restricted, or federated. Clearing
+  it requires `--clear --i-understand`.
+- `php artisan rustdesk:admin:reset` restores access from a shell when the console is unreachable.
+  It removes a security control only when explicitly told to (`--unlink-federated-identities`,
+  `--clear-force-sso`, `--clear-2fa`), names what it removed, and records a `ConsoleAudit` row plus
+  a warning-level log entry, because CLI credential changes are otherwise invisible: the console
+  audit trail is written by HTTP middleware only.
+- Anyone able to run these commands already holds the database credentials, the application key,
+  and root inside the container, so they grant no authority that population lacked. They make the
+  change auditable, which a hand-written `UPDATE` would not be.
+
+## Initial Administrator Credential
+
+- `ADMIN_PASS` is optional. Unset, the first administrator receives a password generated with
+  `random_int()` over an alphabet that omits visually ambiguous characters, at a length chosen for
+  entropy rather than composition rules, and validated against the same policy an operator-supplied
+  value faces.
+- It is surfaced once on stderr at first boot and written to `storage/app/.initial-admin-password`,
+  owned `root:root` mode `0400` so an application file-read primitive cannot disclose it, never
+  under `storage/app/public`, never in `storage/logs`, never in the database, and never on any
+  route. The file deletes itself the first time that account signs in.
+- The seeder holds a row lock across the existence check and the insert, so two replicas booting
+  against one database cannot both generate a credential. An existing administrator's password is
+  never rotated on any subsequent boot.
+
 ## Federated Role Grants
 
 - An identity-provider group may grant a console admin role (Admin → SSO role mappings). A

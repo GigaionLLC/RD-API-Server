@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Support\BootstrapAdminCredentials;
+use App\Support\InitialAdminPassword;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use RuntimeException;
 use Tests\TestCase;
 
 class BootstrapAdminSeederTest extends TestCase
@@ -30,22 +30,25 @@ class BootstrapAdminSeederTest extends TestCase
     protected function tearDown(): void
     {
         $this->app['env'] = $this->originalEnvironment;
+        // A production seed without ADMIN_PASS now writes a real credential file; do not leave it
+        // behind for the rest of the suite or the developer's working tree.
+        InitialAdminPassword::forget();
 
         parent::tearDown();
     }
 
-    public function test_production_seed_fails_before_creating_an_admin_when_password_is_missing(): void
+    public function test_production_seed_generates_a_password_when_none_is_configured(): void
     {
         $this->app['env'] = 'production';
 
-        try {
-            $this->runSeeder();
-            $this->fail('Expected the production bootstrap to fail without ADMIN_PASS.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('ADMIN_PASS is required', $exception->getMessage());
-        }
+        $this->runSeeder();
 
-        $this->assertDatabaseCount('users', 0);
+        // A missing ADMIN_PASS used to abort the boot. The administrator is now created with a
+        // generated credential that is surfaced once, so a first run needs no prior decision.
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $this->assertTrue((bool) $admin->is_admin);
+        $this->assertFalse(Hash::check(BootstrapAdminCredentials::DEVELOPMENT_PASSWORD, (string) $admin->password));
+        $this->assertTrue((bool) $admin->is_protected_admin);
     }
 
     public function test_production_seed_creates_the_admin_with_an_explicit_safe_password(): void

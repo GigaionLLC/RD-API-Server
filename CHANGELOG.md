@@ -8,6 +8,25 @@ notes.
 
 ### Added
 
+- A break-glass administrator. The first account is designated as protected and can no longer be
+  demoted, disabled, deleted, forced to SSO-only sign-in, or demoted by a directory, so a wrong or
+  unreachable identity provider can never remove the last way into the console. Manage the
+  designation with `php artisan rustdesk:admin:protect`.
+- `php artisan rustdesk:admin:reset <username>` recovers an account from a shell, with opt-in
+  `--unlink-federated-identities`, `--clear-force-sso` and `--clear-2fa`. The last of these is the
+  only path out of a lost second factor with no recovery codes remaining.
+- `ADMIN_PASS` is now optional. When it is unset the initial administrator receives a generated
+  password, printed once at first boot and written to `storage/app/.initial-admin-password` until
+  that account signs in, after which the file is deleted. Setting `ADMIN_PASS` keeps today's
+  behaviour and validation exactly.
+
+### Fixed
+
+- An LDAP directory could silently demote a local administrator on every sign-in. With
+  `LDAP_SYNC=true`, attribute synchronization wrote `is_admin` from group membership, and that
+  membership test returns false whenever `LDAP_ADMIN_GROUP` is unset, which is its default. The
+  break-glass account is now exempt from directory-driven demotion.
+
 - Identity-provider groups can grant console admin roles. A new **SSO role mappings** screen
   declares "membership of this LDAP/FreeIPA or OIDC group grants this role", and membership is
   reconciled at every sign-in across all four login paths. Role assignments now carry provenance,

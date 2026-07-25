@@ -246,12 +246,22 @@ RUSTDESK_API_IMAGE='ghcr.io/gigaionllc/rustdesk-api-server:sha-<40-hex-commit>@s
 
 ## Production bootstrap credentials
 
-The production and production-like Compose files deliberately have no `ADMIN_PASS` fallback.
-Set a unique password of at least 12 characters in the shell or a local `.env` file before the
-first `up`. The runtime seeder rejects a missing, short, known/default, placeholder, repeated, or
-username-derived value before creating the full administrator. A failed seed is not marked as
-installed, so correcting `ADMIN_PASS` and restarting safely retries the bootstrap. Once the
-administrator exists, `ADMIN_PASS` may be removed from the deployment environment.
+`ADMIN_PASS` is optional. When it is unset, the runtime generates a strong password for the first
+administrator, prints it once in the container log, and writes it to
+`storage/app/.initial-admin-password` as a root-owned `0400` file that deletes itself the first
+time that account signs in. Sign in and change it.
+
+Setting `ADMIN_PASS` remains supported for deployments that need a deterministic credential, and is
+still validated: a short, known/default, placeholder, repeated, or username-derived value is
+rejected before the administrator is created. A failed seed is not marked as installed, so
+correcting `ADMIN_PASS` and restarting safely retries the bootstrap. Once the administrator exists,
+`ADMIN_PASS` may be removed from the deployment environment, and re-running the seeder never
+rotates an existing password.
+
+That first administrator is also the break-glass account: no directory or SSO provider can demote,
+disable, or lock it out. If access is lost, recover it from the host with
+`docker compose exec rustdesk-api php artisan rustdesk:admin:reset admin --generate`, adding
+`--clear-2fa` when a second factor is unavailable.
 
 The toolchain stack uses `APP_ENV=local` and keeps the predictable development seed credential
 needed by tests and screenshot fixtures. That fallback is never accepted by a production seed.

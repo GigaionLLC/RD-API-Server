@@ -11,12 +11,14 @@ use App\Models\UserThird;
 use App\Services\AccountCredentialService;
 use App\Services\AdminScopeService;
 use App\Support\AccountPasswordPolicy;
+use App\Support\ProtectedAdministrator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -102,7 +104,14 @@ class UserController extends Controller
         }
 
         $self = (int) $actor->id;
-        $protect = static fn (array $list): array => array_values(array_filter($list, fn (int $id): bool => $id !== $self));
+        // Mass builder writes below fire no model events, so the break-glass account is excluded
+        // here rather than by an observer. Disabling or deleting it would remove the last way back
+        // into a console whose identity provider is broken.
+        $protectedIds = ProtectedAdministrator::idsWithin($ids);
+        $protect = static fn (array $list): array => array_values(array_filter(
+            $list,
+            fn (int $id): bool => $id !== $self && ! in_array($id, $protectedIds, true),
+        ));
 
         switch ($data['action']) {
             case 'enable':
@@ -239,6 +248,7 @@ class UserController extends Controller
     {
         $this->scope->authorizeUser($request->user(), $user, 'users.edit');
         $this->authorizePrivilegedAccountManagement($request, $user);
+        $this->refuseProtectedAdministratorChanges($request, $user);
         $canManageAdminAccess = (bool) $request->user()->is_admin;
         $hasActiveTotp = $user->hasActiveTotp();
 
@@ -323,6 +333,37 @@ class UserController extends Controller
      *
      * @return array<int, int>
      */
+    /**
+     * Refuse the writes that would strip the break-glass account of its way back in.
+     *
+     * Reported as validation errors on the specific fields rather than a blanket 403, so the
+     * console explains which change was rejected and why instead of appearing to fail at random.
+     */
+    private function refuseProtectedAdministratorChanges(Request $request, User $user): void
+    {
+        if (! ProtectedAdministrator::isProtected($user)) {
+            return;
+        }
+
+        $refusals = [];
+
+        if ($request->has('is_admin') && ! $request->boolean('is_admin')) {
+            $refusals['is_admin'] = ProtectedAdministrator::REFUSALS['is_admin'];
+        }
+
+        if ($request->has('status') && (int) $request->input('status') !== User::STATUS_NORMAL) {
+            $refusals['status'] = ProtectedAdministrator::REFUSALS['status'];
+        }
+
+        if ($request->boolean('force_sso')) {
+            $refusals['force_sso'] = ProtectedAdministrator::REFUSALS['force_sso'];
+        }
+
+        if ($refusals !== []) {
+            throw ValidationException::withMessages($refusals);
+        }
+    }
+
     private function parseRoleIds(?string $raw): array
     {
         $ids = array_values(array_filter(array_map(
@@ -421,6 +462,12 @@ class UserController extends Controller
             return redirect()
                 ->route('admin.users.index')
                 ->with('status', 'You cannot delete your own account.');
+        }
+
+        if (ProtectedAdministrator::isProtected($user)) {
+            return redirect()
+                ->route('admin.users.index')
+                ->with('status', ProtectedAdministrator::REFUSALS['delete']);
         }
 
         $user->delete();

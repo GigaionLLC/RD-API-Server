@@ -3,6 +3,46 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-07-25 12:40] - Break-glass administrator, generated bootstrap password, CLI recovery
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `database/migrations/2026_07_25_100001_add_protected_admin_to_users_table.php` (new)
+- `app/Support/{ProtectedAdministrator,GeneratedAdminPassword,InitialAdminPassword}.php` (new)
+- `app/Console/Commands/{ResetAdminPassword,ManageProtectedAdmin}.php` (new)
+- `app/Support/BootstrapAdminCredentials.php`
+- `app/Services/LdapService.php`
+- `app/Http/Controllers/Admin/{AuthController,UserController}.php`
+- `app/Models/User.php`
+- `database/seeders/DatabaseSeeder.php`
+- `docker/entrypoint.sh`
+- `tests/Feature/{ProtectedAdministratorTest,AdminRecoveryCommandTest}.php` (new)
+- `tests/Feature/BootstrapAdminSeederTest.php`
+- `tests/Unit/BootstrapAdminCredentialsTest.php`
+- `.env.example`
+- `QUICKSTART.md`
+- `docker/README.md`
+- `Wiki/core/15-security.md`
+- `CHANGELOG.md`
+- `DevOps/plans/break-glass-admin.md` (new)
+- `DevOps/logs/agent-changelog.md`
+**Database/API Changes:** One migration adds `users.is_protected_admin` plus a unique stored
+generated column, and designates the lowest-id non-federated administrator on upgrade. `ADMIN_PASS`
+becomes optional rather than required in production. No route, response-shape, or RustDesk wire
+contract change.
+**Summary:** Designated one account as break-glass: it cannot be demoted, disabled, deleted,
+restricted to SSO, or demoted by a directory, from the console, the bulk actions, or `/api/v1`. This
+closes a live defect where `LDAP_SYNC=true` wrote `is_admin` from directory group membership on every
+sign-in while the membership test returns false whenever `LDAP_ADMIN_GROUP` is unset, so the default
+configuration silently demoted a linked administrator. `ADMIN_PASS` is now optional: an unset value
+generates a password, surfaced once on stderr and in a root-owned `0400` file that deletes itself at
+first sign-in, with the seeder holding a row lock so concurrent boots cannot both generate one and an
+existing password never rotating. Added `rustdesk:admin:reset`, the only path out of a lost second
+factor with no recovery codes, and `rustdesk:admin:protect` to show, move, or deliberately clear the
+designation; both are CLI-only so a console session can never reassign the account that exists to
+survive a compromised console. Verified in Docker: Pint across 300 files, PHPStan across 194 files,
+641 PHPUnit tests / 3,453 assertions (up from 622 / 3,242), and 71 Playwright tests with 21
+intentional skips.
+
 ## [2026-07-24 17:05] - Identity-provider group to console role mapping
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**

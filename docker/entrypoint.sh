@@ -292,6 +292,17 @@ fi
 
 chown -R www-data:www-data storage bootstrap/cache || true
 
+# The bootstrap credential file is written by the seeder above and must not be readable by the web
+# process: an application file-read primitive would otherwise disclose the administrator password.
+# Ownership is re-asserted here because the chown above walks the whole storage tree. The file
+# removes itself once that account first signs in.
+initial_password_file="storage/app/.initial-admin-password"
+if [ -f "$initial_password_file" ]; then
+    chown root:root "$initial_password_file" || true
+    chmod 400 "$initial_password_file" || true
+    echo "[entrypoint] the generated administrator password is in $initial_password_file until that account first signs in." >&2
+fi
+
 # PHP-FPM starts only after ADMIN_PASS has been removed above. It intentionally inherits the
 # remaining application environment through clear_env=no.
 

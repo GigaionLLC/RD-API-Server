@@ -27,9 +27,11 @@ final class BootstrapAdminCredentials
                 return self::DEVELOPMENT_PASSWORD;
             }
 
-            throw new RuntimeException(
-                'Production bootstrap refused: ADMIN_PASS is required before the initial administrator can be created.'
-            );
+            // A generated password is a safe default, where refusing to start was merely a safe
+            // one. ADMIN_PASS remains supported for deployments and test harnesses that need a
+            // deterministic credential; leaving it unset now produces a strong random password
+            // that is surfaced once at first boot instead of aborting startup.
+            return GeneratedAdminPassword::create($username);
         }
 
         $password = (string) $configuredPassword;
@@ -56,7 +58,7 @@ final class BootstrapAdminCredentials
         return $password;
     }
 
-    private static function isMissing(?string $password): bool
+    public static function isMissing(?string $password): bool
     {
         return $password === null || trim($password) === '';
     }

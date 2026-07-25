@@ -53,6 +53,7 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'is_protected_admin' => 'boolean',
             'force_sso' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'two_factor_secret' => 'encrypted',

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\LdapIdentity;
 use App\Models\User;
+use App\Support\ProtectedAdministrator;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -255,7 +256,13 @@ class LdapService
             }
             $user->email = $directoryEmail;
             $user->display_name = $this->nullableUserAttribute($attrs['display_name']);
-            $user->is_admin = $attrs['is_admin'];
+            // The break-glass administrator exists precisely so a directory cannot remove the last
+            // way into the console. Note that isAdmin() returns false whenever LDAP_ADMIN_GROUP is
+            // unset, so without this guard the default configuration demotes a linked administrator
+            // on every single sign-in.
+            if (! ProtectedAdministrator::isProtected($user)) {
+                $user->is_admin = $attrs['is_admin'];
+            }
             $user->save();
         }
 

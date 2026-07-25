@@ -8,6 +8,7 @@ Create a `.env` file next to `docker-compose.yml`. Generate unique values with a
 manager; do not copy the angle-bracket placeholders literally.
 
 ```env
+# Optional: omit ADMIN_PASS to have one generated and shown once at first boot.
 ADMIN_PASS=<unique-admin-password-at-least-12-characters>
 DB_PASSWORD=<unique-database-password-used-by-the-app-and-MariaDB>
 DB_CONNECTION=mariadb
@@ -33,11 +34,12 @@ both the `db` service and the app's `depends_on` entry.
 
 - **Admin console:** http://localhost:21114/admin
 - **Client API base:** http://localhost:21114/api
-- **Initial login:** `admin` / the unique `ADMIN_PASS` you supplied above.
+- **Initial login:** `admin` / the `ADMIN_PASS` you supplied, or the generated password shown in the container log.
 
-Production has no default admin password. On a new database the container stops before seeding
-if `ADMIN_PASS` is missing, shorter than 12 characters, known/default, a placeholder, repeated,
-or derived from `ADMIN_USER`.
+`ADMIN_PASS` is optional. Leave it out and a strong password is generated on the first boot,
+printed once in the container log and written to `storage/app/.initial-admin-password` until that
+account first signs in. If you do set it, it is still refused when shorter than 12 characters,
+known/default, a placeholder, repeated, or derived from `ADMIN_USER`.
 
 ## 2. Point it at your RustDesk servers
 
@@ -267,6 +269,19 @@ real client address. A trusted proxy or custom client can instead send a random 
 `X-Recording-Token`; a proxy must strip any inbound copy before injecting that header. Default
 limits are 8 MiB per chunk, 2 GiB per file, 10 GiB total, 5,000 files, four active uploads per
 source, and 600 requests per source/minute; each has a matching setting in `.env.example`.
+
+**If you are locked out.** The first administrator account is the break-glass account: no directory
+or SSO provider can demote, disable, or lock it out. Recover it from a shell on the host:
+
+```bash
+docker compose exec rustdesk-api php artisan rustdesk:admin:reset admin --generate
+```
+
+Add `--clear-2fa` if the second factor is lost and the recovery codes are spent, `--clear-force-sso`
+if the account was restricted to SSO sign-in, and `--unlink-federated-identities` if it was linked
+to a directory or identity provider. Each is off by default, and the command prints exactly what it
+removed. `php artisan rustdesk:admin:protect --show` says which account currently holds the
+designation.
 
 **A self-hosted OIDC provider on a private network** (Authentik, Keycloak, Authelia, Zitadel on
 a LAN, VPN, Docker network, or Kubernetes cluster) needs its address trusted explicitly.
