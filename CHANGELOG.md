@@ -6,6 +6,8 @@ notes.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-25
+
 ### Added
 
 - A break-glass administrator. The first account is designated as protected and can no longer be
@@ -20,8 +22,18 @@ notes.
   that account signs in, after which the file is deleted. Setting `ADMIN_PASS` keeps today's
   behaviour and validation exactly.
 
+### Changed
+
+- Release candidates can now be published. A tag suffixed `-alpha.N`, `-beta.N` or `-rc.N`
+  publishes its exact version and moves a new `:next` alias, while `:latest`, `:1` and `:1.3` stay
+  on the last stable release, so an unpinned deployment never receives a candidate. Promotion is a
+  stable tag on the same commit.
+
 ### Fixed
 
+- The production runtime smoke read `docker logs` once immediately after container readiness, which
+  could miss a line that had already been written. It now polls, so a slow log flush no longer fails
+  the release gate.
 - An LDAP directory could silently demote a local administrator on every sign-in. With
   `LDAP_SYNC=true`, attribute synchronization wrote `is_admin` from group membership, and that
   membership test returns false whenever `LDAP_ADMIN_GROUP` is unset, which is its default. The
@@ -183,7 +195,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.3.0...HEAD
+[1.3.0]: docs/releases/v1.3.0.md
 [1.2.0]: docs/releases/v1.2.0.md
 [#1]: https://github.com/GigaionLLC/RD-API-Server/issues/1
 [1.1.0]: docs/releases/v1.1.0.md

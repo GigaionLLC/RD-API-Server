@@ -12,6 +12,12 @@ command, backed by MariaDB.
 > compatibility with its open‑source client. This is a **separate implementation** of the
 > client's public API, maintained independently.
 
+> 🧪 **Release candidate: [v1.3.0-rc.1](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.3.0-rc.1)**
+> — identity-provider groups can grant console roles, and one break-glass administrator is now
+> protected from every identity provider. Pull `:1.3.0-rc.1` or `:next` to test it; `:latest` still
+> points at v1.2.0 until it is promoted. See the
+> **[v1.3.0 release notes](docs/releases/v1.3.0.md)**.
+>
 > ✅ **Stable release: [v1.2.0](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.2.0).**
 > This release makes a self-hosted OIDC provider on a private network usable through an explicit,
 > deny-by-default trusted-network opt-in, and makes OIDC sign-in failures report their real cause.
@@ -83,14 +89,15 @@ A quick look at the dark admin console — full set in the
 
 The bundled **[`docker-compose.yml`](docker-compose.yml)** runs the published image with
 **MariaDB/InnoDB**, the only supported database. Copy it (or the example below), then create a
-local `.env` file with a unique admin password (at least 12 characters), your DB password, and
-RustDesk endpoints. There is no production admin-password default.
+local `.env` file with your DB password and RustDesk endpoints. `ADMIN_PASS` is optional: omit it
+and a strong password is generated at first boot and shown once in the container log.
 
 For a deployment that must remain on the current stable release, set
 `RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.2.0`; `latest` moves only with a
 verified, annotated stable release tag.
 
 ```env
+# Optional: omit to have one generated and shown once at first boot.
 ADMIN_PASS=<unique-admin-password-from-your-password-manager>
 DB_PASSWORD=<unique-database-password>
 DB_CONNECTION=mariadb
@@ -240,6 +247,8 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 ## 📚 Documentation
 
 - **[CHANGELOG.md](CHANGELOG.md)** — public release history
+- **[v1.3.0 release notes](docs/releases/v1.3.0.md)** — SSO group to role mapping, break-glass
+  administrator, optional `ADMIN_PASS`, release candidates
 - **[v1.2.0 release notes](docs/releases/v1.2.0.md)** — private-network OIDC providers, what the
   opt-in never permits, and OIDC failure diagnostics
 - **[v1.1.0 release notes](docs/releases/v1.1.0.md)** — Nginx/PHP-FPM runtime, proxy defaults,
