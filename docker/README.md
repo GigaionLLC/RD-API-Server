@@ -244,6 +244,35 @@ RUSTDESK_API_IMAGE='ghcr.io/gigaionllc/rustdesk-api-server:sha-<40-hex-commit>@s
   docker compose up -d
 ```
 
+## Release channels
+
+Three kinds of tag exist on the registry, and which one you pin decides what an upgrade does.
+
+| Pull | Moves | Use for |
+|---|---|---|
+| `:latest`, `:1`, `:1.3` | Stable releases only | Ordinary deployments |
+| `:1.3.0`, `:1.3.0-rc.1` | Never | Reproducible pinning |
+| `:next` | Every prerelease | Testing a candidate before it ships |
+| `:sha-<commit>` | Never | Bisecting a specific `main` build |
+
+A prerelease tag (`v1.3.0-rc.1`, `-beta.N`, `-alpha.N`) publishes its exact version and moves
+`:next`. It deliberately does **not** move `:latest`, `:1`, or `:1.3`, so an unpinned production
+deployment never receives a candidate. Promotion is then just a stable tag on the same commit:
+
+```bash
+git tag -a v1.3.0-rc.1 -m "RD-API-Server v1.3.0-rc.1" && git push origin v1.3.0-rc.1
+# testers: RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:next
+# once confirmed, on the same commit:
+git tag -a v1.3.0 -m "RD-API-Server v1.3.0" && git push origin v1.3.0
+```
+
+Both tags must be annotated and must point at the current `main` commit; CI rejects anything else,
+so a candidate can never contain code that is not on `main`. Mark the candidate's GitHub Release
+with `gh release create ... --prerelease` so it does not display as the current release.
+
+To test a candidate without disturbing a real deployment, pin the digest rather than `:next`:
+`:next` moves the moment the next candidate is published.
+
 ## Production bootstrap credentials
 
 `ADMIN_PASS` is optional. When it is unset, the runtime generates a strong password for the first
