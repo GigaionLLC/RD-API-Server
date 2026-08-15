@@ -3,6 +3,34 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-15 14:40] - Plan: from-scratch browser RustDesk client (`web-client/`)
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `web-client/PLAN.md` (new)
+**Database/API Changes:** None — planning only, no implementation code.
+**Summary:** Verified against stock hbbs/hbbr source that WebSocket rendezvous (21118) and relay (21119) are unconditional since server 1.1.6, so a browser client needs no sidecar; produced a phased build plan for a from-scratch, permissively-licensed TypeScript viewer with a clean-room process (own `.proto` authored from field tables), a Worker/WebGL render path targeting ≤1 frame copy, and a conformance suite seeded from defects that shipped in competing implementations.
+
+## [2026-08-15 15:35] - Plan revision: Chromium-desktop-only target, AGPL, scope cuts
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `web-client/PLAN.md`
+**Database/API Changes:** None — planning only.
+**Summary:** Settled four decisions — HTTPS required, Chrome/Chromium desktop only, AGPL-3.0 (same as the repo), no build step — which delete the touch module, the File System Access fallback tier, and browser-matrix testing while making transfer resume and keyboard lock guaranteed rather than best-effort; estimate drops to 17–24 weeks and the render path now starts at `drawImage(VideoFrame)` on OffscreenCanvas rather than a WebGL shader pipeline.
+
+## [2026-08-15 15:10] - Plan revision: drop the web-client build toolchain
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `web-client/PLAN.md`
+**Database/API Changes:** None — planning only.
+**Summary:** Confirmed the HTTPS-only requirement and replaced the generated-protobuf design with a hand-written ~700-line wire codec plus declarative descriptor tables transcribed from the spec, so the client ships as native ES modules with no bundler, no codegen, and no `'unsafe-eval'`; types move to JSDoc + `checkJs` in CI, crypto/zstd/xterm stay vendored prebuilt via the existing `copy-admin-vendor.mjs` pattern, and Phase 0 widens by ~1 week to cover codec conformance tests.
+
+## [2026-08-15 11:20] - Research: a third-party implementation feature comparison
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `DevOps/vault/notes/18-competitive-analysis-2026-08.md` (new)
+**Database/API Changes:** None — research only, no code written.
+**Summary:** Compared a third-party RustDesk server implementation against this server; verified every claim against the protocol's observable behaviour rather than their docs, which invalidated most apparent gaps — including their own comment that the stock heartbeat carries CPU/memory/disk metrics (it does not) — and established that their browser-based RustDesk viewer needs no custom server or agent and could use stock WS ports 21118/21119 directly instead of their TCP-bridge design.
+
 ## [2026-07-25 21:15] - Candidate release channel, publish and record v1.3.0
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
