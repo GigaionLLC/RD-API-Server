@@ -1,0 +1,24 @@
+{
+    "name": "@rd-api-server/web-client",
+    "version": "0.1.0",
+    "description": "Browser RustDesk client — native ES modules, no build step.",
+    "license": "AGPL-3.0-or-later",
+    "type": "module",
+    "private": true,
+    "exports": {
+        ".": "./src/index.js"
+    },
+    "files": [
+        "src",
+        "vendor",
+        "LICENSE",
+        "README.md"
+    ],
+    "scripts": {
+        "test": "node --test test/",
+        "typecheck": "tsc --noEmit -p jsconfig.json"
+    },
+    "devDependencies": {
+        "typescript": "^5.6.0"
+    }
+}
