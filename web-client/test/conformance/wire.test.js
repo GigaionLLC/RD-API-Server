@@ -101,7 +101,9 @@ test('uint64 preserves opaque handles above 2^53', () => {
     // cursor_id is a cache key; Number would round it and break shape lookup.
     const handle = 0x0123456789abcdefn;
     assert.equal(new Reader(written((w) => w.varint64(handle))).uint64(), handle);
-    assert.notEqual(Number(handle), 0x0123456789abcdef); // precision really is lost as Number
+    // Demonstrate that the BigInt path is load-bearing: a Number round-trip does not
+    // return the same handle, so a Number-based cache key would collide across shapes.
+    assert.notEqual(BigInt(Number(handle)), handle);
 });
 
 /* -------------------------------------------------------------------------- */

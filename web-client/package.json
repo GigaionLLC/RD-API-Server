@@ -15,7 +15,7 @@
         "README.md"
     ],
     "scripts": {
-        "test": "node --test test/",
+        "test": "node --test",
         "typecheck": "tsc --noEmit -p jsconfig.json"
     },
     "devDependencies": {

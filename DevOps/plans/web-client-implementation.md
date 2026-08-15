@@ -115,10 +115,13 @@ in `PLAN.md` §6 — 7a–7f codec cases first, then the protocol silent-failure
 ## 7️⃣ Phase 7: Implementation Checklist
 
 - `[x]` Branch `feat/web-client`, research + strategy plan committed
-- `[ ]` Spec corpus `docs/spec/01`–`06`
-- `[ ]` `wire.js` + conformance tests
-- `[ ]` `enums.js` + `descriptors.js` + `codec.js` + round-trip tests
-- `[ ]` `crypto/` + known-answer tests
+- `[x]` `docs/spec/06-schema.md` — the wire schema (the source for the descriptors)
+- `[ ]` Spec corpus `docs/spec/01`–`05` (prose specs; 06 is the load-bearing one)
+- `[x]` `wire.js` + 22 conformance tests
+- `[x]` `enums.js` + `rendezvous.js` + `message.js` + `codec.js` + 22 round-trip tests
+- `[x]` `crypto/stream.js` — secretbox counters + nonce, 10 tests (cipher injected)
+- `[ ]` `crypto/handshake.js` + `password.js` — needs `vendor/` (noble) first
+- `[ ]` `vendor/` bootstrap via the `copy-admin-vendor.mjs` pattern
 - `[ ]` `transport/` + mock peer
 - `[ ]` `session/machine.js` — connect milestone
 - `[ ]` worker + video + render — pixels milestone
