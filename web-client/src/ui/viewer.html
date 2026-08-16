@@ -60,6 +60,10 @@
     <input id="key" placeholder="server key (base64)" autocomplete="off">
     <input id="password" type="password" placeholder="password" autocomplete="off">
     <select id="display" title="Monitor" disabled><option>display</option></select>
+    <select id="mode" title="Pipeline placement — 'main thread' is the baseline both competitors use">
+      <option value="worker" selected>worker</option>
+      <option value="main">main thread</option>
+    </select>
     <label title="Muted by default: if the peer is this machine, its own audio played back is a feedback loop">
       <input type="checkbox" id="mute" checked> mute
     </label>
