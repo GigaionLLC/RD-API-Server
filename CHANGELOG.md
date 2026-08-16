@@ -4,6 +4,43 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.4.1] - 2026-08-16
+
+### Added
+
+- **The browser remote desktop can now be stood up without touching a reverse proxy.** Setting
+  `RUSTDESK_WS_ID_UPSTREAM` and `RUSTDESK_WS_RELAY_UPSTREAM` — `host:port` as reachable from the
+  container, so on a Compose network the service names — makes this runtime serve `/ws/id` and
+  `/ws/relay` on the console's own hostname and certificate and forward them to `hbbs` and `hbbr`.
+  The viewer derives its endpoints from `APP_URL`, so nothing else needs configuring: no second
+  certificate, no extra public ports, and no hand-written WebSocket vhost.
+
+  The trade-off is stated wherever the option is offered: this container joins the media path,
+  which the direct arrangement exists to avoid. Explicit `RUSTDESK_WS_*_URL` values still win, so
+  moving between the two is a configuration change rather than a redeployment.
+
+  This also removes the easiest way to break the feature by hand. `hbbs` overwrites a connection's
+  address with `X-Real-IP` — falling back to `X-Forwarded-For`, unvalidated — and keys its
+  pending-response map on the result, so a proxy that forwards those headers makes concurrent
+  operators behind one address take each other's connections. The runtime blanks them.
+
+- **A Remote desktop page** under System reports every condition that would otherwise present as
+  "cannot connect" against a server that is running perfectly well: viewer assets, ID server,
+  server key, secure context, whether a forwarded HTTPS header is actually trusted, which transport
+  is configured, and whether the upstreams answer from inside the container. It also probes the
+  endpoint from the operator's own browser — the check that matters, and the only one the server
+  cannot make on their behalf.
+
+### Fixed
+
+- An HTTPS console with no WebSocket endpoints configured rendered a viewer that looked ready and
+  then failed to connect, which reads as an unreachable server rather than a missing setting. The
+  device page now says which values are missing.
+
+- Server-side tests for the viewer routes, which shipped in 1.4.0 without any: both routes re-run
+  the operator's device scope, the iframe document is gated exactly like the page that embeds it,
+  and no peer password appears in the injected configuration.
+
 ## [1.4.0] - 2026-08-16
 
 ### Added
@@ -244,7 +281,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.1...HEAD
+[1.4.1]: docs/releases/v1.4.1.md
 [1.4.0]: docs/releases/v1.4.0.md
 [1.3.0]: docs/releases/v1.3.0.md
 [1.2.0]: docs/releases/v1.2.0.md
