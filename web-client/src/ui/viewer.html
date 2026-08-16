@@ -57,6 +57,23 @@
   }
   body.showstats #stats { display: block; }
 
+  #chat {
+    position: absolute; right: 10px; bottom: 10px; width: 320px; display: none;
+    flex-direction: column; background: #0d0f13ee; border: 1px solid var(--line);
+    border-radius: 8px; overflow: hidden;
+  }
+  body.showchat #chat { display: flex; }
+  #chatLog { max-height: 240px; overflow-y: auto; padding: 8px; font-size: 13px; }
+  #chatLog .msg { margin-bottom: 6px; word-wrap: break-word; }
+  #chatLog .from { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  #chatLog .me .from { color: var(--accent); }
+  #chatLog .empty { color: var(--muted); }
+  #chatForm { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+  #chatInput { flex: 1; min-width: 0; }
+  /* An unread marker on the toolbar button, so a message is not missed while the panel
+     is closed — the protocol has no notification of its own. */
+  #chatBtn.unread { background: var(--warn); border-color: transparent; color: #14161a; }
+
   #hint {
     position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
     color: var(--muted); pointer-events: none; padding: 24px;
@@ -96,6 +113,7 @@
       <label class="check" title="Paste into the viewer to send; the peer's clipboard is applied on your next click or keypress">
         <input type="checkbox" id="clipboard" checked> clipboard
       </label>
+      <button id="chatBtn" title="Message whoever is at the remote machine">Chat</button>
       <button id="cad" title="Ctrl+Alt+Del">Ctrl+Alt+Del</button>
       <button id="refresh" title="Force a key frame. Restarts capture for every viewer of this display.">Refresh</button>
       <button id="fullscreen">Fullscreen</button>
@@ -111,6 +129,14 @@
     <canvas id="cursor"></canvas>
     <div id="hint">Enter connection details and press Connect.<br>Requires a secure context — <code>localhost</code> counts.</div>
     <div id="stats">no session</div>
+
+    <div id="chat">
+      <div id="chatLog"></div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="Message the remote user…" autocomplete="off" maxlength="4096">
+        <button type="submit" class="primary">Send</button>
+      </form>
+    </div>
   </div>
 
   <script type="module" src="./viewer.js"></script>

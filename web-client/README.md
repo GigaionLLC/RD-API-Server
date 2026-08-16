@@ -36,7 +36,8 @@ length-prefix codec at all.
 | Mouse, keyboard, wheel, drag, keyboard lock | working |
 | Quality and FPS control | working |
 | Clipboard — text and HTML, both directions | working |
-| File transfer, chat, terminal | not implemented |
+| Chat — message the person at the remote machine | working |
+| File transfer, terminal | not implemented |
 
 Deliberately out of scope, : **cliprdr** (no web API can act as
 a deferred OS clipboard file provider), **switch-sides** (needs input injection),

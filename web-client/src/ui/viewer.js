@@ -20,6 +20,7 @@ import { CursorLayer } from '../render/cursor.js';
 import { AudioStreamPlayer } from '../media/audio.js';
 import { InputController } from '../input/controller.js';
 import { ClipboardSync } from '../clipboard.js';
+import { ChatChannel } from '../chat.js';
 import { JankProbe } from './jank.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,6 +36,7 @@ let cursor = null;
 let audio = null;
 let input = null;
 let clipboard = null;
+let chat = null;
 let codecs = null;
 const jank = new JankProbe();
 
@@ -57,6 +59,8 @@ globalThis.__viewer = {
     get audio() { audio?.requestStats(); return audio?.stats() ?? null; },
     get input() { return input?.stats() ?? null; },
     get clipboard() { return clipboard?.stats() ?? null; },
+    get chat() { return chat?.stats() ?? null; },
+    sendChat(text) { return chat?.send(text) ?? false; },
     get jank() { return jank.stats(); },
     get error() { return lastError; },
     get mainThreadVideoWork() {
@@ -154,6 +158,11 @@ function setupInput(canvas) {
         enabled: $('clipboard').checked,
     });
 
+    chat = new ChatChannel({
+        send: (msg) => session.send(msg),
+        onMessage: (entry) => appendChat(entry),
+    });
+
     // Outbound is paste-driven: browsers expose no clipboard-change event, so a copy on
     // this side is not visible to us until the user pastes into the viewer.
     document.addEventListener('paste', (ev) => {
@@ -168,6 +177,30 @@ function setupInput(canvas) {
     }
 
     applyViewOnly();
+}
+
+/** @param {{from: 'peer'|'me', text: string, at: number}} entry */
+function appendChat(entry) {
+    const log = $('chatLog');
+    log.querySelector('.empty')?.remove();
+
+    const row = document.createElement('div');
+    row.className = `msg ${entry.from === 'me' ? 'me' : 'peer'}`;
+    const who = document.createElement('div');
+    who.className = 'from';
+    who.textContent = `${entry.from === 'me' ? 'you' : 'remote'} · ${new Date(entry.at).toLocaleTimeString()}`;
+    const body = document.createElement('div');
+    // textContent, never innerHTML: this string comes straight off the wire.
+    body.textContent = entry.text;
+    row.append(who, body);
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+
+    // The protocol has no notification of its own, so an inbound message while the panel
+    // is closed would otherwise go unnoticed entirely.
+    if (entry.from === 'peer' && !document.body.classList.contains('showchat')) {
+        $('chatBtn').classList.add('unread');
+    }
 }
 
 function applyViewOnly() {
@@ -204,6 +237,7 @@ async function connectWorker(video, cursorCanvas) {
     ws.onAudioFormat = async (f) => { await audio.setFormat(f); await audio.unlock(); };
     ws.onAudioFrame = (d) => audio.push(d);
     ws.onClipboard = (entries) => clipboard?.receive(entries);
+    ws.onChat = (text) => chat?.receive(text);
     ws.onStats = (s) => {
         workerStats = s;
         if (s.surface?.width) remote = { width: s.surface.width, height: s.surface.height };
@@ -254,6 +288,7 @@ async function connectMain(video, cursorCanvas) {
     };
     s.onDisplaySwitch = (d) => { cursor.setDisplay(d); decoder.reset(); };
     s.onClipboard = (entries) => clipboard?.receive(entries);
+    s.onChat = (text) => chat?.receive(text);
     s.onVideoFrame = (f) => {
         const t0 = performance.now();
         frames++;
@@ -347,6 +382,10 @@ function teardown() {
     jank.stop();
     input?.detach(); input = null;
     clipboard = null;
+    chat = null;
+    $('chatLog').innerHTML = '<div class="empty">No messages yet.</div>';
+    document.body.classList.remove('showchat');
+    $('chatBtn').classList.remove('unread');
     if (mode === 'main') decoder?.close();
     session?.close();
     audio?.close();
@@ -362,6 +401,16 @@ $('quality').addEventListener('change', setQuality);
 $('viewonly').addEventListener('change', applyViewOnly);
 $('mute').addEventListener('change', (e) => audio?.setMuted(e.target.checked));
 $('clipboard').addEventListener('change', (e) => clipboard?.setEnabled(e.target.checked));
+$('chatBtn').addEventListener('click', () => {
+    const open = document.body.classList.toggle('showchat');
+    $('chatBtn').classList.remove('unread');
+    if (open) { chat?.markRead(); $('chatInput').focus(); }
+});
+$('chatForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const field = /** @type {HTMLInputElement} */ ($('chatInput'));
+    if (chat?.send(field.value)) field.value = '';
+});
 $('cad').addEventListener('click', () => input?.sendCtrlAltDel());
 $('refresh').addEventListener('click', doRefresh);
 $('statsBtn').addEventListener('click', () => document.body.classList.toggle('showstats'));
