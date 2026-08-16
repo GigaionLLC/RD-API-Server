@@ -19,6 +19,7 @@ import { VideoSurface } from '../render/surface.js';
 import { CursorLayer } from '../render/cursor.js';
 import { AudioStreamPlayer } from '../media/audio.js';
 import { InputController } from '../input/controller.js';
+import { ClipboardSync } from '../clipboard.js';
 import { JankProbe } from './jank.js';
 
 const $ = (id) => document.getElementById(id);
@@ -33,6 +34,7 @@ let surface = null;
 let cursor = null;
 let audio = null;
 let input = null;
+let clipboard = null;
 let codecs = null;
 const jank = new JankProbe();
 
@@ -54,6 +56,7 @@ globalThis.__viewer = {
     get cursor() { return mode === 'worker' ? (workerStats?.cursor ?? null) : (cursor?.stats() ?? null); },
     get audio() { audio?.requestStats(); return audio?.stats() ?? null; },
     get input() { return input?.stats() ?? null; },
+    get clipboard() { return clipboard?.stats() ?? null; },
     get jank() { return jank.stats(); },
     get error() { return lastError; },
     get mainThreadVideoWork() {
@@ -144,6 +147,26 @@ function setupInput(canvas) {
         viewOnly: $('viewonly').checked,
     });
     input.attach();
+
+    clipboard = new ClipboardSync({
+        send: (msg) => session.send(msg),
+        peerInfo: () => session.peerInfo,
+        enabled: $('clipboard').checked,
+    });
+
+    // Outbound is paste-driven: browsers expose no clipboard-change event, so a copy on
+    // this side is not visible to us until the user pastes into the viewer.
+    document.addEventListener('paste', (ev) => {
+        if ($('viewonly').checked) return;
+        if (clipboard?.sendFromPaste(ev)) ev.preventDefault();
+    });
+
+    // Inbound needs a transient user activation, so it is flushed on the next gesture
+    // rather than when it arrives.
+    for (const type of ['pointerdown', 'keydown', 'focus']) {
+        canvas.addEventListener(type, () => { clipboard?.flush(); });
+    }
+
     applyViewOnly();
 }
 
@@ -180,6 +203,7 @@ async function connectWorker(video, cursorCanvas) {
     ws.onDisplaySwitch = (d) => { if (d.width) remote = { width: d.width, height: d.height }; };
     ws.onAudioFormat = async (f) => { await audio.setFormat(f); await audio.unlock(); };
     ws.onAudioFrame = (d) => audio.push(d);
+    ws.onClipboard = (entries) => clipboard?.receive(entries);
     ws.onStats = (s) => {
         workerStats = s;
         if (s.surface?.width) remote = { width: s.surface.width, height: s.surface.height };
@@ -229,6 +253,7 @@ async function connectMain(video, cursorCanvas) {
         else if (c.type === 'position') cursor.setPosition(c.x, c.y);
     };
     s.onDisplaySwitch = (d) => { cursor.setDisplay(d); decoder.reset(); };
+    s.onClipboard = (entries) => clipboard?.receive(entries);
     s.onVideoFrame = (f) => {
         const t0 = performance.now();
         frames++;
@@ -283,6 +308,7 @@ function paintStats() {
     if (mode === 'worker') session.requestStats?.();
     const a = audio?.stats() ?? {};
     const i = input?.stats() ?? {};
+    const cb = clipboard?.stats() ?? {};
     const j = jank.stats();
     let lines;
 
@@ -312,6 +338,7 @@ function paintStats() {
         ...lines,
         `audio    ${a.format ? `${a.format.sampleRate}Hz ×${a.format.channels}` : '—'} · ${a.packets ?? 0} pkt · ${a.errors ?? 0} err${a.muted ? ' · muted' : ''}`,
         `input    ${i.mouse ?? 0} mouse · ${i.keys ?? 0} keys${i.viewOnly ? ' · VIEW ONLY' : ''}${i.locked ? ' · kbd locked' : ''}`,
+        `clip     ${cb.received ?? 0} in · ${cb.sent ?? 0} out · ${cb.dropped ?? 0} dropped${cb.pending ? ' · awaiting gesture' : ''}${cb.enabled === false ? ' · off' : ''}`,
         `jank     p95 ${j.p95 ?? '—'}ms · max ${j.max ?? '—'}ms`,
     ].join('\n');
 }
@@ -319,6 +346,7 @@ function paintStats() {
 function teardown() {
     jank.stop();
     input?.detach(); input = null;
+    clipboard = null;
     if (mode === 'main') decoder?.close();
     session?.close();
     audio?.close();
@@ -333,6 +361,7 @@ $('display').addEventListener('change', switchDisplay);
 $('quality').addEventListener('change', setQuality);
 $('viewonly').addEventListener('change', applyViewOnly);
 $('mute').addEventListener('change', (e) => audio?.setMuted(e.target.checked));
+$('clipboard').addEventListener('change', (e) => clipboard?.setEnabled(e.target.checked));
 $('cad').addEventListener('click', () => input?.sendCtrlAltDel());
 $('refresh').addEventListener('click', doRefresh);
 $('statsBtn').addEventListener('click', () => document.body.classList.toggle('showstats'));

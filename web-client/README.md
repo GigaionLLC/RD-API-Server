@@ -35,7 +35,8 @@ length-prefix codec at all.
 | Audio — Opus via AudioDecoder + AudioWorklet | working |
 | Mouse, keyboard, wheel, drag, keyboard lock | working |
 | Quality and FPS control | working |
-| Clipboard, file transfer, chat, terminal | not implemented |
+| Clipboard — text and HTML, both directions | working |
+| File transfer, chat, terminal | not implemented |
 
 Deliberately out of scope, : **cliprdr** (no web API can act as
 a deferred OS clipboard file provider), **switch-sides** (needs input injection),

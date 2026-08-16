@@ -70,6 +70,9 @@ export class WorkerSession {
             case 'chat':
                 this.onChat?.(msg.text);
                 break;
+            case 'clipboard':
+                this.onClipboard?.(msg.entries);
+                break;
             case 'permissions':
                 this.denied = msg.denied;
                 this.onPermissions?.(msg.denied);

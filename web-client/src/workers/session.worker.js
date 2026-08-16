@@ -109,6 +109,19 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
         post({ type: 'audio', data: copy }, [copy.buffer]);
     };
     session.onChat = (text) => post({ type: 'chat', text });
+    session.onClipboard = (entries) => {
+        // Copy each payload out of the receive buffer, which is reused, before it crosses
+        // the thread boundary.
+        post({
+            type: 'clipboard',
+            entries: entries.map((e) => ({
+                format: e.format ?? 0,
+                compress: e.compress === true,
+                content: new Uint8Array(e.content ?? []),
+                special_name: e.special_name ?? '',
+            })),
+        });
+    };
     session.onPermissions = (p) => post({ type: 'permissions', denied: p.denied() });
     session.onClose = (err) => post({ type: 'closed', code: err.code, message: err.message });
 
