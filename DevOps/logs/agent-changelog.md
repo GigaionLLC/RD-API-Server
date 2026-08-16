@@ -3,6 +3,34 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-16 21:30] - Released v1.4.4: remote desktop verified against a live peer
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `app/Http/Controllers/Admin/WebClientController.php` (<base> injection, ASSET_BASE constant)
+- `app/Services/WebClientDiagnosticsService.php` (server key half detection)
+- `tests/Feature/WebClientAssetsTest.php`, `tests/Feature/WebClientTest.php`
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.4.4.md`
+**Database/API Changes:** None. `/api/version` reports `1.4.4`.
+**Summary:** Published v1.4.4 at manifest digest
+`sha256:8b3561625c8d09bec29c2912fb2fd7cfb371a22ed43209322fdefa7f3e2d6254`. **The feature now
+demonstrably works**: a live session was driven through the published image against peer 345890346 —
+rendezvous, relay, encrypted handshake, login, H.265 1920x1080, frames received equal to frames
+painted, four monitors enumerated, view-only so no input was ever sent. The last fault was that the
+viewer's HTML is served from an application route while its `src="./viewer.js"` resolves against
+that route, so one 404 stopped the entire module graph; a `<base>` fixes it, and the trailing slash
+`asset()` strips is load-bearing — without it the identical failure recurs from a base that looks
+correct, which was caught only by re-checking in a browser rather than assuming. **Method note that
+matters more than the fix:** three releases were spent diagnosing this from source reading, and it
+took ten minutes once a throwaway stack was stood up on http://localhost (a secure context needing
+no TLS) and the page was inspected in a real browser. When a page behaves as though its scripts did
+not run, stand it up and look. Also found, while configuring that stack from the operator's own
+compose: their `RUSTDESK_KEY` holds the 64-byte Ed25519 PRIVATE key rather than the 32-byte public
+one — confirmed because its last 32 bytes equal the key their client uses. That publishes the key
+proving the server's identity to every client that fetches a configuration, and hbbs refuses it
+outright. The diagnostics page now detects it, prints the correct public key, and says to rotate the
+pair; the operator was told to rotate, since the value also appeared in chat. **Verification stack
+was torn down afterwards.**
+
 ## [2026-08-16 20:30] - Released v1.4.3: the published viewer never ran
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
