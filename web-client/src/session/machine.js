@@ -112,12 +112,23 @@ export class RustDeskSession {
             relayUrl: this.opts.relayUrl ?? '',
         });
 
-        const relayInfo = await this._rendezvous(urls.rendezvous);
-        await this._openRelay(urls.relay, relayInfo);
-        await this._handshake(relayInfo);
-        const info = await this._login();
-        this._pump(); // fire and forget; errors surface via onClose
-        return info;
+        try {
+            const relayInfo = await this._rendezvous(urls.rendezvous);
+            await this._openRelay(urls.relay, relayInfo);
+            await this._handshake(relayInfo);
+            const info = await this._login();
+            this._pump(); // fire and forget; errors surface via onClose
+            return info;
+        } catch (err) {
+            // A TransportError carries no `code`, so letting it escape as-is leaves the
+            // caller unable to classify the single most common failure — an unreachable
+            // or restarting server — and a retry policy would treat it as fatal.
+            if (err instanceof TransportError) {
+                this.socket?.close();
+                throw new SessionError(err.message, 'transport');
+            }
+            throw err;
+        }
     }
 
     /**
@@ -156,7 +167,14 @@ export class RustDeskSession {
                 if (ph.socket_addr.length === 0) {
                     const name = Object.keys(PunchHoleFailure)
                         .find((k) => PunchHoleFailure[k] === (ph.failure ?? 0));
-                    throw new SessionError(ph.other_failure || name || 'unknown failure', 'rendezvous_failed');
+                    // OFFLINE is worth retrying — a rebooting machine comes back, and an
+                    // operator watching one expects the session to catch it. The other
+                    // failures (unknown id, licence mismatch) are settled.
+                    const offline = (ph.failure ?? 0) === PunchHoleFailure.OFFLINE;
+                    throw new SessionError(
+                        ph.other_failure || name || 'unknown failure',
+                        offline ? 'offline' : 'rendezvous_failed',
+                    );
                 }
                 // A browser cannot hole-punch, so a direct address is unusable.
                 throw new SessionError('peer offered a direct connection; a browser can only relay', 'no_relay');

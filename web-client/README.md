@@ -37,7 +37,8 @@ length-prefix codec at all.
 | Image-quality control | working |
 | Clipboard — text and HTML, both directions | working |
 | Chat — message the person at the remote machine | working |
-| File transfer, terminal, 2FA login, auto-reconnect | not implemented |
+| Auto-reconnect with backoff, human error messages | working |
+| File transfer, terminal, 2FA login | not implemented |
 
 Deliberately out of scope, : **cliprdr** (no web API can act as
 a deferred OS clipboard file provider), **switch-sides** (needs input injection),
@@ -144,7 +145,7 @@ npm run test:browser  # Playwright, real Chromium
 npm run typecheck  # tsc --noEmit --checkJs (JSDoc types, zero build output)
 ```
 
-173 conformance tests over the protocol, crypto, session, input and clipboard layers. They encode the
+201 conformance tests over the protocol, crypto, session, input and clipboard layers. They encode the
 protocol's silent-failure modes: pre-incremented secretbox counters, the `<= 1` byte
 passthrough rule, per-field zigzag, packed vs unpacked repeated fields, negatively
 signalled permissions, and the mouse mask requiring exactly one button bit.
