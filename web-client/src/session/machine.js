@@ -11,6 +11,8 @@
  *   onAudioFormat(fmt) / onAudioFrame(bytes)
  *   onChat(text)
  *   onPermissions(set)     the PermissionSet, after a change
+ *   onMessageBox(box)      {msgtype, title, text, link} the peer wants shown
+ *   onElevation(state)     {uac, elevated, portable, response} Windows elevation state
  *   onClipboard(entries)
  *   onDisplaySwitch(info)
  *   onMessage(msg)         every decoded Message, for anything unhandled
@@ -25,7 +27,7 @@ import { encode, decode } from '../protocol/codec.js';
 import { RendezvousMessage } from '../protocol/rendezvous.js';
 import { Message, CODEC_BY_FIELD } from '../protocol/message.js';
 import { NatType, ConnType, PunchHoleFailure } from '../protocol/enums.js';
-import { FrameSocket, endpoints, TransportError } from '../transport/ws.js';
+import { FrameSocket, endpoints, splitHostPort, TransportError } from '../transport/ws.js';
 import { negotiate, decodeBase64 } from '../crypto/handshake.js';
 import { derivePassword } from '../crypto/password.js';
 import { secretboxCipher } from '../crypto/cipher.js';
@@ -49,6 +51,7 @@ export class RustDeskSession {
     /**
      * @param {object} opts
      * @param {string} opts.host Rendezvous host, optionally `host:port`.
+     * @param {string} [opts.relayHost] Relay host when it is not the rendezvous host.
      * @param {string} opts.peerId
      * @param {string} [opts.serverKey] Base64 Ed25519 server key.
      * @param {string} [opts.password]
@@ -72,6 +75,12 @@ export class RustDeskSession {
         this.activeDisplay = 0;
         this.encrypted = false;
         this.downgradeReason = null;
+        /**
+         * Windows elevation, accumulated from separate one-shot Misc booleans.
+         * @type {{uac: boolean, elevated: boolean, portable: boolean,
+         *         pending: boolean, response: string | null}}
+         */
+        this.elevation = { uac: false, elevated: false, portable: false, pending: false, response: null };
         /** @type {FrameSocket | null} */
         this.socket = null;
         /** @type {SecretStream | null} */
@@ -104,8 +113,11 @@ export class RustDeskSession {
     async connect() {
         const urls = endpoints({
             host: this.opts.host,
-            rendezvousPort: this.opts.rendezvousPort ?? 21116,
-            relayPort: this.opts.relayPort ?? 21117,
+            relayHost: this.opts.relayHost ?? '',
+            // Passed through undefined rather than defaulted here, so that a port written
+            // into the host string is not overridden by a default the operator never set.
+            rendezvousPort: this.opts.rendezvousPort,
+            relayPort: this.opts.relayPort,
             secure: this.opts.secure ?? false,
             pathRouted: this.opts.pathRouted ?? false,
             rendezvousUrl: this.opts.rendezvousUrl ?? '',
@@ -194,10 +206,16 @@ export class RustDeskSession {
         this._setState('relay');
         // An explicit relay URL is authoritative: behind a reverse proxy the peer's
         // advertised relay host is usually not reachable from a browser at all.
+        //
+        // Otherwise the advertised address is used verbatim, port included. hbbs hands out
+        // whatever `relay-server` it was configured with, which is how a deployment on a
+        // non-standard port or a separate relay machine describes itself — discarding that
+        // port and substituting 21117 sent every such deployment to a closed socket.
+        const advertised = splitHostPort(info.relayServer ?? '');
         const url = this.opts.relayUrl || (info.relayServer
             ? endpoints({
                 host: info.relayServer,
-                relayPort: this.opts.relayPort ?? 21117,
+                relayPort: advertised.port ?? this.opts.relayPort,
                 secure: this.opts.secure ?? false,
                 pathRouted: this.opts.pathRouted ?? false,
             }).relay
@@ -311,12 +329,21 @@ export class RustDeskSession {
         }
     }
 
-    /** The message pump for the life of the session. */
+    /**
+     * The message pump for the life of the session.
+     *
+     * Reads here have no deadline. The handshake reads do — a peer that stops mid-login
+     * is broken — but an established session is legitimately silent: the peer sends
+     * video only when the screen changes, so a locked or idle desktop can produce
+     * nothing for hours. A per-read timeout would have torn those sessions down.
+     * Liveness is still covered: the peer's own TestDelay keepalive arrives on its
+     * schedule, and a socket that actually dies rejects every waiter through `_onClose`.
+     */
     async _pump() {
         this._running = true;
         try {
             while (this._running && this.socket && !this.socket.closed) {
-                this._dispatch(await this._recv('message'));
+                this._dispatch(await this._recv('message', 0));
             }
         } catch (err) {
             if (this._running) this._fail(err);
@@ -369,6 +396,11 @@ export class RustDeskSession {
                 this.peerInfo = m.peer_info;
                 this.onPeerInfo?.(m.peer_info);
                 break;
+            case 'message_box':
+                // Everything from "waiting for the user to accept" to "account locked
+                // out" arrives here. Dropped, the session just appears to stall.
+                this.onMessageBox?.(m.message_box);
+                break;
             default:
                 break;
         }
@@ -393,9 +425,55 @@ export class RustDeskSession {
             case 'close_reason':
                 this._fail(new SessionError(misc.close_reason || 'peer closed the session', 'closed_by_peer'));
                 break;
+
+            // Windows elevation. These arrive as separate one-shot booleans, so the
+            // session keeps the composite state and emits all of it: the UI needs
+            // "a UAC prompt is up AND we already elevated" to decide what to say.
+            case 'uac':
+                this.elevation.uac = misc.uac === true;
+                this.onElevation?.({ ...this.elevation });
+                break;
+            case 'foreground_window_elevated':
+                this.elevation.elevated = misc.foreground_window_elevated === true;
+                this.onElevation?.({ ...this.elevation });
+                break;
+            case 'portable_service_running':
+                // The portable (non-installed) service cannot elevate itself, so this
+                // decides whether offering an Elevate button is honest.
+                this.elevation.portable = misc.portable_service_running === true;
+                this.onElevation?.({ ...this.elevation });
+                break;
+            case 'elevation_response':
+                this.elevation.pending = false;
+                this.elevation.response = misc.elevation_response ?? '';
+                this.onElevation?.({ ...this.elevation });
+                break;
+
             default:
                 break;
         }
+    }
+
+    /**
+     * Asks the peer's service to elevate this session.
+     *
+     * Two forms, and the peer decides which it honours: `direct` raises a consent prompt
+     * that someone at the machine must answer, while `logon` passes administrator
+     * credentials for the peer to use instead — the only form that works when nobody is
+     * physically present.
+     *
+     * The answer is asynchronous and arrives as `elevation_response`, empty on success.
+     *
+     * @param {{username?: string, password?: string}} [creds] Omit for a consent prompt.
+     */
+    requestElevation(creds) {
+        const request = creds?.username
+            ? { logon: { username: creds.username, password: creds.password ?? '' } }
+            : { direct: true };
+        this.elevation.pending = true;
+        this.elevation.response = null;
+        this.send({ misc: { elevation_request: request } });
+        this.onElevation?.({ ...this.elevation });
     }
 
     /**
@@ -409,9 +487,12 @@ export class RustDeskSession {
         this.targetBitrateKbps = td.target_bitrate ?? 0;
     }
 
-    /** @param {string} label */
-    async _recv(label) {
-        return decode(Message, this.stream.decrypt(await this.socket.next(label)));
+    /**
+     * @param {string} label
+     * @param {number} [timeoutMs] Pass 0 to wait indefinitely — see `_pump`.
+     */
+    async _recv(label, timeoutMs) {
+        return decode(Message, this.stream.decrypt(await this.socket.next(label, timeoutMs)));
     }
 
     /** @returns {bigint} Non-zero and stable for this session. */

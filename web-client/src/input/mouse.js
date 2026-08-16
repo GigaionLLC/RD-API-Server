@@ -82,6 +82,102 @@ export function wheelNotches(ev) {
 }
 
 /**
+ * One wheel notch, in the pixels a browser reports for it.
+ *
+ * Chrome reports 100 per notch in pixel mode; Firefox uses line mode instead, which the
+ * caller has already converted. The exact number only decides how far a notch scrolls,
+ * not whether scrolling works.
+ */
+export const NOTCH_PX = 100;
+
+/** Below this, a pixel-mode delta is a trackpad rather than a wheel. See `ScrollRouter`. */
+const TRACKPAD_MAX_PX = 40;
+
+/**
+ * Turns a stream of browser wheel events into protocol scroll messages.
+ *
+ * Two problems, both of which a naive `±1 per event` gets wrong in opposite directions:
+ *
+ *  - A mouse wheel produces large discrete deltas. Sending one notch per event is
+ *    correct, but a fast flick that the browser coalesces into a single 300px event has
+ *    to become three notches, or scrolling a long document takes three times the wrist.
+ *  - A trackpad produces a continuous stream of small deltas — often under 10px. Rounding
+ *    each to a full notch turns a 3px nudge into a page jump; discarding them makes the
+ *    trackpad feel dead. Those go out as TRACKPAD, which the host applies as pixels
+ *    without the ×120 wheel multiplication.
+ *
+ * Remainders are carried between events, so a slow drag accumulates instead of being
+ * repeatedly truncated to zero.
+ */
+export class ScrollRouter {
+    /**
+     * @param {object} [opts]
+     * @param {number} [opts.notchPx]
+     * @param {boolean} [opts.allowTrackpad] Whether the peer accepts TRACKPAD. Defaults
+     *   to off: an older host ignores a mouse type it does not know, which would leave
+     *   scrolling silently dead rather than merely coarse. The caller gates this on the
+     *   peer version — see protocol/version.js.
+     */
+    constructor({ notchPx = NOTCH_PX, allowTrackpad = false } = {}) {
+        this.notchPx = notchPx;
+        this.allowTrackpad = allowTrackpad;
+        this._wheel = { x: 0, y: 0 };
+        this._pixels = { x: 0, y: 0 };
+    }
+
+    /**
+     * @param {{deltaX: number, deltaY: number, deltaMode?: number}} ev Already converted
+     *   to pixels by the caller, which knows the browser's line and page heights.
+     * @param {boolean} [precise] The event came from a precise device. Callers pass the
+     *   original `deltaMode === 0`; line and page modes are only ever produced by a wheel.
+     * @returns {{kind: 'wheel'|'trackpad', x: number, y: number} | null}
+     */
+    push({ deltaX = 0, deltaY = 0 }, precise = true) {
+        if (!deltaX && !deltaY) return null;
+
+        // A wheel in pixel mode still arrives in notch-sized steps; a trackpad does not.
+        // Taking the larger axis avoids classifying the near-zero cross-axis of a diagonal
+        // trackpad gesture as a wheel event on its own.
+        const magnitude = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+        const isTrackpad = this.allowTrackpad && precise && magnitude < TRACKPAD_MAX_PX;
+
+        if (isTrackpad) {
+            // Both axes: a trackpad scrolls diagonally on purpose, and the axis lock that
+            // suits a wheel would make a diagonal gesture stutter between the two.
+            this._pixels.x += deltaX;
+            this._pixels.y += deltaY;
+            const x = Math.trunc(this._pixels.x);
+            const y = Math.trunc(this._pixels.y);
+            this._pixels.x -= x;
+            this._pixels.y -= y;
+            if (!x && !y) return null;
+            // `|| 0` normalises negative zero, which is a valid protobuf value but makes
+            // every equality check on the result surprising.
+            return { kind: 'trackpad', x: -x || 0, y: -y || 0 };
+        }
+
+        // Dominant axis only. A wheel tilts rarely, and cross-axis leakage on a mouse is
+        // noise rather than intent.
+        const vertical = Math.abs(deltaY) >= Math.abs(deltaX);
+        const axis = vertical ? 'y' : 'x';
+        this._wheel[axis] += vertical ? deltaY : deltaX;
+        const notches = Math.trunc(this._wheel[axis] / this.notchPx);
+        if (!notches) return null;
+        this._wheel[axis] -= notches * this.notchPx;
+        // The other axis's residue is stale once the user has changed direction.
+        this._wheel[vertical ? 'x' : 'y'] = 0;
+        return vertical
+            ? { kind: 'wheel', x: 0, y: -notches }
+            : { kind: 'wheel', x: -notches, y: 0 };
+    }
+
+    reset() {
+        this._wheel = { x: 0, y: 0 };
+        this._pixels = { x: 0, y: 0 };
+    }
+}
+
+/**
  * Builds mouse messages. Kept separate from the session so a consumer of the session
  * library cannot move a remote pointer without explicitly constructing one of these.
  */

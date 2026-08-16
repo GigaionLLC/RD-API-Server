@@ -145,7 +145,7 @@ npm run test:browser  # Playwright, real Chromium
 npm run typecheck  # tsc --noEmit --checkJs (JSDoc types, zero build output)
 ```
 
-201 conformance tests over the protocol, crypto, session, input and clipboard layers. They encode the
+253 conformance tests over the protocol, crypto, session, input and clipboard layers. They encode the
 protocol's silent-failure modes: pre-incremented secretbox counters, the `<= 1` byte
 passthrough rule, per-field zigzag, packed vs unpacked repeated fields, negatively
 signalled permissions, and the mouse mask requiring exactly one button bit.

@@ -21,7 +21,7 @@
  * by accident.
  */
 
-import { MouseEncoder, buttonFor, modifiersOf, toVirtualDesktop, wheelNotches } from './mouse.js';
+import { MouseEncoder, ScrollRouter, buttonFor, modifiersOf, toVirtualDesktop } from './mouse.js';
 import { KeyboardEncoder, namedKey, isPrintable, modifiersFor } from './keyboard.js';
 import { ControlKey } from '../protocol/enums.js';
 
@@ -37,13 +37,16 @@ export class InputController {
      * @param {() => {width: number, height: number}} opts.remoteSize Current video size.
      * @param {() => {x?: number, y?: number, scale?: number}} opts.display Active display.
      * @param {boolean} [opts.viewOnly]
+     * @param {boolean} [opts.trackpad] Peer accepts pixel-precise scrolling; gate it on
+     *   `supportsTrackpadScroll(peerInfo)`.
      */
-    constructor({ element, send, remoteSize, display, viewOnly = false }) {
+    constructor({ element, send, remoteSize, display, viewOnly = false, trackpad = false }) {
         this.element = element;
         this.remoteSize = remoteSize;
         this.display = display;
         this.viewOnly = viewOnly;
         this.mouse = new MouseEncoder(send, { viewOnly });
+        this.scroll = new ScrollRouter({ allowTrackpad: trackpad });
         this.keyboard = new KeyboardEncoder(send, { viewOnly });
         this.enabled = false;
         this.locked = false;
@@ -132,11 +135,15 @@ export class InputController {
         this._on(el, 'wheel', (ev) => {
             if (this.viewOnly) return;
             ev.preventDefault();
-            // deltaMode: 0 = pixels, 1 = lines, 2 = pages.
+            // deltaMode: 0 = pixels, 1 = lines, 2 = pages. Only a wheel produces the
+            // latter two, so pixel mode is what distinguishes a precise device.
             const factor = ev.deltaMode === 1 ? LINE_HEIGHT_PX : ev.deltaMode === 2 ? PAGE_HEIGHT_PX : 1;
-            const px = { deltaX: ev.deltaX * factor, deltaY: ev.deltaY * factor, deltaMode: 0 };
-            const n = wheelNotches(px);
-            if (n.x || n.y) this.mouse.wheel(n.x, n.y, modifiersOf(ev));
+            const px = { deltaX: ev.deltaX * factor, deltaY: ev.deltaY * factor };
+            const out = this.scroll.push(px, ev.deltaMode === 0);
+            if (!out) return; // accumulating; a sub-notch nudge is not a page jump
+            const mods = modifiersOf(ev);
+            if (out.kind === 'trackpad') this.mouse.trackpad(out.x, out.y, mods);
+            else this.mouse.wheel(out.x, out.y, mods);
         }, { passive: false });
 
         this._on(el, 'contextmenu', (ev) => { if (!this.viewOnly) ev.preventDefault(); });
@@ -215,6 +222,7 @@ export class InputController {
     detach() {
         this.keyboard.releaseAll();
         this.unlockKeyboard();
+        this.scroll.reset(); // a part-notch remainder must not carry into the next session
         for (const off of this._bound.splice(0)) off();
         this.enabled = false;
     }

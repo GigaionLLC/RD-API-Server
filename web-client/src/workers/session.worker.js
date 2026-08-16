@@ -79,7 +79,12 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
     codecs = new CodecCapabilities(decodable);
 
     decoder = new VideoStreamDecoder({
-        onFrame: (f) => surface.draw(f),
+        onFrame: (f) => {
+            surface.draw(f);
+            // Closes the loop on markFailure: without this a codec that glitched three
+            // times an hour apart is retired as though it had failed three times running.
+            if (decoder?.codec) codecs.markSuccess(decoder.codec);
+        },
         onError: (err, codec) => {
             post({ type: 'decodeError', codec, message: err.message });
             if (codecs.markFailure(codec)) {
@@ -170,6 +175,14 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
         });
     };
     session.onPermissions = (p) => post({ type: 'permissions', denied: p.denied() });
+    session.onMessageBox = (box) => post({
+        type: 'messageBox',
+        box: {
+            msgtype: box.msgtype ?? '', title: box.title ?? '',
+            text: box.text ?? '', link: box.link ?? '',
+        },
+    });
+    session.onElevation = (state) => post({ type: 'elevation', state });
     session.onClose = (err) => post({ type: 'closed', code: err.code, message: err.message });
 
     try {
@@ -270,6 +283,11 @@ globalThis.onmessage = async (ev) => {
             break;
         case 'refresh':
             refresh();
+            break;
+        case 'elevate':
+            // Credentials, when present, are consumed here and never retained: the worker
+            // encrypts them into the session stream and drops the message.
+            session?.requestElevation(msg.creds);
             break;
         case 'stats':
             post(stats());

@@ -1,0 +1,31 @@
+{
+    "//": [
+        "Type checking for plain JavaScript. There is no build step and no TypeScript in",
+        "the shipped source: this reads the JSDoc annotations and reports what they catch.",
+        "DOM and WebWorker cannot both be listed — their globals collide — so DOM is used",
+        "and the worker's own globals are annotated where they differ.",
+        "Run with: npm run typecheck",
+        "",
+        "NOT a passing gate yet. It currently reports a backlog, most of it from three",
+        "patterns rather than three bugs: event handlers assigned by consumers and never",
+        "declared on the class, canvas contexts typed as a union that includes",
+        "ImageBitmapRenderingContext, and globals the DOM lib does not describe",
+        "(navigator.keyboard, AudioWorkletGlobalScope, the vendored trees). Treat the",
+        "output as a to-do list, not as CI."
+    ],
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ES2022",
+        "moduleResolution": "bundler",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "allowJs": true,
+        "checkJs": true,
+        "noEmit": true,
+        "strict": false,
+        "noImplicitAny": false,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": ["src/**/*.js"],
+    "exclude": ["node_modules", "vendor", "test", "e2e", "tools", "scripts"]
+}

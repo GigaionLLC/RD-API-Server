@@ -13,7 +13,7 @@
 
 import { RustDeskSession } from '../session/machine.js';
 import { WorkerSession } from '../session/client.js';
-import { CodecCapabilities, probeDecodable, customQuality } from '../media/codec.js';
+import { CodecCapabilities, probeDecodable, customQuality, presetQuality } from '../media/codec.js';
 import { VideoStreamDecoder } from '../media/decoder.js';
 import { VideoSurface } from '../render/surface.js';
 import { CursorLayer } from '../render/cursor.js';
@@ -22,7 +22,11 @@ import { InputController } from '../input/controller.js';
 import { ClipboardSync } from '../clipboard.js';
 import { ChatChannel } from '../chat.js';
 import { ReconnectPolicy, explain } from '../session/retry.js';
+import {
+    describeMessageBox, describeDenials, describeElevation, describeElevationResponse,
+} from '../session/notices.js';
 import { JankProbe } from './jank.js';
+import { supportsTrackpadScroll } from '../protocol/version.js';
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
@@ -47,6 +51,8 @@ let lastError = null; let workerStats = null;
 let remote = { width: 0, height: 0 };
 let activeDisplay = {};
 let chosenDisplay = 0;
+/** @type {string[]} Permissions the peer has explicitly denied. */
+let deniedNames = [];
 
 let mainVideoWorkMs = 0; let mainDrawMs = 0; let mainDrawSamples = 0;
 
@@ -65,6 +71,14 @@ globalThis.__viewer = {
     sendChat(text) { return chat?.send(text) ?? false; },
     get jank() { return jank.stats(); },
     get error() { return lastError; },
+    get denied() { return [...deniedNames]; },
+    get notices() {
+        return [...notices].map(([key, el]) => ({
+            key,
+            title: el.querySelector('.title')?.textContent ?? '',
+            detail: el.querySelector('.detail')?.textContent ?? '',
+        }));
+    },
     get mainThreadVideoWork() {
         const f = mode === 'worker' ? (workerStats?.frames ?? 0) : frames;
         const total = mainVideoWorkMs + mainDrawMs;
@@ -83,6 +97,15 @@ globalThis.__viewer = {
     },
     switchTo(i) { $('display').value = String(i); switchDisplay(); },
     setViewOnly(v) { $('viewonly').checked = v; applyViewOnly(); },
+    // Drives the notice stack without a peer. The reconciliation this exercises — a
+    // banner that must disappear when a permission is granted back — cannot be reached
+    // from a unit test, and getting a real peer to deny a permission on cue is not a
+    // repeatable test.
+    notify: {
+        messageBox: (box) => onMessageBox(box),
+        permissions: (denied) => onDenials(denied),
+        elevation: (state) => onElevation(state),
+    },
 };
 
 function setStatus(text, kind = '') {
@@ -104,6 +127,9 @@ function sessionOptions() {
     if (config) {
         return {
             host: config.host,
+            // Deployments that run hbbr on its own machine advertise it through hbbs, but
+            // the fallback used when nothing is advertised needs it too.
+            relayHost: config.relayHost ?? '',
             peerId: config.peerId,
             serverKey: config.serverKey ?? '',
             password: $('password')?.value ?? config.password ?? '',
@@ -183,6 +209,9 @@ function setupInput(canvas) {
         remoteSize: () => remote,
         display: () => activeDisplay,
         viewOnly: $('viewonly').checked,
+        // Pixel-precise scrolling only where the peer is known to apply it; older hosts
+        // ignore the message, which would read as a dead trackpad.
+        trackpad: supportsTrackpadScroll(session.peerInfo ?? {}),
     });
     input.attach();
 
@@ -223,6 +252,153 @@ function setupInput(canvas) {
     applyViewOnly();
 }
 
+/* -------------------------------------------------------------------------- */
+/* Notices                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A keyed stack, not a log. Peers repeat the same MessageBox for as long as they are
+ * waiting for a decision, and permission state is a level rather than an edge — appending
+ * would bury the canvas under identical cards within seconds.
+ * @type {Map<string, HTMLElement>}
+ */
+const notices = new Map();
+
+/** @param {{key: string, severity: string, title: string, detail?: string, link?: string, action?: string}} n */
+function showNotice(n) {
+    const card = document.createElement('div');
+    card.className = `notice ${n.severity}`;
+
+    const body = document.createElement('div');
+    body.className = 'body';
+
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = n.title;
+    body.appendChild(title);
+
+    if (n.detail) {
+        const detail = document.createElement('div');
+        detail.className = 'detail';
+        // textContent throughout: every one of these strings arrives from the peer.
+        detail.textContent = n.detail;
+        body.appendChild(detail);
+    }
+    if (n.link) {
+        const link = document.createElement('div');
+        link.className = 'link';
+        // Shown, not linked. A peer-supplied URL in trusted chrome is a phishing surface.
+        link.textContent = n.link;
+        body.appendChild(link);
+    }
+    if (n.action === 'elevate') body.appendChild(elevationForm());
+
+    const close = document.createElement('button');
+    close.className = 'dismiss';
+    close.type = 'button';
+    close.title = 'Dismiss';
+    close.textContent = '×';
+    close.addEventListener('click', () => dismissNotice(n.key));
+
+    card.append(body, close);
+    notices.get(n.key)?.remove();
+    notices.set(n.key, card);
+    $('notices').appendChild(card);
+}
+
+/** @param {string} key */
+function dismissNotice(key) {
+    notices.get(key)?.remove();
+    notices.delete(key);
+}
+
+function clearNotices() {
+    for (const el of notices.values()) el.remove();
+    notices.clear();
+}
+
+/**
+ * Two ways out of an elevation block, because they fail in different situations: a consent
+ * prompt needs someone at the machine, and credentials work when nobody is there.
+ */
+function elevationForm() {
+    const wrap = document.createElement('div');
+
+    const ask = document.createElement('button');
+    ask.type = 'button';
+    ask.textContent = 'Ask at the machine';
+    ask.title = 'Raises a consent prompt the remote user must accept';
+    ask.addEventListener('click', () => session?.requestElevation?.());
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.appendChild(ask);
+    wrap.appendChild(actions);
+
+    const form = document.createElement('form');
+    const user = document.createElement('input');
+    user.placeholder = 'administrator';
+    user.autocomplete = 'off';
+    const pass = document.createElement('input');
+    pass.type = 'password';
+    pass.placeholder = 'password';
+    pass.autocomplete = 'off';
+    const go = document.createElement('button');
+    go.type = 'submit';
+    go.className = 'primary';
+    go.textContent = 'Elevate';
+    form.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        if (!user.value) return;
+        session?.requestElevation?.({ username: user.value, password: pass.value });
+        // Held only as long as it takes to encrypt into the session stream.
+        pass.value = '';
+    });
+    form.append(user, pass, go);
+    wrap.appendChild(form);
+    return wrap;
+}
+
+/** @param {object} box */
+function onMessageBox(box) {
+    const n = describeMessageBox(box);
+    showNotice(n);
+    // A peer asking for the password again wants the field, not a card to read.
+    if (n.prompt === 'password') $('password')?.focus();
+}
+
+/** @param {string[]} denied */
+function onDenials(denied) {
+    const wanted = describeDenials(denied);
+    const keep = new Set(wanted.map((n) => n.key));
+    // Permissions are a live level: a permission switched back on at the remote end must
+    // take its banner away, or the operator is told input is dead while it works.
+    for (const key of [...notices.keys()]) {
+        if (key.startsWith('perm:') && !keep.has(key)) dismissNotice(key);
+    }
+    for (const n of wanted) if (!notices.has(n.key)) showNotice(n);
+    deniedNames = denied;
+    applyViewOnly();
+}
+
+/** @param {{uac: boolean, elevated: boolean, portable: boolean, pending: boolean, response: string|null}} state */
+function onElevation(state) {
+    const n = describeElevation(state);
+    if (n) {
+        if (!notices.has(n.key)) showNotice(n);
+    } else {
+        dismissNotice('elev:uac');
+        dismissNotice('elev:foreground');
+    }
+    if (state.response !== null && state.response !== undefined) {
+        const r = describeElevationResponse(state.response);
+        showNotice(r);
+        // Success clears the block that prompted it; a failure leaves it up, because the
+        // window is still unreachable.
+        if (r.severity === 'info') { dismissNotice('elev:uac'); dismissNotice('elev:foreground'); }
+    }
+}
+
 /** @param {{from: 'peer'|'me', text: string, at: number}} entry */
 function appendChat(entry) {
     const log = $('chatLog');
@@ -248,7 +424,9 @@ function appendChat(entry) {
 }
 
 function applyViewOnly() {
-    const v = $('viewonly').checked;
+    // A peer that has switched off keyboard control is view-only whatever the checkbox
+    // says; unchecking it must not resume sending input the peer is discarding.
+    const v = $('viewonly').checked || deniedNames.includes('Keyboard');
     input?.setViewOnly(v);
     document.body.classList.toggle('viewonly', v);
 }
@@ -292,6 +470,9 @@ async function connectWorker(video, cursorCanvas) {
     ws.onAudioFrame = (d) => audio.push(d);
     ws.onClipboard = (entries) => clipboard?.receive(entries);
     ws.onChat = (text) => chat?.receive(text);
+    ws.onMessageBox = onMessageBox;
+    ws.onPermissions = onDenials;
+    ws.onElevation = onElevation;
     ws.onStats = (s) => {
         workerStats = s;
         if (s.surface?.width) remote = { width: s.surface.width, height: s.surface.height };
@@ -319,6 +500,8 @@ async function connectMain(video, cursorCanvas) {
             surface.draw(f);
             mainDrawMs += performance.now() - t0;
             mainDrawSamples++;
+            // Pairs with markFailure below: a streak is only meaningful if success clears it.
+            if (decoder?.codec) codecs.markSuccess(decoder.codec);
         },
         onError: (err, codec) => {
             lastError = `${codec}: ${err.message}`;
@@ -348,6 +531,9 @@ async function connectMain(video, cursorCanvas) {
     s.onDisplaySwitch = (d) => { cursor.setDisplay(d); decoder.reset(); };
     s.onClipboard = (entries) => clipboard?.receive(entries);
     s.onChat = (text) => chat?.receive(text);
+    s.onMessageBox = onMessageBox;
+    s.onPermissions = (set) => onDenials(set.denied());
+    s.onElevation = onElevation;
     s.onVideoFrame = (f) => {
         const t0 = performance.now();
         frames++;
@@ -421,11 +607,15 @@ function switchDisplay() {
     cursor?.setDisplay(activeDisplay);
 }
 
-function setQuality() {
-    const pct = Number($('quality').value || 0);
-    if (!session || session.state !== 'connected' || !pct) return;
+/**
+ * @param {{preset?: string, percent?: number}} choice A protocol preset, or a custom
+ *   percentage for callers that want a value between them.
+ */
+function setQuality(choice = { preset: $('quality').value }) {
+    if (!session || session.state !== 'connected') return;
     // Preset and custom are mutually exclusive: sending both drops the custom value.
-    session.send({ misc: { option: customQuality(pct) } });
+    const option = choice.percent ? customQuality(choice.percent) : presetQuality(choice.preset);
+    session.send({ misc: { option } });
 }
 
 function paintStats() {
@@ -465,6 +655,7 @@ function paintStats() {
         `input    ${i.mouse ?? 0} mouse · ${i.keys ?? 0} keys${i.viewOnly ? ' · VIEW ONLY' : ''}${i.locked ? ' · kbd locked' : ''}`,
         `clip     ${cb.received ?? 0} in · ${cb.sent ?? 0} out · ${cb.dropped ?? 0} dropped${cb.pending ? ' · awaiting gesture' : ''}${cb.enabled === false ? ' · off' : ''}`,
         `jank     p95 ${j.p95 ?? '—'}ms · max ${j.max ?? '—'}ms`,
+        ...(deniedNames.length ? [`denied   ${deniedNames.join(', ')}`] : []),
     ].join('\n');
 }
 
@@ -475,6 +666,8 @@ function teardown() {
     clipboard = null;
     chat = null;
     $('chatLog').innerHTML = '<div class="empty">No messages yet.</div>';
+    clearNotices();
+    deniedNames = [];
     document.body.classList.remove('showchat');
     $('chatBtn').classList.remove('unread');
     if (mode === 'main') decoder?.close();
@@ -493,7 +686,7 @@ $('disconnect').addEventListener('click', () => {
     teardown();
 });
 $('display').addEventListener('change', switchDisplay);
-$('quality').addEventListener('change', setQuality);
+$('quality').addEventListener('change', () => setQuality());
 $('viewonly').addEventListener('change', applyViewOnly);
 $('mute').addEventListener('change', (e) => audio?.setMuted(e.target.checked));
 $('clipboard').addEventListener('change', (e) => clipboard?.setEnabled(e.target.checked));

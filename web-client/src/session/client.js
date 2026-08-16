@@ -21,6 +21,8 @@ export class WorkerSession {
         /** Non-null when the session fell back to plaintext; the UI must surface this. */
         this.downgradeReason = null;
         this.denied = [];
+        /** @type {{uac: boolean, elevated: boolean, portable: boolean, pending: boolean, response: string | null}} */
+        this.elevation = { uac: false, elevated: false, portable: false, pending: false, response: null };
         /** @type {object | null} */
         this.lastStats = null;
         this.transferred = false;
@@ -81,6 +83,13 @@ export class WorkerSession {
                 this.denied = msg.denied;
                 this.onPermissions?.(msg.denied);
                 break;
+            case 'messageBox':
+                this.onMessageBox?.(msg.box);
+                break;
+            case 'elevation':
+                this.elevation = msg.state;
+                this.onElevation?.(msg.state);
+                break;
             case 'stats':
                 this.lastStats = msg;
                 this.encrypted = msg.encrypted;
@@ -121,6 +130,11 @@ export class WorkerSession {
 
     refresh() {
         this.worker?.postMessage({ type: 'refresh' });
+    }
+
+    /** @param {{username?: string, password?: string}} [creds] Omit for a consent prompt. */
+    requestElevation(creds) {
+        this.worker?.postMessage({ type: 'elevate', creds });
     }
 
     requestStats() {
