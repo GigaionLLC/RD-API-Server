@@ -120,8 +120,13 @@ in `PLAN.md` §6 — 7a–7f codec cases first, then the protocol silent-failure
 - `[x]` `wire.js` + 22 conformance tests
 - `[x]` `enums.js` + `rendezvous.js` + `message.js` + `codec.js` + 22 round-trip tests
 - `[x]` `crypto/stream.js` — secretbox counters + nonce, 10 tests (cipher injected)
+- `[x]` **Live rendezvous verified against real hbbs** (`test/integration/rendezvous.mjs`) —
+  WS on 21118 accepted, one frame = one message, our PunchHoleRequest understood,
+  RelayResponse decoded, `nat_type=SYMMETRIC` confirmed as the relay trigger.
+  **The no-sidecar architecture is now empirically proven, not just read from source.**
 - `[ ]` `crypto/handshake.js` + `password.js` — needs `vendor/` (noble) first
 - `[ ]` `vendor/` bootstrap via the `copy-admin-vendor.mjs` pattern
+- `[ ]` relay leg: `RequestRelay` on :21119, pair by uuid
 - `[ ]` `transport/` + mock peer
 - `[ ]` `session/machine.js` — connect milestone
 - `[ ]` worker + video + render — pixels milestone
