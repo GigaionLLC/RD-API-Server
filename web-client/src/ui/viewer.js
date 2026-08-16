@@ -21,6 +21,7 @@ import { AudioStreamPlayer } from '../media/audio.js';
 import { InputController } from '../input/controller.js';
 import { ClipboardSync } from '../clipboard.js';
 import { ChatChannel } from '../chat.js';
+import { ReconnectPolicy, explain } from '../session/retry.js';
 import { JankProbe } from './jank.js';
 
 const $ = (id) => document.getElementById(id);
@@ -252,8 +253,12 @@ function applyViewOnly() {
     document.body.classList.toggle('viewonly', v);
 }
 
-async function connect() {
+/** @param {boolean} [isRetry] Suppresses the counter reset, so backoff keeps growing. */
+async function connect(isRetry = false) {
     lastError = null; workerStats = null;
+    // A fresh attempt by the operator starts from a short delay again; a scheduled retry
+    // must not, or backoff never grows.
+    if (!isRetry) cancelRetry();
     frames = 0; bytes = 0; keyFrames = 0; firstFrameAt = 0;
     mainVideoWorkMs = 0; mainDrawMs = 0; mainDrawSamples = 0;
     remote = { width: 0, height: 0 };
@@ -274,7 +279,13 @@ async function connectWorker(video, cursorCanvas) {
     const ws = new WorkerSession();
     session = ws;
     ws.onState = (s) => { if (s !== 'connected') setStatus(s); };
-    ws.onPeerInfo = (info) => { populateDisplays(info); setupInput($('video')); };
+    ws.onPeerInfo = (info) => {
+        // A session that survived long enough to log in resets the backoff, so a drop an
+        // hour from now waits a second rather than thirty.
+        retry.reset();
+        populateDisplays(info);
+        setupInput($('video'));
+    };
     ws.onResize = (w, h) => { remote = { width: w, height: h }; };
     ws.onDisplaySwitch = (d) => { if (d.width) remote = { width: d.width, height: d.height }; };
     ws.onAudioFormat = async (f) => { await audio.setFormat(f); await audio.unlock(); };
@@ -285,7 +296,7 @@ async function connectWorker(video, cursorCanvas) {
         workerStats = s;
         if (s.surface?.width) remote = { width: s.surface.width, height: s.surface.height };
     };
-    ws.onClose = (err) => fail(err.message);
+    ws.onClose = (err) => fail(err);
     ws.connect({ videoCanvas: video, cursorCanvas, session: sessionOptions() });
 }
 
@@ -295,7 +306,11 @@ async function connectMain(video, cursorCanvas) {
     surface.onResize = (w, h) => { cursor.resize(w, h); remote = { width: w, height: h }; };
 
     const decodable = await probeDecodable();
-    if (decodable.size === 0) { fail('WebCodecs unavailable — needs a secure context'); return; }
+    if (decodable.size === 0) {
+        // Not retryable: a browser without WebCodecs will not grow it on the next attempt.
+        fail({ code: 'unsupported', message: 'WebCodecs is unavailable — this page needs a secure context (HTTPS or localhost)' });
+        return;
+    }
     codecs = new CodecCapabilities(decodable);
 
     decoder = new VideoStreamDecoder({
@@ -318,6 +333,7 @@ async function connectMain(video, cursorCanvas) {
     session = s;
     s.onState = (st) => { if (st !== 'connected') setStatus(st); };
     s.onPeerInfo = (info) => {
+        retry.reset();
         populateDisplays(info);
         cursor.setDisplay(info.displays[info.current_display ?? 0] ?? {});
         setupInput($('video'));
@@ -341,15 +357,45 @@ async function connectMain(video, cursorCanvas) {
         decoder.decode(f);
         mainVideoWorkMs += performance.now() - t0;
     };
-    s.onClose = (err) => fail(err.message);
+    s.onClose = (err) => fail(err);
 
-    try { await s.connect(); } catch (err) { fail(`${err.code ?? 'error'}: ${err.message}`); }
+    try { await s.connect(); } catch (err) { fail(err); }
 }
 
-function fail(message) {
-    lastError = message;
-    setStatus(message, 'err');
+const retry = new ReconnectPolicy();
+let retryTimer = null;
+
+/**
+ * Ends the session, and reconnects if the failure was transient.
+ *
+ * Every session is relayed, so drops are ordinary rather than exceptional. What is NOT
+ * retried matters more: a wrong password would walk the peer's failed-attempt counter
+ * toward a lockout, and a refused encryption downgrade would invite whatever stripped it
+ * to keep trying. The taxonomy lives in session/retry.js.
+ *
+ * @param {{code?: string, message?: string}} err
+ */
+function fail(err) {
+    const info = explain(err);
+    lastError = `${info.title}: ${info.detail}`;
     teardown();
+
+    if ($('autoreconnect').checked && retry.shouldRetry(err)) {
+        const delay = retry.nextDelay();
+        const seconds = Math.max(1, Math.round(delay / 1000));
+        setStatus(`${info.title} — reconnecting in ${seconds}s (${retry.attempt}/${retry.maxAttempts})`, 'warn');
+        retryTimer = setTimeout(() => { retryTimer = null; connect(true); }, delay);
+        return;
+    }
+
+    setStatus(info.retryable && retry.exhausted
+        ? `${info.title} — gave up after ${retry.maxAttempts} attempts`
+        : `${info.title} — ${info.detail}`, 'err');
+}
+
+function cancelRetry() {
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    retry.reset();
 }
 
 function doRefresh() {
@@ -440,7 +486,12 @@ function teardown() {
 }
 
 $('connect').addEventListener('click', () => { connect(); });
-$('disconnect').addEventListener('click', () => { setStatus('disconnected'); teardown(); });
+$('disconnect').addEventListener('click', () => {
+    // An explicit disconnect must cancel a pending retry, or the session reappears.
+    cancelRetry();
+    setStatus('disconnected');
+    teardown();
+});
 $('display').addEventListener('change', switchDisplay);
 $('quality').addEventListener('change', setQuality);
 $('viewonly').addEventListener('change', applyViewOnly);
