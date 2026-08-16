@@ -3,10 +3,10 @@
 ## 📊 State Dashboard
 | Metric | Value |
 | :--- | :--- |
-| **Status** | `IN_PROGRESS` |
+| **Status** | `RELEASE_CANDIDATE` |
 | **Version** | `v1.0.0` |
 | **Active Persona** | `Architect` → `Implementer` |
-| **Last Updated** | 2026-08-15 16:00 |
+| **Last Updated** | 2026-08-16 09:30 |
 
 ---
 
@@ -136,14 +136,17 @@ in `web-client/test/conformance/` — codec cases first, then the protocol silen
 construction from `hsalsa` + `x25519` by hand. tweetnacl maps 1:1 onto the NaCl primitives
 the protocol requires: combined-mode Ed25519 verify, crypto_box, crypto_secretbox. `SecretStream` takes the
 cipher by injection, so swapping the per-frame secretbox to noble later stays contained.
-- `[ ]` `transport/` + mock peer
-- `[ ]` `session/machine.js` — connect milestone
-- `[ ]` worker + video + render — pixels milestone
-- `[ ]` input — control milestone
-- `[ ]` displays / cursor / audio
-- `[ ]` files / chat / clipboard / terminal
-- `[ ]` host integration + reverse-proxy config
-- `[ ]` hardening, perf gates, security review
+- `[x]` `transport/ws.js` + `session/machine.js` — connect milestone (live `PeerInfo`)
+- `[x]` worker + video + render — pixels milestone (H.265, 0 dropped, 0ms main-thread)
+- `[x]` input — control milestone (click, drag, wheel, text verified against a scratch target)
+- `[x]` displays / cursor / audio — all verified live
+- `[x]` clipboard (both directions) and chat — verified live
+- `[ ]` **file transfer** — parked by the product owner until after the first release
+- `[ ]` **terminal** — not started
+- `[x]` host integration (Connect action, per-device authorization) + nginx/Caddy config
+- `[x]` browser coverage — 10 Playwright tests close the manual-verification gap
+- `[x]` release paperwork — CHANGELOG, `docs/releases/v1.4.0.md`
+- `[ ]` hardening pass and security review — outstanding
 
 ## 8️⃣ Phase 8: Verification Dashboard
 * **Verification Status:** `PENDING`

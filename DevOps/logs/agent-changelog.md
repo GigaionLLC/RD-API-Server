@@ -10,6 +10,15 @@ Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 **Database/API Changes:** None — planning only, no implementation code.
 **Summary:** Verified against stock hbbs/hbbr source that WebSocket rendezvous (21118) and relay (21119) are unconditional since server 1.1.6, so a browser client needs no sidecar; produced a phased build plan for a from-scratch, permissively-licensed TypeScript viewer with a clean-room process (own `.proto` authored from field tables), a Worker/WebGL render path targeting ≤1 frame copy, and a conformance suite seeded from defects that shipped in competing implementations.
 
+## [2026-08-16 09:30] - Browser remote desktop: release preparation
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `CHANGELOG.md`, `docs/releases/v1.4.0.md` (new)
+- `web-client/e2e/` (new — Playwright), `web-client/playwright.config.mjs`, `web-client/package.json`
+- `web-client/src/chat.js`, `web-client/src/clipboard.js`, `web-client/src/protocol/version.js` (new)
+**Database/API Changes:** None. No migration; the client API is untouched.
+**Summary:** Completed the feature set for a first release of the browser remote desktop — clipboard both directions and chat, each verified live against a real peer with independent confirmation (Windows clipboard read back; the peer opening a connection-manager window). Closed the manual-verification gap with 10 Playwright tests in real Chromium covering WebCodecs, compositing, the audio graph and the Worker, including a full encode/decode/paint round trip; 173 Node tests plus 10 browser tests now pass. Drafted CHANGELOG and v1.4.0 release notes stating scope honestly, including that file transfer and terminal are absent and that every browser session is relayed.
+
 ## [2026-08-15 15:35] - Plan revision: Chromium-desktop-only target, AGPL, scope cuts
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**

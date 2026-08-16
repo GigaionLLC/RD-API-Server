@@ -6,6 +6,35 @@ notes.
 
 ## [Unreleased]
 
+### Added
+
+- **Browser remote desktop.** A **Connect** action on each device opens a full remote desktop in
+  the browser — screen, sound, mouse, keyboard, clipboard and chat — with no plugin, no download
+  and no client install. The page speaks the RustDesk protocol directly to `hbbs` and `hbbr` over
+  WebSocket, so this server is never in the media path and the feature adds no long-running process
+  to operate.
+
+  Working today: video over VP8, VP9, AV1, H.264 and H.265; switching between the peer's monitors;
+  the remote cursor; Opus audio; mouse, keyboard, wheel and drag, with Ctrl+W and Escape reaching
+  the remote machine in fullscreen; clipboard text and HTML in both directions; and chat with
+  whoever is at the far end.
+
+  Not yet implemented: **file transfer** and **terminal**. Direct peer-to-peer is not possible from
+  a browser, so **every session is relayed** — budget relay bandwidth before offering this widely.
+
+  Requires **Chrome or Chromium on desktop**, and a **secure context**: an HTTPS console needs a
+  TLS terminator in front of ports 21118 and 21119, configured through `RUSTDESK_WS_ID_URL` and
+  `RUSTDESK_WS_RELAY_URL`. The peer's own connection password is entered in the viewer; this server
+  neither holds nor transmits it. See **[docs/web-client-deployment.md](docs/web-client-deployment.md)**
+  for nginx and Caddy configuration and two traps worth reading before deploying.
+
+  The viewer is a standalone package under `web-client/` with no build step. Publish it with
+  `node web-client/scripts/install-assets.mjs` after upgrading.
+
+- **An encrypted notes vault** (`scripts/vault.mjs`) keeps commercially sensitive working notes in
+  the repository and its history without exposing them publicly. `DevOps/vault/vault.enc` is
+  committed; the decrypted working copy and the passphrase are not.
+
 ## [1.3.0] - 2026-07-25
 
 ### Added
