@@ -80,9 +80,12 @@ export class CodecCapabilities {
         this.prefer = prefer;
         /** @type {Map<string, number>} */
         this.failures = new Map();
-        // VP9 has no host-side gate and is the universal fallback; the peer can always
-        // fall back to it, so claiming it is both safe and necessary.
-        this.decodable.add('vp9');
+        // VP9 is the peer's universal fallback and has no host-side gate, so it is added
+        // when the probe found nothing — a viewer advertising no codec at all cannot be
+        // sent anything. It is NOT forced when the probe ran and deliberately excluded
+        // it: claiming a codec this browser cannot decode would produce a connect-and-die
+        // loop, and would also force every other viewer of the same peer onto it.
+        if (this.decodable.size === 0) this.decodable.add('vp9');
     }
 
     /**

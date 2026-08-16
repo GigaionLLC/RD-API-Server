@@ -22,6 +22,7 @@
 import { RustDeskSession } from '../session/machine.js';
 import { CodecCapabilities, probeDecodable } from '../media/codec.js';
 import { VideoStreamDecoder } from '../media/decoder.js';
+import { FrameQueue } from '../media/frame-queue.js';
 import { VideoSurface } from '../render/surface.js';
 import { CursorLayer } from '../render/cursor.js';
 
@@ -35,6 +36,18 @@ let surface = null;
 let cursor = null;
 /** @type {CodecCapabilities | null} */
 let codecs = null;
+/** @type {Map<number, FrameQueue>} Admission control, one per display. */
+const queues = new Map();
+
+/**
+ * How much work the decoder may have outstanding before we stop handing it more.
+ *
+ * WebCodecs queues internally with no bound of its own, so on a machine that decodes
+ * slower than the network delivers — 4K, or AV1 without hardware support — the queue
+ * grows without limit: seconds of latency, rising memory, and no path back. Dropping to
+ * the next key frame is the only recovery the protocol offers.
+ */
+const MAX_DECODE_QUEUE = 4;
 
 let frames = 0;
 let bytes = 0;
@@ -96,7 +109,34 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
         if (f.key) keyFrames++;
         for (const u of f.units) bytes += u.data.length;
         if (!firstFrameAt) firstFrameAt = performance.now();
-        decoder.decode(f);
+
+        // The ACK has already gone out, in machine.js, before this handler ran. That is
+        // deliberate and must stay: the peer will not capture the next frame until it
+        // arrives, so withholding it as backpressure collapses the stream to one frame
+        // every three seconds. The bound is applied here instead, to what the decoder is
+        // asked to do.
+        const q = queueFor(f.display);
+
+        // Behind on decode: shed everything until the next key frame rather than let the
+        // decoder's own unbounded queue absorb the backlog as latency.
+        if (!f.key && decoder.queueSize >= MAX_DECODE_QUEUE) {
+            q.markBackpressure();
+            refresh();
+            return;
+        }
+
+        const { deliver, needsRefresh } = q.push(f);
+        if (deliver) decoder.decode(deliver);
+        if (needsRefresh) refresh();
+
+        // Drain immediately: push() only delivers key frames directly, so without this
+        // every delta would sit in the ring and the picture would freeze on the last key
+        // frame. The ring exists to absorb a brief stall, not to schedule playback.
+        while (decoder.queueSize < MAX_DECODE_QUEUE) {
+            const next = q.shift();
+            if (!next) break;
+            decoder.decode(next);
+        }
     };
     session.onCursor = (c) => {
         if (c.type === 'shape') cursor.setShape(c);
@@ -142,24 +182,32 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
 /**
  * Requests a key frame for the display we are actually viewing.
  *
- * Rate-limited because a refresh restarts the peer's capture pipeline for EVERY viewer of
- * that display, and the decoder fires `onKeyFrameNeeded` on every error — an unbounded
- * path would hammer the host during a persistently bad stream.
+ * Rate limiting lives in FrameQueue rather than here, so there is one implementation of
+ * the policy. A refresh restarts the peer's capture pipeline for EVERY viewer of that
+ * display, and the decoder asks for a key frame on every error, so an unbounded path
+ * would hammer the host through a bad stream.
  */
-let lastRefreshAt = -Infinity;
-let refreshCount = 0;
-const REFRESH_INTERVAL_MS = 10_000;
-const MAX_REFRESHES = 20;
-
 function refresh() {
     if (!session || session.state !== 'connected') return false;
-    const now = performance.now();
-    if (refreshCount >= MAX_REFRESHES || now - lastRefreshAt < REFRESH_INTERVAL_MS) return false;
-    lastRefreshAt = now;
-    refreshCount++;
+    const q = queueFor(session.activeDisplay);
+    if (!q.mayRefresh()) return false;
+    q.markRefreshed();
     session.send({ misc: { refresh_video_display: session.activeDisplay } });
     decoder?.reset();
     return true;
+}
+
+/** @param {number} display @returns {FrameQueue} */
+function queueFor(display) {
+    let q = queues.get(display);
+    if (!q) {
+        // Deliberately shallow. This is live video: a deep ring converts a stall into
+        // seconds of stale picture, when shedding to the next key frame is both cheaper
+        // and what the viewer actually wants. Overflow here means "shed and refresh".
+        q = new FrameQueue({ capacity: 8, now: () => performance.now() });
+        queues.set(display, q);
+    }
+    return q;
 }
 
 /** @param {number} display */
@@ -173,7 +221,9 @@ function switchDisplay(display) {
     // Recovery refreshes read this; without it a decode error after switching asks the
     // peer to re-key the monitor we are no longer watching, forever.
     session.activeDisplay = display;
-    lastRefreshAt = performance.now();
+    // The switch already forces a key frame, so do not let a decode error immediately
+    // spend another refresh on top of it.
+    queueFor(display).markRefreshed();
     decoder?.reset();
     const info = session.peerInfo?.displays?.[display];
     if (info) cursor?.setDisplay(info);
@@ -198,6 +248,7 @@ function stats() {
         surface: s,
         cursor: { ...c, position: undefined },
         bufferedAmount: session?.bufferedAmount ?? 0,
+        admission: queues.get(session?.activeDisplay ?? 0)?.stats() ?? null,
     };
 }
 
@@ -227,6 +278,7 @@ globalThis.onmessage = async (ev) => {
             decoder?.close();
             session?.close();
             session = null;
+            queues.clear();
             break;
         default:
             break;

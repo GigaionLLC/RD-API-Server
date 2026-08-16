@@ -168,9 +168,20 @@ test('frames drain in order', () => {
 /* Codec advertisement                                                        */
 /* -------------------------------------------------------------------------- */
 
-test('VP9 is always advertised — it is the peer\'s only ungated fallback', () => {
+test('an empty probe still advertises VP9 — the peer\'s only ungated fallback', () => {
+    // A viewer advertising no codec at all cannot be sent anything.
     const caps = new CodecCapabilities([]);
     assert.equal(caps.toSupportedDecoding().ability_vp9, 1);
+});
+
+test('a probe that excluded VP9 is respected, not overridden', () => {
+    // Forcing it back would advertise a codec this browser cannot decode: a
+    // connect-and-die loop for us, and every other viewer of the same peer is dragged
+    // onto it too, since a codec is only usable if every viewer can decode it.
+    const caps = new CodecCapabilities(['h264']);
+    const sd = caps.toSupportedDecoding();
+    assert.equal(sd.ability_vp9, 0);
+    assert.equal(sd.ability_h264, 1);
 });
 
 test('advertisement maps decodable families to 1 and the rest to 0', () => {
