@@ -3,6 +3,36 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-16 20:30] - Released v1.4.3: the published viewer never ran
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `web-client/scripts/install-assets.mjs`, `docker/Dockerfile.runtime` (preserve the source layout)
+- `app/Http/Controllers/Admin/WebClientController.php`, `app/Services/WebClientDiagnosticsService.php`, `scripts/ci-runtime-smoke.sh`, `web-client/README.md` (path moved to `src/ui/`)
+- `tests/Feature/WebClientAssetsTest.php` (new), `tests/Feature/WebClientTest.php` (non-destructive teardown)
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.4.3.md`
+**Database/API Changes:** None. `/api/version` reports `1.4.3`. The viewer moved to `/assets/webclient/src/ui/viewer.html`.
+**Summary:** Published v1.4.3 at manifest digest
+`sha256:57e2bfce387c3b64212ded67b6937751e8776c2188ff899bac4e934a3720ba99`. **This is the root cause
+of the symptom reported across 1.4.0-1.4.2** and the thing I twice failed to diagnose from
+reasoning: the published copy flattened `src/*` to the document root while leaving `vendor/` a
+sibling, so `../vendor/...` and `../../vendor/...` each resolved one directory too high, into
+`/assets/vendor/` where the console's own Bootstrap and jQuery live. The browser 404ed on the first
+vendored import and a failed import takes the whole module graph with it — so no script ran at all
+and the viewer was bare HTML, which is exactly why it offered a manual connection form on a page
+whose `window.RD_CONFIG` was present and correct two lines above. Earlier attempts to explain it
+from the PHP side were looking in the wrong layer; the evidence that settled it was resolving every
+published import against the filesystem, which takes one command and should have been the first
+thing tried. **Lesson recorded:** when a page behaves as though its scripts did not run, check that
+its scripts can load before auditing what they would have done. The layout now matches the source in
+both the publisher and the image build; the publisher clears its whole target first, since removing
+only the trees it writes stranded the old flattened copy at paths nothing serves. Two tests close
+the seam — every published import resolved the way a browser resolves it, and the published copy
+asserted byte-identical to the source — and the browser suite now covers the shipping layout for
+free, because tools/serve.mjs serves the package root and that is the shape being published. Also
+fixed the feature suite deleting the published viewer on every run: its stub tested a path that had
+moved, so it always believed the assets were absent, and its teardown removed the entire tree.
+**Not verified:** a full session against a live peer through the published copy.
+
 ## [2026-08-16 19:40] - Released v1.4.2: Remote control screen; no accidental connections
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
