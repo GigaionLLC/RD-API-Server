@@ -37,3 +37,6 @@ Thumbs.db
 /playwright-report/
 /storage/e2e.sqlite
 /database/database.sqlite
+
+# Viewer assets are copied from web-client/ by scripts/install-assets.mjs.
+/public/assets/webclient/
