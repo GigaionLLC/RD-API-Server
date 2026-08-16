@@ -3,6 +3,37 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-16 18:20] - Released v1.4.0: browser remote desktop published
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `docs/releases/v1.4.0.md` (version 1.3.0 -> 1.4.0)
+- `docker/Dockerfile.runtime`, `.dockerignore`, `scripts/ci-runtime-smoke.sh` (publish the viewer into the image)
+- `CLA.md`, `CONTRIBUTING.md`, `.github/workflows/cla.yml` (contributor assignment agreement, draft)
+- `web-client/src/session/{machine,client,notices}.js`, `web-client/src/workers/session.worker.js`, `web-client/src/ui/viewer.{js,html}`, `web-client/src/render/cursor.js`, `web-client/src/input/{mouse,controller}.js`, `web-client/src/media/codec.js`, `web-client/src/transport/ws.js`, `web-client/src/protocol/version.js`
+- `web-client/test/conformance/{notices,endpoints,input,media,session}.test.js`, `web-client/e2e/browser.spec.mjs`, `web-client/jsconfig.json`
+**Database/API Changes:** None. `/api/version` now reports `1.4.0`; no migration, no route or response-shape change.
+**Summary:** Tagged and published v1.4.0 — AMD64/ARM64 at manifest digest
+`sha256:2faa5e4cfbcd9746221e9366d2a3a56aa748280b605c1c21a3187b6e9f863cfa`, with `latest`, `1` and
+`1.4` moved to it. **A release blocker was found during preparation:** the published viewer lives at
+`public/assets/webclient`, which is gitignored, and nothing in the image build regenerated it — the
+local copy existed only because the installer had been run by hand. A clean CI checkout has no copy,
+so the image would have shipped a Connect button opening a 404, and no test could have caught it
+because every PHP and browser test runs against a working tree that has the copy. The build stage now
+republishes it, `.dockerignore` excludes the host copy so a local build takes CI's path, and the
+runtime smoke fetches the viewer back out of the built image. Verified by pulling the published
+manifest and finding all 36 files present. Also closed nine client defects that all present as "it
+just stopped working": steady-state reads inherited the handshake's 20s deadline and killed idle
+sessions; `MessageBox` and permission denials were decoded and dropped; Windows UAC and elevated
+foreground windows silently discarded input with no explanation; the cursor ignored the mapping
+between the peer's coordinate space and the canvas; scrolling flattened every event to one notch;
+`markSuccess` was never called so non-consecutive glitches retired a codec; relay derivation
+discarded the advertised port and `relayHost` was read by nothing; and quality "Auto" mapped to
+`NotSet`, which means "leave unchanged". Gates: 253 web-client unit tests, 14 browser tests, 641 PHP
+tests, Pint and PHPStan all pass. **Not verified:** macOS or Linux peers, multiple concurrent
+operators, and a reverse-proxied `wss` deployment — all testing was against one local Windows peer.
+`npm run typecheck` was referencing a jsconfig that did not exist; a config was added and reports a
+backlog, so it is documented as a to-do list rather than a gate.
+
 ## [2026-08-15 14:40] - Plan: from-scratch browser RustDesk client (`web-client/`)
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**

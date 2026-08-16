@@ -12,12 +12,13 @@ command, backed by MariaDB.
 > compatibility with its open‑source client. This is a **separate implementation** of the
 > client's public API, maintained independently.
 
-> ✅ **Stable release: [v1.3.0](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.3.0).**
-> Identity-provider groups can grant console roles, and one break-glass administrator is protected
-> from every identity provider, including a directory that would previously have demoted it.
-> `ADMIN_PASS` is now optional. No configuration change is required to upgrade. Review the
-> **[release notes](docs/releases/v1.3.0.md)**, especially what the group mapping deliberately
-> never permits.
+> ✅ **Stable release: [v1.4.0](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.4.0).**
+> **Connect** on any device opens a remote desktop in the browser — screen, sound, mouse, keyboard,
+> clipboard and chat — with no plugin, no download and no client install. The page speaks the
+> RustDesk protocol directly to `hbbs` and `hbbr`, so this server is never in the media path. No
+> configuration change is required to upgrade; using the remote desktop needs a TLS terminator in
+> front of the WebSocket ports. Review the **[release notes](docs/releases/v1.4.0.md)**, especially
+> the two reverse-proxy traps and what is not implemented yet.
 
 > Implements the RustDesk client API contract and adds the features the client supports that
 > most open‑source API servers don't — including **Strategy (Security‑Settings) push** and
@@ -87,7 +88,7 @@ local `.env` file with your DB password and RustDesk endpoints. `ADMIN_PASS` is 
 and a strong password is generated at first boot and shown once in the container log.
 
 For a deployment that must remain on the current stable release, set
-`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.3.0`; `latest` moves only with a
+`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.4.0`; `latest` moves only with a
 verified, annotated stable release tag.
 
 ```env
@@ -241,6 +242,8 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 ## 📚 Documentation
 
 - **[CHANGELOG.md](CHANGELOG.md)** — public release history
+- **[v1.4.0 release notes](docs/releases/v1.4.0.md)** — the browser remote desktop, what it does
+  not do yet, and the reverse-proxy configuration it needs
 - **[v1.3.0 release notes](docs/releases/v1.3.0.md)** — SSO group to role mapping, break-glass
   administrator, optional `ADMIN_PASS`, release candidates
 - **[v1.2.0 release notes](docs/releases/v1.2.0.md)** — private-network OIDC providers, what the
