@@ -2,84 +2,111 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>RustDesk Web Client — dev viewer</title>
+<title>Remote Desktop</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
     color-scheme: dark;
-    --bg: #14161a;
-    --panel: #1b1e24;
-    --line: #2a2f38;
-    --text: #e6e9ef;
-    --muted: #98a1b0;
-    --accent: #2f6feb;
-    --ok: #2ea043;
-    --err: #f85149;
+    --bg: #14161a; --panel: #1b1e24; --line: #2a2f38;
+    --text: #e6e9ef; --muted: #98a1b0;
+    --accent: #2f6feb; --ok: #2ea043; --err: #f85149; --warn: #d29922;
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
-    display: flex; flex-direction: column; height: 100vh;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
   }
   header {
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-    padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
   }
   input, select, button {
     font: inherit; color: var(--text); background: #22262e;
     border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px;
   }
-  input { min-width: 150px; }
-  input[type=password] { min-width: 130px; }
-  button { background: var(--accent); border-color: transparent; cursor: pointer; }
-  button:disabled { opacity: .5; cursor: default; }
-  button.ghost { background: #22262e; border-color: var(--line); }
-  #stage { flex: 1; position: relative; overflow: hidden; background: #000; }
-  /* The cursor sits on its own layer. Compositing it into the video canvas would tie it
-     to the frame rate, and peers only send frames when the screen changes — so on a
-     static remote desktop the cursor would visibly stick. */
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: transparent; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.on { background: var(--accent); border-color: transparent; }
+  label.check { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  #status { margin-left: auto; color: var(--muted); white-space: nowrap; }
+  #status.ok { color: var(--ok); } #status.err { color: var(--err); }
+  #status.warn { color: var(--warn); }
+
+  #connectBar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #toolbar { display: none; gap: 8px; flex-wrap: wrap; align-items: center; }
+  body.connected #connectBar { display: none; }
+  body.connected #toolbar { display: flex; }
+
+  #stage { flex: 1 1 auto; position: relative; overflow: hidden; background: #000; min-height: 0; }
+  /* The cursor is its own layer: compositing it into the video canvas would tie it to
+     the frame rate, and peers only send frames when the screen changes. */
   #video, #cursor { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   #cursor { pointer-events: none; }
+  #video { cursor: none; }
+  body.viewonly #video { cursor: default; }
+
   #stats {
-    position: absolute; left: 10px; bottom: 10px; padding: 6px 10px;
-    background: #000a; border: 1px solid var(--line); border-radius: 6px;
+    position: absolute; left: 10px; bottom: 10px; padding: 6px 10px; display: none;
+    background: #000c; border: 1px solid var(--line); border-radius: 6px;
     font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--muted); white-space: pre; pointer-events: none;
   }
-  #status { margin-left: auto; color: var(--muted); }
-  #status.ok { color: var(--ok); }
-  #status.err { color: var(--err); }
-  .note { color: var(--muted); font-size: 12px; padding: 6px 12px; }
+  body.showstats #stats { display: block; }
+
+  #hint {
+    position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+    color: var(--muted); pointer-events: none; padding: 24px;
+  }
+  body.connected #hint { display: none; }
 </style>
 </head>
 <body>
   <header>
-    <input id="host" placeholder="id server host" autocomplete="off">
-    <input id="peer" placeholder="peer id" autocomplete="off">
-    <input id="key" placeholder="server key (base64)" autocomplete="off">
-    <input id="password" type="password" placeholder="password" autocomplete="off">
-    <select id="display" title="Monitor" disabled><option>display</option></select>
-    <select id="mode" title="Pipeline placement — 'main thread' is the baseline both competitors use">
-      <option value="worker" selected>worker</option>
-      <option value="main">main thread</option>
-    </select>
-    <label title="Muted by default: if the peer is this machine, its own audio played back is a feedback loop">
-      <input type="checkbox" id="mute" checked> mute
-    </label>
-    <button id="connect">Connect</button>
-    <button id="disconnect" class="ghost" disabled>Disconnect</button>
+    <div id="connectBar">
+      <input id="host" placeholder="id server host" autocomplete="off">
+      <input id="peer" placeholder="peer id" autocomplete="off">
+      <input id="key" placeholder="server key (base64)" autocomplete="off">
+      <input id="password" type="password" placeholder="password" autocomplete="current-password">
+      <select id="mode" title="Pipeline placement. 'main thread' exists only as a performance baseline.">
+        <option value="worker" selected>worker</option>
+        <option value="main">main thread</option>
+      </select>
+      <button id="connect" class="primary">Connect</button>
+    </div>
+
+    <div id="toolbar">
+      <select id="display" title="Monitor"></select>
+      <select id="quality" title="Image quality">
+        <option value="0">Auto</option>
+        <option value="30">Speed</option>
+        <option value="50" selected>Balanced</option>
+        <option value="80">Quality</option>
+        <option value="100">Best</option>
+      </select>
+      <label class="check" title="When the peer is this machine, sending input drives this desktop">
+        <input type="checkbox" id="viewonly"> view only
+      </label>
+      <label class="check" title="Muted by default: the peer's own audio through its own speakers is a feedback loop">
+        <input type="checkbox" id="mute" checked> mute
+      </label>
+      <button id="cad" title="Ctrl+Alt+Del">Ctrl+Alt+Del</button>
+      <button id="refresh" title="Force a key frame. Restarts capture for every viewer of this display.">Refresh</button>
+      <button id="fullscreen">Fullscreen</button>
+      <button id="statsBtn" title="Toggle statistics">Stats</button>
+      <button id="disconnect">Disconnect</button>
+    </div>
+
     <span id="status">idle</span>
   </header>
-
-  <div class="note">
-    View-only harness: no mouse or keyboard input is sent. Requires a secure context —
-    <code>localhost</code> counts, so WebCodecs works over plain http here.
-  </div>
 
   <div id="stage">
     <canvas id="video"></canvas>
     <canvas id="cursor"></canvas>
+    <div id="hint">Enter connection details and press Connect.<br>Requires a secure context — <code>localhost</code> counts.</div>
     <div id="stats">no session</div>
   </div>
 

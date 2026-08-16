@@ -1,101 +1,79 @@
 /**
- * Development viewer.
+ * Remote desktop viewer.
  *
- * Supports two pipelines so they can be compared on the same page against the same peer:
+ * Config may be injected by a host application as `window.RD_CONFIG` — the Laravel
+ * integration renders it so the operator never types server details — otherwise the
+ * connection form is used. Either way this is the same file; there is no build step and
+ * no separate "embedded" variant to drift.
  *
- *   worker  — socket, decryption, protobuf, decode and compositing all off the main
- *             thread. This is the intended production path.
- *   main    — everything on the main thread, which is what both competing
- *             implementations do. Kept solely as the baseline for measurement.
- *
- * View-only: no input is sent, because the peer under test is usually the machine
- * running the browser.
+ * Two pipelines are selectable. `worker` is the real one: socket, decryption, protobuf,
+ * decode and compositing all off the main thread. `main` exists only as the measurement
+ * baseline, and is what competing implementations do.
  */
 
 import { RustDeskSession } from '../session/machine.js';
 import { WorkerSession } from '../session/client.js';
-import { CodecCapabilities, probeDecodable } from '../media/codec.js';
+import { CodecCapabilities, probeDecodable, customQuality } from '../media/codec.js';
 import { VideoStreamDecoder } from '../media/decoder.js';
 import { VideoSurface } from '../render/surface.js';
 import { CursorLayer } from '../render/cursor.js';
 import { AudioStreamPlayer } from '../media/audio.js';
+import { InputController } from '../input/controller.js';
 import { JankProbe } from './jank.js';
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 const statsEl = $('stats');
+const config = globalThis.RD_CONFIG ?? null;
 
 let mode = 'worker';
-let session = null;      // RustDeskSession (main mode) or WorkerSession (worker mode)
-let decoder = null;      // main mode only
-let surface = null;      // main mode only
-let cursor = null;       // main mode only
+let session = null;
+let decoder = null;
+let surface = null;
+let cursor = null;
 let audio = null;
+let input = null;
 let codecs = null;
 const jank = new JankProbe();
 
-let frames = 0;
-let bytes = 0;
-let keyFrames = 0;
-let firstFrameAt = 0;
-let startedAt = 0;
-let lastError = null;
-let workerStats = null;
+let frames = 0; let bytes = 0; let keyFrames = 0;
+let firstFrameAt = 0; let startedAt = 0;
+let lastError = null; let workerStats = null;
+let remote = { width: 0, height: 0 };
+let activeDisplay = {};
 
-/**
- * Cumulative main-thread time spent handling video, measured directly.
- *
- * The rAF-based JankProbe only samples when the page is compositing, which is not always
- * true in an automated harness — and jank is a downstream symptom anyway. This counts the
- * actual blocking work: in main mode, decrypt/decode/draw per frame; in worker mode it
- * should stay at zero, because no frame byte reaches this thread.
- */
-let mainVideoWorkMs = 0;
-let mainVideoSamples = 0;
-let mainDrawMs = 0;
-let mainDrawSamples = 0;
+let mainVideoWorkMs = 0; let mainDrawMs = 0; let mainDrawSamples = 0;
 
 globalThis.__viewer = {
     get mode() { return mode; },
     get state() { return session?.state ?? 'idle'; },
     get frames() { return mode === 'worker' ? (workerStats?.frames ?? 0) : frames; },
     get painted() { return mode === 'worker' ? (workerStats?.surface?.painted ?? 0) : (surface?.stats().painted ?? 0); },
-    get decoded() { return mode === 'worker' ? (workerStats?.decoder?.decoded ?? 0) : (decoder?.stats().decoded ?? 0); },
     get codec() { return mode === 'worker' ? (workerStats?.decoder?.codec ?? null) : (decoder?.stats().codec ?? null); },
-    get size() {
-        if (mode === 'worker') return [workerStats?.surface?.width ?? 0, workerStats?.surface?.height ?? 0];
-        return surface ? [surface.width, surface.height] : [0, 0];
-    },
+    get size() { return [remote.width, remote.height]; },
     get cursor() { return mode === 'worker' ? (workerStats?.cursor ?? null) : (cursor?.stats() ?? null); },
     get audio() { audio?.requestStats(); return audio?.stats() ?? null; },
+    get input() { return input?.stats() ?? null; },
     get jank() { return jank.stats(); },
+    get error() { return lastError; },
     get mainThreadVideoWork() {
         const f = mode === 'worker' ? (workerStats?.frames ?? 0) : frames;
         const total = mainVideoWorkMs + mainDrawMs;
         return {
             framesReceived: f,
-            // Receive-path work: secretbox decrypt, protobuf decode, decode() enqueue.
             receiveMs: +mainVideoWorkMs.toFixed(2),
-            // Composite work, in the WebCodecs output callback.
             drawMs: +mainDrawMs.toFixed(2),
             drawSamples: mainDrawSamples,
             totalMs: +total.toFixed(2),
             perFrameMs: f ? +(total / f).toFixed(3) : 0,
             note: mode === 'worker'
-                ? 'worker mode: no frame byte reaches this thread, so zero is expected'
-                : 'main mode: decrypt, protobuf decode and canvas composite all block here '
-                  + '(WebCodecs decode itself is off-thread in both modes)',
+                ? 'worker mode: no frame byte reaches this thread'
+                : 'main mode: decrypt, protobuf decode and composite block here '
+                  + '(WebCodecs decode is off-thread in both modes)',
         };
     },
-    get workerStats() { return workerStats; },
-    get error() { return lastError; },
-    get timeToFirstFrameMs() {
-        if (mode === 'worker') return Math.round(workerStats?.ttff ?? 0);
-        return firstFrameAt ? Math.round(firstFrameAt - startedAt) : 0;
-    },
     switchTo(i) { $('display').value = String(i); switchDisplay(); },
-    setMuted(v) { audio?.setMuted(v); $('mute').checked = v; },
-    resetJank() { jank.gaps.length = 0; },
+    setViewOnly(v) { $('viewonly').checked = v; applyViewOnly(); },
 };
 
 function setStatus(text, kind = '') {
@@ -103,18 +81,29 @@ function setStatus(text, kind = '') {
     statusEl.className = kind;
 }
 
-/** Canvas transfer to a worker is permanent, so each connect needs fresh elements. */
+/** transferControlToOffscreen is permanent, so each connect needs fresh elements. */
 function freshCanvases() {
     for (const id of ['video', 'cursor']) {
-        const old = $(id);
         const next = document.createElement('canvas');
         next.id = id;
-        old.replaceWith(next);
+        $(id).replaceWith(next);
     }
     return { video: $('video'), cursorCanvas: $('cursor') };
 }
 
 function sessionOptions() {
+    if (config) {
+        return {
+            host: config.host,
+            peerId: config.peerId,
+            serverKey: config.serverKey ?? '',
+            password: $('password')?.value ?? config.password ?? '',
+            myId: config.myId ?? 'web-client',
+            myName: config.myName ?? 'Web Client',
+            secure: config.secure ?? location.protocol === 'https:',
+            pathRouted: config.pathRouted ?? false,
+        };
+    }
     return {
         host: $('host').value.trim(),
         peerId: $('peer').value.trim(),
@@ -132,67 +121,80 @@ function populateDisplays(info) {
     info.displays.forEach((d, i) => {
         const opt = document.createElement('option');
         opt.value = String(i);
-        opt.textContent = `${i}: ${d.width}x${d.height}${d.name ? ` ${d.name}` : ''}`;
+        opt.textContent = `Monitor ${i + 1} · ${d.width}×${d.height}`;
         sel.appendChild(opt);
     });
-    sel.value = String(info.current_display ?? 0);
-    sel.disabled = false;
-    setStatus(`${info.username}@${info.hostname} · ${info.platform}`, 'ok');
+    const current = info.current_display ?? 0;
+    sel.value = String(current);
+    activeDisplay = info.displays[current] ?? {};
+    document.body.classList.add('connected');
+    setStatus(`${info.username || 'peer'}@${info.hostname} · ${info.platform}`, 'ok');
+}
+
+function setupInput(canvas) {
+    input = new InputController({
+        element: canvas,
+        send: (b) => (mode === 'worker' ? session.sendRaw(b) : session.socket.send(session.stream.encrypt(b))),
+        remoteSize: () => remote,
+        display: () => activeDisplay,
+        viewOnly: $('viewonly').checked,
+    });
+    input.attach();
+    applyViewOnly();
+}
+
+function applyViewOnly() {
+    const v = $('viewonly').checked;
+    input?.setViewOnly(v);
+    document.body.classList.toggle('viewonly', v);
 }
 
 async function connect() {
-    lastError = null;
-    workerStats = null;
+    lastError = null; workerStats = null;
     frames = 0; bytes = 0; keyFrames = 0; firstFrameAt = 0;
-    mainVideoWorkMs = 0; mainVideoSamples = 0; mainDrawMs = 0; mainDrawSamples = 0;
+    mainVideoWorkMs = 0; mainDrawMs = 0; mainDrawSamples = 0;
+    remote = { width: 0, height: 0 };
     startedAt = performance.now();
-    mode = $('mode').value;
+    mode = $('mode')?.value ?? 'worker';
 
     const { video, cursorCanvas } = freshCanvases();
     audio = new AudioStreamPlayer({ muted: $('mute').checked });
-
     $('connect').disabled = true;
-    $('disconnect').disabled = false;
     jank.start();
+    setStatus('connecting…');
 
     if (mode === 'worker') await connectWorker(video, cursorCanvas);
     else await connectMain(video, cursorCanvas);
 }
 
-/** @param {HTMLCanvasElement} video @param {HTMLCanvasElement} cursorCanvas */
 async function connectWorker(video, cursorCanvas) {
     const ws = new WorkerSession();
     session = ws;
-
-    ws.onState = (s) => setStatus(s);
-    ws.onPeerInfo = (info) => populateDisplays(info);
+    ws.onState = (s) => { if (s !== 'connected') setStatus(s); };
+    ws.onPeerInfo = (info) => { populateDisplays(info); setupInput($('video')); };
+    ws.onResize = (w, h) => { remote = { width: w, height: h }; };
+    ws.onDisplaySwitch = (d) => { if (d.width) remote = { width: d.width, height: d.height }; };
     ws.onAudioFormat = async (f) => { await audio.setFormat(f); await audio.unlock(); };
-    ws.onAudioFrame = (data) => audio.push(data);
-    ws.onStats = (s) => { workerStats = s; };
-    ws.onClose = (err) => { lastError = err.message; setStatus(`closed: ${err.message}`, 'err'); teardown(); };
-
+    ws.onAudioFrame = (d) => audio.push(d);
+    ws.onStats = (s) => {
+        workerStats = s;
+        if (s.surface?.width) remote = { width: s.surface.width, height: s.surface.height };
+    };
+    ws.onClose = (err) => fail(err.message);
     ws.connect({ videoCanvas: video, cursorCanvas, session: sessionOptions() });
 }
 
-/** @param {HTMLCanvasElement} video @param {HTMLCanvasElement} cursorCanvas */
 async function connectMain(video, cursorCanvas) {
     surface = new VideoSurface(video);
     cursor = new CursorLayer(cursorCanvas);
-    surface.onResize = (w, h) => cursor.resize(w, h);
+    surface.onResize = (w, h) => { cursor.resize(w, h); remote = { width: w, height: h }; };
 
     const decodable = await probeDecodable();
-    if (decodable.size === 0) {
-        setStatus('WebCodecs unavailable — needs a secure context', 'err');
-        lastError = 'no-webcodecs';
-        return;
-    }
+    if (decodable.size === 0) { fail('WebCodecs unavailable — needs a secure context'); return; }
     codecs = new CodecCapabilities(decodable);
 
     decoder = new VideoStreamDecoder({
         onFrame: (f) => {
-            // The real main-thread cost sits here, not at decode(). WebCodecs decodes on
-            // its own thread and hands the frame back via this callback, where the canvas
-            // composite actually happens.
             const t0 = performance.now();
             surface.draw(f);
             mainDrawMs += performance.now() - t0;
@@ -204,16 +206,19 @@ async function connectMain(video, cursorCanvas) {
                 session.send({ misc: { option: { supported_decoding: codecs.toSupportedDecoding() } } });
             }
         },
-        onKeyFrameNeeded: () => refresh(),
+        onKeyFrameNeeded: () => doRefresh(),
     });
 
     const s = new RustDeskSession({ ...sessionOptions(), codecs });
     session = s;
-
-    s.onState = (st) => setStatus(st);
-    s.onPeerInfo = (info) => { populateDisplays(info); cursor.setDisplay(info.displays[info.current_display ?? 0] ?? {}); };
+    s.onState = (st) => { if (st !== 'connected') setStatus(st); };
+    s.onPeerInfo = (info) => {
+        populateDisplays(info);
+        cursor.setDisplay(info.displays[info.current_display ?? 0] ?? {});
+        setupInput($('video'));
+    };
     s.onAudioFormat = async (f) => { await audio.setFormat(f); await audio.unlock(); };
-    s.onAudioFrame = (bytesIn) => audio.push(bytesIn);
+    s.onAudioFrame = (b) => audio.push(b);
     s.onCursor = (c) => {
         if (c.type === 'shape') cursor.setShape(c);
         else if (c.type === 'id') cursor.useShape(c.id);
@@ -228,20 +233,19 @@ async function connectMain(video, cursorCanvas) {
         if (!firstFrameAt) firstFrameAt = t0;
         decoder.decode(f);
         mainVideoWorkMs += performance.now() - t0;
-        mainVideoSamples++;
     };
-    s.onClose = (err) => { lastError = err.message; setStatus(`closed: ${err.message}`, 'err'); teardown(); };
+    s.onClose = (err) => fail(err.message);
 
-    try {
-        await s.connect();
-    } catch (err) {
-        lastError = err.message;
-        setStatus(`${err.code ?? 'error'}: ${err.message}`, 'err');
-        teardown();
-    }
+    try { await s.connect(); } catch (err) { fail(`${err.code ?? 'error'}: ${err.message}`); }
 }
 
-function refresh() {
+function fail(message) {
+    lastError = message;
+    setStatus(message, 'err');
+    teardown();
+}
+
+function doRefresh() {
     if (!session) return;
     if (mode === 'worker') session.refresh();
     else if (session.state === 'connected') {
@@ -253,80 +257,101 @@ function refresh() {
 function switchDisplay() {
     if (!session) return;
     const display = Number(/** @type {HTMLSelectElement} */ ($('display')).value || 0);
+    activeDisplay = session.peerInfo?.displays?.[display] ?? activeDisplay;
     if (mode === 'worker') { session.switchDisplay(display); return; }
     if (session.state !== 'connected') return;
     session.send({ misc: { switch_display: { display } } });
     session.send({ misc: { capture_displays: { set: [display] } } });
     session.send({ misc: { refresh_video_display: display } });
     decoder?.reset();
-    const info = session.peerInfo?.displays?.[display];
-    if (info) cursor?.setDisplay(info);
+    cursor?.setDisplay(activeDisplay);
+}
+
+function setQuality() {
+    const pct = Number($('quality').value || 0);
+    if (!session || session.state !== 'connected' || !pct) return;
+    // Preset and custom are mutually exclusive: sending both drops the custom value.
+    session.send({ misc: { option: customQuality(pct) } });
 }
 
 function paintStats() {
     if (!session) { statsEl.textContent = 'no session'; return; }
     if (mode === 'worker') session.requestStats?.();
-
-    const j = jank.stats();
     const a = audio?.stats() ?? {};
-    let head;
-    let body;
+    const i = input?.stats() ?? {};
+    const j = jank.stats();
+    let lines;
 
     if (mode === 'worker') {
         const w = workerStats;
-        head = `state    ${session.state}${w?.encrypted ? ' · encrypted' : ''} · WORKER`;
-        body = w ? [
-            `codec    ${w.decoder?.codec ?? '—'}  ${w.surface?.width || 0}x${w.surface?.height || 0}`,
-            `frames   ${w.frames} recv · ${w.decoder?.decoded ?? 0} dec · ${w.surface?.painted ?? 0} painted`,
-            `keys     ${w.keyFrames}  dropped ${w.decoder?.dropped ?? 0}  queue ${w.decoder?.queueSize ?? 0}`,
-            `data     ${(w.bytes / 1024).toFixed(0)} KiB  ${w.fps.toFixed(1)} fps`,
-            `ttff     ${Math.round(w.ttff)} ms   rtt ${w.rtt ?? '—'} ms`,
+        lines = w ? [
+            `worker   ${w.state}${w.encrypted ? ' · encrypted' : ''}`,
+            `codec    ${w.decoder?.codec ?? '—'}  ${w.surface?.width || 0}×${w.surface?.height || 0}`,
+            `frames   ${w.frames} · ${w.surface?.painted ?? 0} painted · ${w.decoder?.dropped ?? 0} dropped`,
+            `data     ${(w.bytes / 1024).toFixed(0)} KiB  ${w.fps.toFixed(1)} fps  ttff ${Math.round(w.ttff)}ms`,
+            `rtt      ${w.rtt ?? '—'} ms   buffered ${w.bufferedAmount ?? 0}`,
             `cursor   ${w.cursor?.cached ?? 0} cached · ${w.cursor?.missing ?? 0} missing`,
-        ] : ['waiting for worker stats…'];
+        ] : ['worker starting…'];
     } else {
-        const d = decoder?.stats() ?? {};
-        const s = surface?.stats() ?? {};
-        const c = cursor?.stats() ?? {};
+        const d = decoder?.stats() ?? {}; const s = surface?.stats() ?? {};
         const secs = (performance.now() - startedAt) / 1000;
-        head = `state    ${session.state}${session.encrypted ? ' · encrypted' : ''} · MAIN THREAD`;
-        body = [
-            `codec    ${d.codec ?? '—'}  ${s.width || 0}x${s.height || 0}`,
-            `frames   ${frames} recv · ${d.decoded ?? 0} dec · ${s.painted ?? 0} painted`,
-            `keys     ${keyFrames}  dropped ${d.dropped ?? 0}  queue ${d.queueSize ?? 0}`,
+        lines = [
+            `main     ${session.state}${session.encrypted ? ' · encrypted' : ''}`,
+            `codec    ${d.codec ?? '—'}  ${s.width || 0}×${s.height || 0}`,
+            `frames   ${frames} · ${s.painted ?? 0} painted · ${d.dropped ?? 0} dropped`,
             `data     ${(bytes / 1024).toFixed(0)} KiB  ${(frames / Math.max(secs, 0.001)).toFixed(1)} fps`,
-            `ttff     ${firstFrameAt ? Math.round(firstFrameAt - startedAt) : '—'} ms   rtt ${session.lastDelayMs ?? '—'} ms`,
-            `cursor   ${c.cached ?? 0} cached · ${c.missing ?? 0} missing`,
+            `mainwork ${(mainVideoWorkMs + mainDrawMs).toFixed(1)} ms total`,
         ];
     }
 
     statsEl.textContent = [
-        head,
-        ...body,
-        `audio    ${a.format ? `${a.format.sampleRate}Hz x${a.format.channels}` : '—'} · ${a.packets ?? 0} pkt · ${a.errors ?? 0} err${a.muted ? ' · muted' : ''}`,
-        `jank     p50 ${j.p50 ?? '—'}ms · p95 ${j.p95 ?? '—'}ms · max ${j.max ?? '—'}ms · >${jank.budgetMs}ms: ${j.overBudgetPct ?? '—'}%`,
+        ...lines,
+        `audio    ${a.format ? `${a.format.sampleRate}Hz ×${a.format.channels}` : '—'} · ${a.packets ?? 0} pkt · ${a.errors ?? 0} err${a.muted ? ' · muted' : ''}`,
+        `input    ${i.mouse ?? 0} mouse · ${i.keys ?? 0} keys${i.viewOnly ? ' · VIEW ONLY' : ''}${i.locked ? ' · kbd locked' : ''}`,
+        `jank     p95 ${j.p95 ?? '—'}ms · max ${j.max ?? '—'}ms`,
     ].join('\n');
 }
 
 function teardown() {
     jank.stop();
+    input?.detach(); input = null;
     if (mode === 'main') decoder?.close();
     session?.close();
     audio?.close();
-    decoder = null; surface = null; cursor = null; audio = null;
+    decoder = null; surface = null; cursor = null; audio = null; session = null;
+    document.body.classList.remove('connected');
     $('connect').disabled = false;
-    $('disconnect').disabled = true;
 }
 
 $('connect').addEventListener('click', () => { connect(); });
 $('disconnect').addEventListener('click', () => { setStatus('disconnected'); teardown(); });
 $('display').addEventListener('change', switchDisplay);
+$('quality').addEventListener('change', setQuality);
+$('viewonly').addEventListener('change', applyViewOnly);
 $('mute').addEventListener('change', (e) => audio?.setMuted(e.target.checked));
+$('cad').addEventListener('click', () => input?.sendCtrlAltDel());
+$('refresh').addEventListener('click', doRefresh);
+$('statsBtn').addEventListener('click', () => document.body.classList.toggle('showstats'));
+$('fullscreen').addEventListener('click', async () => {
+    if (document.fullscreenElement) { await document.exitFullscreen(); input?.unlockKeyboard(); return; }
+    await $('stage').requestFullscreen();
+    // Keyboard lock generally requires fullscreen, and is what lets Ctrl+W and Escape
+    // reach the peer instead of the browser.
+    await input?.lockKeyboard();
+});
 
-const params = new URLSearchParams(location.search);
-for (const k of ['host', 'peer', 'key', 'password']) {
-    if (params.has(k)) $(k).value = params.get(k);
+if (config) {
+    // Host-provided config: hide the server fields, keep the password prompt.
+    for (const id of ['host', 'peer', 'key', 'mode']) $(id)?.remove();
+    if (config.password) { $('password').value = config.password; }
+    $('hint').textContent = `Ready to connect to ${config.peerLabel ?? config.peerId}.`;
+    if (config.autoConnect) connect();
+} else {
+    const params = new URLSearchParams(location.search);
+    for (const k of ['host', 'peer', 'key', 'password', 'mode']) {
+        if (params.has(k)) $(k).value = params.get(k);
+    }
+    if (params.get('auto') === '1') connect();
 }
-if (params.has('mode')) $('mode').value = params.get('mode');
-if (params.get('auto') === '1') connect();
 
 setInterval(paintStats, 500);
