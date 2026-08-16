@@ -24,6 +24,8 @@ single-stack PHP). MariaDB with InnoDB is the only supported database.
 | The rebuild plan + deep research | [docs/modernization/README.md](docs/modernization/README.md) |
 | The RustDesk client API contract (spec) | [docs/modernization/02-client-api-contract.md](docs/modernization/02-client-api-contract.md) |
 | Operational process (plans, backlog, logs) | [DevOps/](DevOps/) |
+| **Sensitive notes (encrypted, unlock first)** | [DevOps/vault/README.md](DevOps/vault/README.md) — `node scripts/vault.mjs unlock` when `VAULT_PASSPHRASE` is in `.env` |
+| Browser remote desktop (the web client) | [web-client/README.md](web-client/README.md) |
 
 ## Build & test (Docker toolchain — host has no Composer/Node)
 

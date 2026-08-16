@@ -1,0 +1,8 @@
+# Build-time only. Maintainers run `npm i` to regenerate vendor/ via scripts/vendor.mjs;
+# the committed vendor/ output is what ships, and consumers never install anything.
+node_modules/
+package-lock.json
+
+# Playwright artefacts
+test-results/
+playwright-report/

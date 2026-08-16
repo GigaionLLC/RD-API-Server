@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\SsoRoleMappingController;
 use App\Http\Controllers\Admin\StrategyController;
 use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\WebClientController;
 use App\Http\Controllers\Admin\WebhookController;
 use App\Http\Controllers\MetricsController;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +68,11 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::get('/admin/devices/export', [DeviceController::class, 'export'])->middleware('permission:devices.view')->name('admin.devices.export');
     Route::get('/admin/devices/search', [DeviceController::class, 'search'])->middleware('permission:devices.view')->name('admin.devices.search');
     Route::post('/admin/devices/bulk', [DeviceController::class, 'bulkUpdate'])->middleware('permission:devices.edit')->name('admin.devices.bulk');
+    // Browser remote desktop. The frame route returns the viewer document itself; the
+    // browser then speaks the RustDesk protocol straight to hbbs/hbbr over WebSocket, so
+    // this application is never in the media path.
+    Route::get('/admin/devices/{device}/connect', [WebClientController::class, 'show'])->middleware('permission:devices.view')->name('admin.devices.connect');
+    Route::get('/admin/devices/{device}/connect/frame', [WebClientController::class, 'frame'])->middleware('permission:devices.view')->name('admin.devices.connect.frame');
     Route::get('/admin/devices/{device}/edit', [DeviceController::class, 'edit'])->middleware('permission:devices.view')->name('admin.devices.edit');
     Route::put('/admin/devices/{device}', [DeviceController::class, 'update'])->middleware('permission:devices.edit')->name('admin.devices.update');
     Route::delete('/admin/devices/{device}', [DeviceController::class, 'destroy'])->middleware('permission:devices.edit')->name('admin.devices.destroy');

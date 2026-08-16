@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Remote Desktop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #14161a; --panel: #1b1e24; --line: #2a2f38;
+    --text: #e6e9ef; --muted: #98a1b0;
+    --accent: #2f6feb; --ok: #2ea043; --err: #f85149; --warn: #d29922;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+  }
+  input, select, button {
+    font: inherit; color: var(--text); background: #22262e;
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px;
+  }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: transparent; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.on { background: var(--accent); border-color: transparent; }
+  label.check { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  #status { margin-left: auto; color: var(--muted); white-space: nowrap; }
+  #status.ok { color: var(--ok); } #status.err { color: var(--err); }
+  #status.warn { color: var(--warn); }
+  /* Deliberately loud. A downgraded session puts the password proof, keystrokes and
+     screen content on the relay in plaintext; that cannot live in a debug overlay. */
+  #insecure {
+    background: var(--err); color: #fff; padding: 4px 10px; border-radius: 6px;
+    font-weight: 600; font-size: 12px; letter-spacing: .02em;
+  }
+
+  #connectBar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #toolbar { display: none; gap: 8px; flex-wrap: wrap; align-items: center; }
+  body.connected #connectBar { display: none; }
+  body.connected #toolbar { display: flex; }
+
+  #stage { flex: 1 1 auto; position: relative; overflow: hidden; background: #000; min-height: 0; }
+  /* The cursor is its own layer: compositing it into the video canvas would tie it to
+     the frame rate, and peers only send frames when the screen changes. */
+  #video, #cursor { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  #cursor { pointer-events: none; }
+  #video { cursor: none; }
+  body.viewonly #video { cursor: default; }
+
+  #stats {
+    position: absolute; left: 10px; bottom: 10px; padding: 6px 10px; display: none;
+    background: #000c; border: 1px solid var(--line); border-radius: 6px;
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted); white-space: pre; pointer-events: none;
+  }
+  body.showstats #stats { display: block; }
+
+  #chat {
+    position: absolute; right: 10px; bottom: 10px; width: 320px; display: none;
+    flex-direction: column; background: #0d0f13ee; border: 1px solid var(--line);
+    border-radius: 8px; overflow: hidden;
+  }
+  body.showchat #chat { display: flex; }
+  #chatLog { max-height: 240px; overflow-y: auto; padding: 8px; font-size: 13px; }
+  #chatLog .msg { margin-bottom: 6px; word-wrap: break-word; }
+  #chatLog .from { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  #chatLog .me .from { color: var(--accent); }
+  #chatLog .empty { color: var(--muted); }
+  #chatForm { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+  #chatInput { flex: 1; min-width: 0; }
+  /* An unread marker on the toolbar button, so a message is not missed while the panel
+     is closed — the protocol has no notification of its own. */
+  #chatBtn.unread { background: var(--warn); border-color: transparent; color: #14161a; }
+
+  #hint {
+    position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+    color: var(--muted); pointer-events: none; padding: 24px;
+  }
+  body.connected #hint { display: none; }
+</style>
+</head>
+<body>
+  <header>
+    <div id="connectBar">
+      <input id="host" placeholder="id server host" autocomplete="off">
+      <input id="peer" placeholder="peer id" autocomplete="off">
+      <input id="key" placeholder="server key (base64)" autocomplete="off">
+      <input id="password" type="password" placeholder="password" autocomplete="current-password">
+      <select id="mode" title="Pipeline placement. 'main thread' exists only as a performance baseline.">
+        <option value="worker" selected>worker</option>
+        <option value="main">main thread</option>
+      </select>
+      <button id="connect" class="primary">Connect</button>
+    </div>
+
+    <div id="toolbar">
+      <select id="display" title="Monitor"></select>
+      <select id="quality" title="Image quality">
+        <option value="0">Auto</option>
+        <option value="30">Speed</option>
+        <option value="50" selected>Balanced</option>
+        <option value="80">Quality</option>
+        <option value="100">Best</option>
+      </select>
+      <label class="check" title="When the peer is this machine, sending input drives this desktop">
+        <input type="checkbox" id="viewonly"> view only
+      </label>
+      <label class="check" title="Muted by default: the peer's own audio through its own speakers is a feedback loop">
+        <input type="checkbox" id="mute" checked> mute
+      </label>
+      <label class="check" title="Paste into the viewer to send; the peer's clipboard is applied on your next click or keypress">
+        <input type="checkbox" id="clipboard" checked> clipboard
+      </label>
+      <button id="chatBtn" title="Message whoever is at the remote machine">Chat</button>
+      <button id="cad" title="Ctrl+Alt+Del">Ctrl+Alt+Del</button>
+      <button id="refresh" title="Force a key frame. Restarts capture for every viewer of this display.">Refresh</button>
+      <button id="fullscreen">Fullscreen</button>
+      <button id="statsBtn" title="Toggle statistics">Stats</button>
+      <button id="disconnect">Disconnect</button>
+    </div>
+
+    <span id="insecure" hidden></span>
+    <span id="status">idle</span>
+  </header>
+
+  <div id="stage">
+    <canvas id="video"></canvas>
+    <canvas id="cursor"></canvas>
+    <div id="hint">Enter connection details and press Connect.<br>Requires a secure context — <code>localhost</code> counts.</div>
+    <div id="stats">no session</div>
+
+    <div id="chat">
+      <div id="chatLog"></div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="Message the remote user…" autocomplete="off" maxlength="4096">
+        <button type="submit" class="primary">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="./viewer.js"></script>
+</body>
+</html>

@@ -37,3 +37,10 @@ Thumbs.db
 /playwright-report/
 /storage/e2e.sqlite
 /database/database.sqlite
+
+# Viewer assets are copied from web-client/ by scripts/install-assets.mjs.
+/public/assets/webclient/
+
+# Decrypted contents of the notes vault. The encrypted DevOps/vault/vault.enc IS committed;
+# only the plaintext working copy stays local. See scripts/vault.mjs.
+/DevOps/vault/notes/

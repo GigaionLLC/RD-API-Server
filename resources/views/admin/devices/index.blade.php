@@ -139,6 +139,7 @@
                             <td class="rd-muted">{{ $device->last_online_at?->diffForHumans() ?? '—' }}</td>
                             <td>
                                 <div class="rd-table__actions">
+                                    <a href="{{ route('admin.devices.connect', $device) }}" class="rd-btn rd-btn--ghost" title="Open a remote desktop session in the browser"><i class="ri-remote-control-line" aria-hidden="true"></i> Connect</a>
                                     <a href="{{ route('admin.devices.edit', $device) }}" class="rd-btn rd-btn--ghost"><i class="{{ $canEdit ? 'ri-pencil-line' : 'ri-eye-line' }}" aria-hidden="true"></i> {{ $canEdit ? 'Edit' : 'View' }}</a>
                                     @if ($canEdit)
                                     <form method="POST" action="{{ route('admin.devices.destroy', $device) }}" class="m-0">
