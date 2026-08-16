@@ -31,8 +31,17 @@ const TYPES = {
 
 const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
+
+    // Redirect rather than serving the viewer at "/". Serving it here would make its
+    // relative module imports resolve against the root, so `./viewer.js` would 404 and
+    // the page would render with no script and no error anywhere obvious.
+    if (url.pathname === '/' || url.pathname === '') {
+        res.writeHead(302, { location: `/src/ui/viewer.html${url.search}` }).end();
+        return;
+    }
+
     const rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
-    const path = join(root, rel === '' ? 'src/ui/viewer.html' : rel);
+    const path = join(root, rel);
 
     // Containment check: normalize() collapses traversal, this rejects what escapes.
     if (!path.startsWith(root)) {

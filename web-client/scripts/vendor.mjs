@@ -57,6 +57,24 @@ const assets = [
             ].join('\n');
         },
     },
+    {
+        // Cursor bitmaps are always zstd, so this is required for a cursor to render at
+        // all. fzstd is pure JavaScript and already ships a native ES module, which
+        // avoids a wasm binary, its fetch, and its instantiate step — and works inside a
+        // worker with no extra plumbing. Decompress-only is sufficient: we may legally
+        // send `compressed: false` on every outbound file block.
+        pkg: 'fzstd',
+        version: '0.1.1',
+        source: 'node_modules/fzstd/esm/index.mjs',
+        destination: 'fzstd/index.js',
+        license: 'node_modules/fzstd/LICENSE',
+        licenseDestination: 'fzstd/LICENSE',
+        transform(src) {
+            if (!src.includes('export')) throw new Error('fzstd esm build is not an ES module');
+            if (!/decompress/.test(src)) throw new Error('fzstd source missing decompress export');
+            return `/* Vendored from fzstd@0.1.1 (MIT). See ./LICENSE. Unmodified ESM build. */\n${src}`;
+        },
+    },
 ];
 
 /** @param {string} s */

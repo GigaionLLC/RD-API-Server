@@ -36,7 +36,11 @@
   button:disabled { opacity: .5; cursor: default; }
   button.ghost { background: #22262e; border-color: var(--line); }
   #stage { flex: 1; position: relative; overflow: hidden; background: #000; }
-  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  /* The cursor sits on its own layer. Compositing it into the video canvas would tie it
+     to the frame rate, and peers only send frames when the screen changes — so on a
+     static remote desktop the cursor would visibly stick. */
+  #video, #cursor { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  #cursor { pointer-events: none; }
   #stats {
     position: absolute; left: 10px; bottom: 10px; padding: 6px 10px;
     background: #000a; border: 1px solid var(--line); border-radius: 6px;
@@ -68,6 +72,7 @@
 
   <div id="stage">
     <canvas id="video"></canvas>
+    <canvas id="cursor"></canvas>
     <div id="stats">no session</div>
   </div>
 

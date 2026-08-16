@@ -14,6 +14,7 @@ import { RustDeskSession } from '../session/machine.js';
 import { CodecCapabilities, probeDecodable } from '../media/codec.js';
 import { VideoStreamDecoder } from '../media/decoder.js';
 import { VideoSurface } from '../render/surface.js';
+import { CursorLayer } from '../render/cursor.js';
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
@@ -25,6 +26,8 @@ let session = null;
 let decoder = null;
 /** @type {VideoSurface | null} */
 let surface = null;
+/** @type {CursorLayer | null} */
+let cursor = null;
 
 let frames = 0;
 let bytes = 0;
@@ -44,6 +47,8 @@ globalThis.__viewer = {
     get encrypted() { return session?.encrypted ?? false; },
     get displays() { return session?.peerInfo?.displays?.length ?? 0; },
     get error() { return lastError; },
+    get cursor() { return cursor?.stats() ?? null; },
+    switchTo(i) { $('display').value = String(i); switchDisplay(); },
 };
 
 let lastError = null;
@@ -58,6 +63,7 @@ function paintStats() {
     if (!session) { statsEl.textContent = 'no session'; return; }
     const d = decoder?.stats() ?? {};
     const s = surface?.stats() ?? {};
+    const c = cursor?.stats() ?? {};
     const secs = (performance.now() - startedAt) / 1000;
     statsEl.textContent = [
         `state    ${session.state}${session.encrypted ? ' · encrypted' : ' · PLAINTEXT'}`,
@@ -67,6 +73,8 @@ function paintStats() {
         `data     ${(bytes / 1024).toFixed(0)} KiB  ${(frames / Math.max(secs, 0.001)).toFixed(1)} fps`,
         `ttff     ${firstFrameAt ? Math.round(firstFrameAt - startedAt) : '—'} ms`,
         `rtt      ${session.lastDelayMs ?? '—'} ms`,
+        `cursor   ${c.cached ?? 0} cached · ${c.decoded ?? 0} decoded · ${c.missing ?? 0} missing` +
+            `${c.embedded ? ' · embedded' : ''}`,
     ].join('\n');
 }
 
@@ -77,6 +85,10 @@ async function connect() {
 
     const canvas = /** @type {HTMLCanvasElement} */ ($('video'));
     surface = new VideoSurface(canvas);
+    cursor = new CursorLayer(/** @type {HTMLCanvasElement} */ ($('cursor')));
+    // Keep the overlay the same pixel size as the video so one coordinate space serves
+    // both; CSS object-fit then scales them identically.
+    surface.onResize = (w, h) => cursor.resize(w, h);
 
     // Advertise only what this browser genuinely decodes: a codec claimed here is a
     // codec every other viewer of the same peer is forced onto.
@@ -126,7 +138,21 @@ async function connect() {
         });
         sel.value = String(info.current_display ?? 0);
         sel.disabled = false;
+        cursor.setDisplay(info.displays[info.current_display ?? 0] ?? {});
         setStatus(`${info.username}@${info.hostname} · ${info.platform}`, 'ok');
+    };
+
+    session.onCursor = (c) => {
+        if (c.type === 'shape') cursor.setShape(c);
+        else if (c.type === 'id') cursor.useShape(c.id);
+        else if (c.type === 'position') cursor.setPosition(c.x, c.y);
+    };
+
+    session.onDisplaySwitch = (d) => {
+        // Arrives on the video queue, so it is correctly ordered against frames: content
+        // before it belongs to the old geometry, content after to the new.
+        cursor.setDisplay(d);
+        decoder?.reset();
     };
 
     session.onVideoFrame = (f) => {
@@ -175,11 +201,14 @@ function switchDisplay() {
     session.send({ misc: { capture_displays: { set: [display] } } });
     session.send({ misc: { refresh_video_display: display } });
     decoder?.reset();
+    const info = session.peerInfo?.displays?.[display];
+    if (info) cursor?.setDisplay(info);
 }
 
 function teardown() {
     decoder?.close();
     session?.close();
+    cursor = null;
     $('connect').disabled = false;
     $('disconnect').disabled = true;
     paintStats();
