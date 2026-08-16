@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RustDesk Web Client — dev viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #14161a;
+    --panel: #1b1e24;
+    --line: #2a2f38;
+    --text: #e6e9ef;
+    --muted: #98a1b0;
+    --accent: #2f6feb;
+    --ok: #2ea043;
+    --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  input, select, button {
+    font: inherit; color: var(--text); background: #22262e;
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px;
+  }
+  input { min-width: 150px; }
+  input[type=password] { min-width: 130px; }
+  button { background: var(--accent); border-color: transparent; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: #22262e; border-color: var(--line); }
+  #stage { flex: 1; position: relative; overflow: hidden; background: #000; }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  #stats {
+    position: absolute; left: 10px; bottom: 10px; padding: 6px 10px;
+    background: #000a; border: 1px solid var(--line); border-radius: 6px;
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted); white-space: pre; pointer-events: none;
+  }
+  #status { margin-left: auto; color: var(--muted); }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--err); }
+  .note { color: var(--muted); font-size: 12px; padding: 6px 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <input id="host" placeholder="id server host" autocomplete="off">
+    <input id="peer" placeholder="peer id" autocomplete="off">
+    <input id="key" placeholder="server key (base64)" autocomplete="off">
+    <input id="password" type="password" placeholder="password" autocomplete="off">
+    <select id="display" title="Monitor" disabled><option>display</option></select>
+    <button id="connect">Connect</button>
+    <button id="disconnect" class="ghost" disabled>Disconnect</button>
+    <span id="status">idle</span>
+  </header>
+
+  <div class="note">
+    View-only harness: no mouse or keyboard input is sent. Requires a secure context —
+    <code>localhost</code> counts, so WebCodecs works over plain http here.
+  </div>
+
+  <div id="stage">
+    <canvas id="video"></canvas>
+    <div id="stats">no session</div>
+  </div>
+
+  <script type="module" src="./viewer.js"></script>
+</body>
+</html>
