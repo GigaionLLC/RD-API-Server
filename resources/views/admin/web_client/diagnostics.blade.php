@@ -2,7 +2,7 @@
 
 @section('title', 'Remote desktop diagnostics')
 
-@push('head')
+@push('styles')
     <style>
         .rd-diag__row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--rd-border, #2a2f38); }
         .rd-diag__row:first-child { border-top: 0; }

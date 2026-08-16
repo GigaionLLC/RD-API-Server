@@ -4,6 +4,38 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.4.2] - 2026-08-16
+
+### Added
+
+- **A Remote control screen.** Connect to any machine by its RustDesk ID, with the server details
+  filled in from this deployment's own configuration — an operator never types an ID server, a key
+  or an endpoint. An ID that is not in the device list is accepted from an operator whose device
+  permission is unrestricted, which is what a support desk needs when an ID arrives over the phone;
+  anyone scoped to a group keeps that boundary, because otherwise typing an ID by hand would be a
+  way around it.
+
+### Changed
+
+- **Nothing connects on its own, and there is no longer any way to make it.** A remote desktop
+  session is visible on the other machine and interrupts whoever is sitting at it, so starting one
+  must be a decision rather than a side effect of opening a page. **Connect** on a device now opens
+  the Remote control screen with that ID filled in and waits. The viewer's auto-connect handling was
+  removed outright rather than defaulted off, so no configuration value and no URL can bring it
+  back; a browser test asserts that no socket is opened without a click.
+
+### Fixed
+
+- **The viewer rendered as a 300×150 thumbnail** with its toolbar wrapped into a column. Its
+  stylesheet was pushed to a Blade stack the layout does not render, so every rule was silently
+  discarded and the iframe fell back to its intrinsic size. This affected the diagnostics page too.
+- Configuration injection into the viewer document is now verified. When it silently found nothing
+  to replace, the viewer fell back to its manual connection form and asked the operator for server
+  details they should never have to know; that now raises an error naming the cause.
+- Compiled Blade views are cleared before they are rebuilt at start-up. `storage/` is a persistent
+  volume, so views compiled by a previous image survive an upgrade, and `view:cache` does not remove
+  what it finds there.
+
 ## [1.4.1] - 2026-08-16
 
 ### Added
@@ -281,7 +313,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.2...HEAD
+[1.4.2]: docs/releases/v1.4.2.md
 [1.4.1]: docs/releases/v1.4.1.md
 [1.4.0]: docs/releases/v1.4.0.md
 [1.3.0]: docs/releases/v1.3.0.md

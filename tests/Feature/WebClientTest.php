@@ -73,7 +73,9 @@ class WebClientTest extends TestCase
         // 404 rather than 403: whether that device exists is itself outside their scope.
         [$delegate, $inside, $outside] = $this->scopedFixture();
 
-        $this->actingAs($delegate)->get(route('admin.devices.connect', $inside))->assertOk();
+        // Connect hands the id to the remote control screen rather than opening a session.
+        $this->actingAs($delegate)->get(route('admin.devices.connect', $inside))
+            ->assertRedirect(route('admin.remote', ['peer' => $inside->rustdesk_id]));
         $this->actingAs($delegate)->get(route('admin.devices.connect', $outside))->assertNotFound();
 
         // The iframe document is a second entry point and enforces the same boundary; it
@@ -92,7 +94,7 @@ class WebClientTest extends TestCase
         $stranger = $this->user('stranger');
 
         $this->actingAs($stranger)
-            ->get(route('admin.devices.connect', $inside))
+            ->get(route('admin.remote'))
             ->assertRedirect(route('admin.login'));
     }
 
@@ -123,7 +125,7 @@ class WebClientTest extends TestCase
         [, $inside] = $this->scopedFixture();
 
         $this->actingAs($auditor)
-            ->get(route('admin.devices.connect', $inside))
+            ->get(route('admin.remote'))
             ->assertRedirect(route('admin.dashboard'));
     }
 
@@ -163,10 +165,12 @@ class WebClientTest extends TestCase
         $device = $this->device('345890346', $admin, 'Workstation');
 
         $this->actingAs($admin)
-            ->get(route('admin.devices.connect', $device))
+            ->get(route('admin.remote', ['peer' => $device->rustdesk_id]))
             ->assertOk()
             ->assertSee('WebSocket endpoints are not configured')
-            ->assertSee('RUSTDESK_WS_ID_URL');
+            // The remote screen points at the diagnostics page rather than repeating the
+            // environment names, so there is one place that explains how to set them.
+            ->assertSee(route('admin.web-client.diagnostics'), false);
     }
 
     public function test_half_a_configuration_is_reported_as_missing(): void
@@ -183,7 +187,7 @@ class WebClientTest extends TestCase
         $device = $this->device('345890346', $admin, 'Workstation');
 
         $this->actingAs($admin)
-            ->get(route('admin.devices.connect', $device))
+            ->get(route('admin.remote', ['peer' => $device->rustdesk_id]))
             ->assertOk()
             ->assertSee('WebSocket endpoints are not configured');
     }
@@ -200,7 +204,7 @@ class WebClientTest extends TestCase
         $device = $this->device('345890346', $admin, 'Workstation');
 
         $this->actingAs($admin)
-            ->get(route('admin.devices.connect', $device))
+            ->get(route('admin.remote', ['peer' => $device->rustdesk_id]))
             ->assertOk()
             ->assertDontSee('WebSocket endpoints are not configured')
             ->assertSee('rd-viewer');
@@ -217,7 +221,7 @@ class WebClientTest extends TestCase
         $device = $this->device('345890346', $admin, 'Workstation');
 
         $this->actingAs($admin)
-            ->get(route('admin.devices.connect', $device))
+            ->get(route('admin.remote', ['peer' => $device->rustdesk_id]))
             ->assertOk()
             ->assertDontSee('WebSocket endpoints are not configured');
     }
@@ -251,7 +255,7 @@ class WebClientTest extends TestCase
 
         // And the page must not then ask for configuration that is already in place.
         $this->actingAs($admin)
-            ->get(route('admin.devices.connect', $device))
+            ->get(route('admin.remote', ['peer' => $device->rustdesk_id]))
             ->assertOk()
             ->assertDontSee('WebSocket endpoints are not configured');
     }
@@ -298,7 +302,7 @@ class WebClientTest extends TestCase
         $device = $this->device('345890346', $admin, 'Workstation');
 
         $this->actingAs($admin)
-            ->get(route('admin.devices.connect', $device))
+            ->get(route('admin.remote', ['peer' => $device->rustdesk_id]))
             ->assertOk()
             ->assertSee('WebSocket endpoints are not configured');
     }

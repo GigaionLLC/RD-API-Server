@@ -234,6 +234,11 @@ unset ADMIN_PASS
 # --- Production caches (rebuilt each boot so env changes take effect) ---
 php artisan config:cache
 php artisan route:cache
+# storage/ is a persistent volume, so compiled Blade views survive an image upgrade.
+# `view:cache` does not remove what it finds there, and Blade only recompiles when the
+# source file is newer than the compiled one — a comparison that COPY's preserved build
+# mtimes can lose. Clearing first makes the rendered console always match the image.
+php artisan view:clear
 php artisan view:cache
 
 # The bundled application runtime accepts HTTP internally. An HTTPS origin therefore needs a

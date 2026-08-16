@@ -241,7 +241,8 @@ function setupInput(canvas) {
 
     // Both the clipboard write and the AudioContext need a transient user activation, so
     // they are flushed on the next gesture rather than when they arrive. Audio in
-    // particular has no other trigger under autoConnect, where no gesture ever occurs.
+    // particular has no other trigger, since the operator's Connect click happens in
+    // the toolbar rather than on the canvas.
     for (const type of ['pointerdown', 'keydown', 'focus']) {
         canvas.addEventListener(type, () => {
             clipboard?.flush();
@@ -711,12 +712,19 @@ $('fullscreen').addEventListener('click', async () => {
     await input?.lockKeyboard();
 });
 
+// Nothing here ever connects on its own, and there is deliberately no option to.
+//
+// A remote desktop session is visible on the other machine and interrupts whoever is
+// sitting at it. Starting one has to be a decision someone made, not a side effect of
+// opening a page — a mis-clicked link, a restored browser tab or a refresh must never
+// reach another person's screen. Anything that would auto-connect is therefore absent
+// rather than defaulted off, so it cannot be switched on by configuration or by a URL.
 if (config) {
     // Host-provided config: hide the server fields, keep the password prompt.
     for (const id of ['host', 'peer', 'key', 'mode']) $(id)?.remove();
     if (config.password) { $('password').value = config.password; }
-    $('hint').textContent = `Ready to connect to ${config.peerLabel ?? config.peerId}.`;
-    if (config.autoConnect) connect();
+    $('hint').textContent = `Ready to connect to ${config.peerLabel ?? config.peerId}. `
+        + 'Press Connect when you are.';
 } else {
     // Server details may be prefilled from the query string for development, but never
     // the password: a peer secret in a URL lands in browser history, the Referer header
@@ -725,7 +733,6 @@ if (config) {
     for (const k of ['host', 'peer', 'key', 'mode']) {
         if (params.has(k)) $(k).value = params.get(k);
     }
-    if (params.get('auto') === '1') connect();
 }
 
 setInterval(paintStats, 500);

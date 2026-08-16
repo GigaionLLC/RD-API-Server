@@ -7,10 +7,13 @@ use App\Models\Device;
 use App\Models\User;
 use App\Services\AdminScopeService;
 use App\Services\WebClientDiagnosticsService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\View\View;
+use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -52,9 +55,62 @@ class WebClientController extends Controller
     }
 
     /**
-     * The viewer page for one device.
+     * Remote control by peer id.
+     *
+     * The device list is the usual way in, and is a boundary: an operator sees the peers
+     * they are scoped to. But a support desk is regularly given an id over the phone for a
+     * machine that has never checked in here, and sending them to a different tool for
+     * that is the kind of gap that gets a feature abandoned.
+     *
+     * So an id outside the device list is accepted — from an operator whose device
+     * permission is unrestricted. Anyone scoped to a group keeps that boundary, because
+     * otherwise typing an id by hand would be a way around it.
      */
-    public function show(Request $request, Device $device): View
+    public function remote(Request $request): View
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        $peer = $this->requestedPeer($request);
+
+        return view('admin.web_client.remote', [
+            'peer' => $peer,
+            'device' => $peer === '' ? null : $this->deviceFor($peer),
+            'unrestricted' => $this->scope->isUnrestricted($actor, 'devices.view'),
+            'known' => $this->knownPeers($actor),
+            'config' => $peer === '' ? null : $this->clientConfig(null, $actor, $peer),
+            'assetsPresent' => $this->assetsPresent(),
+            'needsWsUrls' => $this->needsWsUrls($this->clientConfig(null, $actor, $peer ?: 'preview')),
+            'diagnostics' => route('admin.web-client.diagnostics'),
+        ]);
+    }
+
+    /**
+     * The viewer document for a peer id typed by hand.
+     */
+    public function remoteFrame(Request $request): Response
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        $peer = $this->requestedPeer($request);
+
+        if ($peer === '') {
+            throw new NotFoundHttpException('no peer id');
+        }
+
+        $this->authorizePeer($actor, $peer);
+
+        return $this->viewerDocument($this->clientConfig(null, $actor, $peer));
+    }
+
+    /**
+     * Connect, from the device list.
+     *
+     * This hands the peer id to the remote control screen rather than opening a session.
+     * Nothing in this feature connects on its own: a remote desktop session is visible on
+     * the other machine and interrupts whoever is using it, so it has to be the result of
+     * someone deciding to, not of a mis-click on a list of five devices.
+     */
+    public function show(Request $request, Device $device): RedirectResponse
     {
         /** @var User $actor */
         $actor = $request->user();
@@ -70,14 +126,7 @@ class WebClientController extends Controller
             throw new NotFoundHttpException;
         }
 
-        $config = $this->clientConfig($device, $actor);
-
-        return view('admin.web_client.show', [
-            'device' => $device,
-            'config' => $config,
-            'assetsPresent' => $this->assetsPresent(),
-            'needsWsUrls' => $this->needsWsUrls($config),
-        ]);
+        return redirect()->route('admin.remote', ['peer' => $device->rustdesk_id]);
     }
 
     /**
@@ -101,21 +150,45 @@ class WebClientController extends Controller
             throw new NotFoundHttpException;
         }
 
+        return $this->viewerDocument($this->clientConfig($device, $actor));
+    }
+
+    /**
+     * The viewer document with its configuration injected.
+     *
+     * The injection is verified rather than assumed. `str_replace` finding nothing is
+     * silent, and the result is a viewer that falls back to its manual connection form —
+     * which reads as a half-finished feature rather than a failure, and asks the operator
+     * for an ID server and key they should never have to know. A 500 naming the cause is
+     * far kinder.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function viewerDocument(array $config): Response
+    {
         $path = public_path('assets/webclient/ui/viewer.html');
         if (! File::isFile($path)) {
             throw new NotFoundHttpException('viewer assets are not installed');
         }
 
-        $config = $this->clientConfig($device, $actor);
         $json = json_encode($config, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
         // Injected before the module script so RD_CONFIG exists when viewer.js evaluates.
         // JSON_HEX_TAG is not needed because the payload is server-owned config, but the
         // closing-tag guard is cheap insurance against a value ever becoming user data.
         $inject = '<script>window.RD_CONFIG='.str_replace('</', '<\/', $json).';</script>';
-        $html = str_replace('<script type="module"', $inject."\n<script type=\"module\"", (string) File::get($path));
+        $needle = '<script type="module"';
+        $document = (string) File::get($path);
 
-        return response($html)
+        if (! str_contains($document, $needle)) {
+            throw new RuntimeException(
+                'The viewer at '.$path.' has no module script tag to inject configuration before. '
+                .'The published copy is out of step with this application; republish it with '
+                .'`node web-client/scripts/install-assets.mjs`.'
+            );
+        }
+
+        return response(str_replace($needle, $inject."\n".$needle, $document))
             ->header('Content-Type', 'text/html; charset=utf-8')
             // Connection material is per-operator and per-device; never let a shared cache
             // hold it.
@@ -130,9 +203,11 @@ class WebClientController extends Controller
      * sit in front of them; an https page cannot open a ws:// socket, which makes this a
      * hard requirement rather than a preference in production.
      *
+     * @param  Device|null  $device  Null when the operator typed a peer id that is not in
+     *                               the device list, which a support desk regularly does.
      * @return array<string, mixed>
      */
-    private function clientConfig(Device $device, User $actor): array
+    private function clientConfig(?Device $device, User $actor, string $peerId = ''): array
     {
         $idServer = (string) config('rustdesk.id_server');
         $relayServer = (string) config('rustdesk.relay_server');
@@ -148,8 +223,10 @@ class WebClientController extends Controller
             // the ports are usually not exposed at all, and a secure page cannot open ws://.
             'rendezvousUrl' => $rendezvousUrl,
             'relayUrl' => $relayUrl,
-            'peerId' => $device->rustdesk_id,
-            'peerLabel' => $device->alias ?: ($device->hostname ?: $device->rustdesk_id),
+            'peerId' => $device?->rustdesk_id ?: $peerId,
+            'peerLabel' => $device
+                ? ($device->alias ?: ($device->hostname ?: $device->rustdesk_id))
+                : $peerId,
             // Shown in the peer's connection manager, so the operator is identifiable there.
             'myName' => (string) ($actor->username ?: 'operator'),
             // Fail closed. This deployment always knows the server key, so a handshake
@@ -159,6 +236,65 @@ class WebClientController extends Controller
             'requireEncryption' => $this->serverKey() !== '',
             'secure' => str_starts_with((string) config('app.url'), 'https://'),
         ];
+    }
+
+    /**
+     * The peer id from the request, reduced to what a RustDesk id can contain.
+     *
+     * Ids are digits, but an operator reads them off a screen that groups them — "345 890
+     * 346" — and will paste them that way, so separators are stripped rather than
+     * rejected. Everything else is dropped: this value reaches the viewer's configuration
+     * and its rendezvous request, so it is narrowed at the edge instead of trusted.
+     */
+    private function requestedPeer(Request $request): string
+    {
+        $raw = (string) $request->query('peer', '');
+
+        return substr(preg_replace('/[^A-Za-z0-9_-]/', '', $raw) ?? '', 0, 64);
+    }
+
+    /** @return Device|null The device with this peer id, if this deployment knows it. */
+    private function deviceFor(string $peerId): ?Device
+    {
+        return $peerId === '' ? null : Device::query()->where('rustdesk_id', $peerId)->first();
+    }
+
+    /**
+     * Whether this operator may open a session to this id.
+     *
+     * A peer inside their device scope is theirs by the same rule the device list uses.
+     * An id from outside it — one read over the phone for a machine that has never checked
+     * in here — is allowed only to an operator whose device permission is unrestricted,
+     * because otherwise typing an id by hand would be a way around the scope.
+     */
+    private function authorizePeer(User $actor, string $peerId): void
+    {
+        if ($this->scope->isUnrestricted($actor, 'devices.view')) {
+            return;
+        }
+
+        $inScope = $this->scope
+            ->scopeDevices(Device::query(), $actor, 'devices.view')
+            ->where('rustdesk_id', $peerId)
+            ->exists();
+
+        if (! $inScope) {
+            throw new NotFoundHttpException;
+        }
+    }
+
+    /**
+     * Peers this operator may reach, for the picker beside the id field.
+     *
+     * @return Collection<int, Device>
+     */
+    private function knownPeers(User $actor): Collection
+    {
+        return $this->scope
+            ->scopeDevices(Device::query(), $actor, 'devices.view')
+            ->orderByDesc('last_online_at')
+            ->limit(200)
+            ->get(['id', 'rustdesk_id', 'alias', 'hostname', 'is_online', 'os']);
     }
 
     /**

@@ -412,3 +412,35 @@ test('a UAC prompt offers elevation and clears on success', async ({ page }) => 
     // The block is gone and the success is reported in its place.
     expect(after).toEqual(['elev:response']);
 });
+
+test('the viewer never connects on its own', async ({ page }) => {
+    // A remote desktop session is visible on the other machine and interrupts whoever is
+    // at it. Opening the page — from a restored tab, a mis-clicked link, a refresh — must
+    // never start one, so there is deliberately no configuration or URL that can.
+    const attempts = [];
+    page.on('websocket', (ws) => attempts.push(ws.url()));
+
+    await page.addInitScript(() => {
+        globalThis.RD_CONFIG = {
+            host: 'id.example.invalid',
+            peerId: '345890346',
+            peerLabel: 'Workstation',
+            serverKey: '',
+            secure: false,
+            // Both of these existed as auto-connect switches at some point. Neither may
+            // work again: this test fails if either is ever honoured.
+            autoConnect: true,
+            auto: true,
+        };
+    });
+    await page.goto('/src/ui/viewer.html?auto=1');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+    await page.waitForTimeout(1500);
+
+    expect(attempts, 'no socket may be opened without a click').toEqual([]);
+    expect(await page.evaluate(() => globalThis.__viewer.state)).toBe('idle');
+
+    // And the id it was given is ready to go, so the operator only presses Connect.
+    expect(await page.evaluate(() => document.getElementById('peer'))).toBeNull();
+    expect(await page.textContent('#hint')).toContain('Workstation');
+});

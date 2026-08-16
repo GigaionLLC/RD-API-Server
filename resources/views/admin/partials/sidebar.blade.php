@@ -32,7 +32,8 @@
         || str_starts_with($nav, 'admin/roles')
         || str_starts_with($nav, 'admin/sso-role-mappings');
     $controlActive = str_starts_with($nav, 'admin/strategies')
-        || str_starts_with($nav, 'admin/sessions');
+        || str_starts_with($nav, 'admin/sessions')
+        || str_starts_with($nav, 'admin/remote');
     $auditActive = str_starts_with($nav, 'admin/audit')
         || str_starts_with($nav, 'admin/console-audit')
         || str_starts_with($nav, 'admin/alarms')
@@ -181,6 +182,13 @@
                             <i class="ri-base-station-line" aria-hidden="true"></i><span>Live sessions</span>
                         </a>
                     @endif
+                    @if ($canDevices)
+                        <a href="/admin/remote"
+                           class="rd-nav__item {{ str_starts_with($nav, 'admin/remote') ? 'active' : '' }}"
+                           @if (str_starts_with($nav, 'admin/remote')) aria-current="page" @endif>
+                            <i class="ri-remote-control-line" aria-hidden="true"></i><span>Remote control</span>
+                        </a>
+                    @endif
                 </div>
             </section>
         @endif
@@ -283,7 +291,7 @@
                     <a href="/admin/web-client/diagnostics"
                        class="rd-nav__item {{ str_starts_with($nav, 'admin/web-client') ? 'active' : '' }}"
                        @if (str_starts_with($nav, 'admin/web-client')) aria-current="page" @endif>
-                        <i class="ri-stethoscope-line" aria-hidden="true"></i><span>Remote desktop</span>
+                        <i class="ri-stethoscope-line" aria-hidden="true"></i><span>Remote diagnostics</span>
                     </a>
                 </div>
             </section>
