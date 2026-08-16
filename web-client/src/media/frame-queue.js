@@ -1,22 +1,31 @@
 /**
- * Per-display inbound video queue.
+ * Per-display inbound video admission control.
  *
  * Spec: docs/spec/04-media-input.md §1.8.
  *
- * Three behaviours, each load-bearing:
+ * This is the only bounded stage between the socket and the decoder, and it exists
+ * because nothing else in the pipeline pushes back. The `video_received` ACK cannot serve
+ * that purpose: the peer will not capture the next frame until it arrives, so withholding
+ * it collapses the stream to one frame every three seconds. The ACK therefore always goes
+ * out immediately, and the bound lives HERE — on what we hand the decoder.
+ *
+ * Four behaviours, each load-bearing:
  *
  *  - A message containing a key frame BYPASSES the queue and clears the discard flag.
  *    Key frames are the only recovery point, so they must never queue behind stale
  *    deltas.
- *  - While discarding (after a refresh request), non-key messages are dropped. Feeding
- *    the decoder deltas whose reference frames were never decoded produces either
- *    garbage or a hard decoder error.
- *  - Overflow of the bounded ring means the pipeline is unrecoverably behind, and the
- *    only fix in this protocol is a refresh — there is no lightweight "resend" request.
+ *  - While discarding (after a refresh request, a decode failure, or decoder
+ *    backpressure), non-key messages are dropped. Feeding the decoder deltas whose
+ *    reference frames were never decoded produces either garbage or a hard error.
+ *  - Live video is dropped, not buffered. A backlog of stale frames is worth less than
+ *    the latency it adds, so the ring is small and overflow discards rather than drains.
+ *  - Overflow means the pipeline is unrecoverably behind, and the only fix in this
+ *    protocol is a refresh — there is no lightweight "resend" request.
  *
  * Refresh is expensive and GLOBAL: it restarts the peer's capture pipeline for every
- * viewer of that display, not just us. Hence the rate limit, which mirrors the reference
- * client: at most 20 per display per session, and no more than one per 10 seconds.
+ * viewer of that display, not just us. Hence the rate limit — at most 20 per display per
+ * session, and no more than one per 10 seconds. The decoder asks for a key frame on every
+ * error, so an unlimited path would hammer the host through a bad stream.
  */
 
 export const DEFAULT_CAPACITY = 120;
@@ -46,6 +55,7 @@ export class FrameQueue {
         this.lastRefreshAt = -Infinity;
         this.droppedWhileDiscarding = 0;
         this.overflowed = 0;
+        this.backpressureEvents = 0;
     }
 
     get length() {
@@ -111,6 +121,19 @@ export class FrameQueue {
         this.items.length = 0;
     }
 
+    /**
+     * Called when the decoder is too far behind to accept more work.
+     *
+     * Distinct from a decode failure only in intent: nothing is broken, we are simply
+     * decoding slower than the network delivers. Dropping to the next key frame is the
+     * one recovery this protocol offers, since there is no way to ask for less.
+     */
+    markBackpressure() {
+        this.backpressureEvents++;
+        this.discarding = true;
+        this.items.length = 0;
+    }
+
     stats() {
         return {
             depth: this.items.length,
@@ -118,6 +141,7 @@ export class FrameQueue {
             refreshCount: this.refreshCount,
             overflowed: this.overflowed,
             droppedWhileDiscarding: this.droppedWhileDiscarding,
+            backpressureEvents: this.backpressureEvents,
         };
     }
 }

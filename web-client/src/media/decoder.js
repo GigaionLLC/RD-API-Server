@@ -89,7 +89,21 @@ export class VideoStreamDecoder {
 
         // The oneof tag is the codec identifier and can change mid-session, so switching
         // is driven by what arrives rather than by what we requested.
-        if (frame.codec !== this.codec) this._configure(frame.codec);
+        //
+        // configure() throws synchronously for a codec this browser cannot handle. Left
+        // unguarded that propagates out through the session's message pump and kills the
+        // whole connection, when the correct response is to retire the codec and let the
+        // peer re-encode in something we can decode.
+        if (frame.codec !== this.codec) {
+            try {
+                this._configure(frame.codec);
+            } catch (err) {
+                this.codec = null;
+                this.awaitingKeyFrame = true;
+                this.onError?.(err instanceof Error ? err : new Error(String(err)), frame.codec);
+                return false;
+            }
+        }
 
         if (this.awaitingKeyFrame) {
             if (!frame.key) {
