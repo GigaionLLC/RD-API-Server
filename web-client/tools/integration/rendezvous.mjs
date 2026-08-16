@@ -8,7 +8,7 @@
  * This is NOT a unit test — it needs the network and a live peer, so it is not picked up
  * by `node --test`. Run it explicitly:
  *
- *   node test/integration/rendezvous.mjs --host <id-server> --peer <peer-id> [--key <b64>]
+ *   node tools/integration/rendezvous.mjs --host <id-server> --peer <peer-id> [--key <b64>]
  *
  * Nothing here is hardcoded: no host, peer id, or server key is committed to the repo.
  *
@@ -36,7 +36,7 @@ function parseArgs(argv) {
         if (k && k in out) out[k] = k === 'port' ? Number(argv[i + 1]) : argv[i + 1];
     }
     if (!out.host || !out.peer) {
-        console.error('usage: node test/integration/rendezvous.mjs --host <id-server> --peer <peer-id> [--key <b64>] [--port 21116]');
+        console.error('usage: node tools/integration/rendezvous.mjs --host <id-server> --peer <peer-id> [--key <b64>] [--port 21116]');
         process.exit(2);
     }
     return out;

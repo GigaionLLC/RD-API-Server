@@ -124,9 +124,18 @@ in `PLAN.md` §6 — 7a–7f codec cases first, then the protocol silent-failure
   WS on 21118 accepted, one frame = one message, our PunchHoleRequest understood,
   RelayResponse decoded, `nat_type=SYMMETRIC` confirmed as the relay trigger.
   **The no-sidecar architecture is now empirically proven, not just read from source.**
-- `[ ]` `crypto/handshake.js` + `password.js` — needs `vendor/` (noble) first
-- `[ ]` `vendor/` bootstrap via the `copy-admin-vendor.mjs` pattern
-- `[ ]` relay leg: `RequestRelay` on :21119, pair by uuid
+- `[x]` `vendor/` bootstrap — `scripts/vendor.mjs`, tweetnacl@1.0.3 UMD→ESM, with `--check`
+- `[x]` `crypto/cipher.js` + `handshake.js` + `password.js` + 20 tests
+- `[x]` relay leg: `RequestRelay` on :21119, pair by uuid
+- `[x]` **Phase 1 + first frame verified against a live peer** (`tools/integration/login.mjs`):
+  rendezvous → relay → two-step Ed25519 chain → sealed session key → secretbox →
+  password login → PeerInfo (4 displays) → first H.264 keyframe. No input sent.
+
+**Crypto library decision changed from the plan:** tweetnacl, not @noble. Noble has
+`secretbox` and `x25519` but no `crypto_box`, which would mean composing the box
+construction from `hsalsa` + `x25519` by hand. tweetnacl maps 1:1 onto sodiumoxide's
+`sign::verify` / `crypto_box_easy` / `crypto_secretbox_easy`. `SecretStream` takes the
+cipher by injection, so swapping the per-frame secretbox to noble later stays contained.
 - `[ ]` `transport/` + mock peer
 - `[ ]` `session/machine.js` — connect milestone
 - `[ ]` worker + video + render — pixels milestone
