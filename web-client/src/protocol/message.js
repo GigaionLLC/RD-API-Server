@@ -782,7 +782,7 @@ export const SwitchSidesResponse = {
  *
  * `cursor_id` (14) is a bare uint64, not a wrapper message — the only such field.
  * `cliprdr` (20) and `pointer_device_event` (26) are intentionally absent: see
- * PLAN.md §5 for why neither is implementable or worthwhile in a browser.
+ * README.md for why neither is implementable or worthwhile in a browser.
  */
 export const Message = {
     name: 'Message',

@@ -1,5 +1,5 @@
 /**
- * Secretbox stream conformance — PLAN.md §6 cases 8 and 9.
+ * Secretbox stream conformance — the stream counter cases.
  *
  * These are the rules that desynchronise a session silently and irrecoverably, so they
  * are tested against a fake cipher that records the exact nonce it was handed. The real

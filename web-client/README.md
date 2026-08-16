@@ -37,7 +37,7 @@ length-prefix codec at all.
 | Quality and FPS control | working |
 | Clipboard, file transfer, chat, terminal | not implemented |
 
-Deliberately out of scope, with reasons in `PLAN.md` §5: **cliprdr** (no web API can act as
+Deliberately out of scope, : **cliprdr** (no web API can act as
 a deferred OS clipboard file provider), **switch-sides** (needs input injection),
 **port-forward** (a browser has no listening socket), **direct P2P** and **LAN discovery**
 (browser limits — every session is relayed).

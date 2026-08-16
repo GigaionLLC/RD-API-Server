@@ -36,8 +36,8 @@
 ## 2️⃣ Phase 2: Requirements & Context
 
 * **Relevant Docs:**
-  - `web-client/PLAN.md` → strategy, architecture, phases, decisions
-  - `DevOps/vault/notes/18-competitive-analysis-2026-08.md` → competitive research
+  - `DevOps/vault/notes/web-client-strategy-plan.md` → strategy and phases (encrypted)
+  - `DevOps/vault/notes/18-competitive-analysis-2026-08.md` → market research (encrypted)
   - `web-client/docs/spec/*` → **the clean-room specification the code is written from**
 
 * **Relevant Code:**
@@ -51,7 +51,7 @@
 * `[x]` Browser targets? → **Chrome/Chromium desktop only.** No Firefox/Safari/touch/mobile.
 * `[x]` Licence? → **AGPL-3.0**, same as the repo.
 * `[x]` Build step? → **None.** Native ES modules, hand-written codec, JSDoc + `checkJs`.
-* `[x]` Copy code from RustDesk/a third-party implementation? → **No.** Clean-room: implement from `docs/spec/`.
+* `[x]` Copy code from RustDesk/the reviewed implementation? → **No.** Clean-room: implement from `docs/spec/`.
 * `[ ]` v1 release scope → recommend Phase 5 (view + control + audio); files/terminal follow.
 
 ## 4️⃣ Phase 4: Detailed Execution Plan
@@ -104,7 +104,7 @@ cd web-client && npm run typecheck # tsc --noEmit --checkJs
 ```
 
 Conformance suite (`test/conformance/`) is written **before** the modules it covers. Cases enumerated
-in `PLAN.md` §6 — 7a–7f codec cases first, then the protocol silent-failure cases.
+in `web-client/test/conformance/` — codec cases first, then the protocol silent-failure cases.
 
 ## 5️⃣ Phase 5: Product Owner Review
 * **Status:** `PENDING`
@@ -133,8 +133,8 @@ in `PLAN.md` §6 — 7a–7f codec cases first, then the protocol silent-failure
 
 **Crypto library decision changed from the plan:** tweetnacl, not @noble. Noble has
 `secretbox` and `x25519` but no `crypto_box`, which would mean composing the box
-construction from `hsalsa` + `x25519` by hand. tweetnacl maps 1:1 onto sodiumoxide's
-`sign::verify` / `crypto_box_easy` / `crypto_secretbox_easy`. `SecretStream` takes the
+construction from `hsalsa` + `x25519` by hand. tweetnacl maps 1:1 onto the NaCl primitives
+the protocol requires: combined-mode Ed25519 verify, crypto_box, crypto_secretbox. `SecretStream` takes the
 cipher by injection, so swapping the per-frame secretbox to noble later stays contained.
 - `[ ]` `transport/` + mock peer
 - `[ ]` `session/machine.js` — connect milestone

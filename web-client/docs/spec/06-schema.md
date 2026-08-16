@@ -7,7 +7,7 @@ Tag numbers are the wire contract and must be exact. All messages are proto3, pa
 
 > **Clean-room note.** These are documented facts about a wire format — message names, field names,
 > tag numbers, types. Implement from this table. Do not consult, copy, or compile any third-party
-> `.proto` file. See `PLAN.md` §2.
+> `.proto` file. See the Provenance section of README.md.
 
 ---
 
@@ -514,7 +514,7 @@ false** for it. Send `MultiClipboards` to peers ≥1.3.0 (non-iOS; Android ≥1.
 Loop suppression uses a synthetic `Special` entry named `dyn.com.rustdesk.owner` which a browser
 cannot write. Instead, hash the last content we applied and suppress echoing it.
 
-`Cliprdr` (Message tag 20) is **not implemented** — see `PLAN.md` §5.
+`Cliprdr` (Message tag 20) is **not implemented** — see README.md "Deliberately out of scope".
 
 ### 4.9 File transfer
 

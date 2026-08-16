@@ -1,5 +1,5 @@
 /**
- * Wire-primitive conformance. Cases 7c and 7e from PLAN.md §6, plus the varint
+ * Wire-primitive conformance. Unknown-field and varint-boundary cases, plus the varint
  * boundaries and sign-extension rules from docs/spec/06-schema.md §1.2.
  *
  * Written before src/protocol/wire.js was trusted; every case here corresponds to a
@@ -19,7 +19,7 @@ function written(fn) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Varint boundaries (PLAN.md §6 case 7e)                                     */
+/* Varint boundaries (byte-length boundaries)                                     */
 /* -------------------------------------------------------------------------- */
 
 test('varint round-trips at every byte-length boundary', () => {
@@ -56,7 +56,7 @@ test('truncated varint is rejected rather than returning a partial value', () =>
 });
 
 /* -------------------------------------------------------------------------- */
-/* Signed integers — zigzag vs sign-extension (case 7b)                        */
+/* Signed integers — zigzag vs sign-extension                                 */
 /* -------------------------------------------------------------------------- */
 
 test('int32 sign-extends negatives to 10 bytes', () => {
@@ -151,7 +151,7 @@ test('bytes returns a view, not a copy', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Tags and unknown-field skipping (case 7c)                                   */
+/* Tags and unknown-field skipping                                            */
 /* -------------------------------------------------------------------------- */
 
 test('tag packs field number and wire type', () => {

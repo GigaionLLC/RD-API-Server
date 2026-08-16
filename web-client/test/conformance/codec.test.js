@@ -1,5 +1,5 @@
 /**
- * Table-driven codec conformance. PLAN.md §6 cases 7a, 7b, 7d, 7f, exercised against
+ * Table-driven codec conformance. the codec conformance cases, exercised against
  * the real descriptors rather than synthetic ones, so a transcription error in
  * src/protocol/*.js fails here.
  */
