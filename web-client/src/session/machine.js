@@ -68,6 +68,8 @@ export class RustDeskSession {
         this.codecs = opts.codecs ?? new CodecCapabilities(['vp9']);
         /** @type {import('../protocol/message.js').PeerInfo | null} */
         this.peerInfo = null;
+        /** Display we are actually viewing. See the note where this is set at login. */
+        this.activeDisplay = 0;
         this.encrypted = false;
         this.downgradeReason = null;
         /** @type {FrameSocket | null} */
@@ -214,6 +216,19 @@ export class RustDeskSession {
         this.downgradeReason = result.downgradeReason;
         this.encrypted = result.sessionKey !== null;
 
+        // Fail closed when the caller says encryption is required. A managed deployment
+        // always knows the server key, so a downgrade there is either an attack or a
+        // misconfiguration — never a legitimate peer without a registered key. Continuing
+        // would put the password proof, keystrokes and screen content on the relay in
+        // plaintext with nothing to show for it.
+        if (result.sessionKey === null && this.opts.requireEncryption) {
+            this.socket?.close();
+            throw new SessionError(
+                `refusing an unencrypted session: ${result.downgradeReason}`,
+                'encryption_required',
+            );
+        }
+
         this.socket.send(encode(Message, {
             public_key: result.publicKeyMessage ?? {
                 asymmetric_value: new Uint8Array(0),
@@ -266,6 +281,11 @@ export class RustDeskSession {
                     throw new SessionError('peer reported no displays', 'no_displays');
                 }
                 this.peerInfo = lr.peer_info;
+                // Tracked separately: peer_info is re-delivered on topology change and
+                // carries the peer's own idea of the current display, which is not
+                // updated by our switch requests. Recovery refreshes read this, so a
+                // stale value silently refreshes the monitor nobody is looking at.
+                this.activeDisplay = lr.peer_info.current_display ?? 0;
                 this._setState('connected');
                 this.onPeerInfo?.(lr.peer_info);
                 return lr.peer_info;

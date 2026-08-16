@@ -18,6 +18,8 @@ export class WorkerSession {
         this.state = 'idle';
         this.peerInfo = null;
         this.encrypted = false;
+        /** Non-null when the session fell back to plaintext; the UI must surface this. */
+        this.downgradeReason = null;
         this.denied = [];
         /** @type {object | null} */
         this.lastStats = null;
@@ -53,6 +55,8 @@ export class WorkerSession {
                 break;
             case 'peerInfo':
                 this.peerInfo = msg.info;
+                this.encrypted = msg.encrypted !== false;
+                this.downgradeReason = msg.downgradeReason ?? null;
                 this.onPeerInfo?.(msg.info);
                 break;
             case 'resize':

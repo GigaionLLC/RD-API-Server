@@ -82,7 +82,14 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
     session.onPeerInfo = (info) => {
         cursor.setDisplay(info.displays[info.current_display ?? 0] ?? {});
         // PeerInfo contains only plain values, so it survives structured clone intact.
-        post({ type: 'peerInfo', info: JSON.parse(JSON.stringify(info, (k, v) => (typeof v === 'bigint' ? String(v) : v))) });
+        post({
+            type: 'peerInfo',
+            info: JSON.parse(JSON.stringify(info, (k, v) => (typeof v === 'bigint' ? String(v) : v))),
+            encrypted: session.encrypted,
+            // Surfaced so the UI can warn: a downgrade means the session, including the
+            // password proof and every keystroke, crosses the relay in plaintext.
+            downgradeReason: session.downgradeReason,
+        });
     };
     session.onVideoFrame = (f) => {
         frames++;
@@ -132,11 +139,27 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
     }
 }
 
+/**
+ * Requests a key frame for the display we are actually viewing.
+ *
+ * Rate-limited because a refresh restarts the peer's capture pipeline for EVERY viewer of
+ * that display, and the decoder fires `onKeyFrameNeeded` on every error — an unbounded
+ * path would hammer the host during a persistently bad stream.
+ */
+let lastRefreshAt = -Infinity;
+let refreshCount = 0;
+const REFRESH_INTERVAL_MS = 10_000;
+const MAX_REFRESHES = 20;
+
 function refresh() {
-    if (!session || session.state !== 'connected') return;
-    const display = session.peerInfo?.current_display ?? 0;
-    session.send({ misc: { refresh_video_display: display } });
+    if (!session || session.state !== 'connected') return false;
+    const now = performance.now();
+    if (refreshCount >= MAX_REFRESHES || now - lastRefreshAt < REFRESH_INTERVAL_MS) return false;
+    lastRefreshAt = now;
+    refreshCount++;
+    session.send({ misc: { refresh_video_display: session.activeDisplay } });
     decoder?.reset();
+    return true;
 }
 
 /** @param {number} display */
@@ -147,6 +170,10 @@ function switchDisplay(display) {
     session.send({ misc: { switch_display: { display } } });
     session.send({ misc: { capture_displays: { set: [display] } } });
     session.send({ misc: { refresh_video_display: display } });
+    // Recovery refreshes read this; without it a decode error after switching asks the
+    // peer to re-key the monitor we are no longer watching, forever.
+    session.activeDisplay = display;
+    lastRefreshAt = performance.now();
     decoder?.reset();
     const info = session.peerInfo?.displays?.[display];
     if (info) cursor?.setDisplay(info);

@@ -45,6 +45,7 @@ let firstFrameAt = 0; let startedAt = 0;
 let lastError = null; let workerStats = null;
 let remote = { width: 0, height: 0 };
 let activeDisplay = {};
+let chosenDisplay = 0;
 
 let mainVideoWorkMs = 0; let mainDrawMs = 0; let mainDrawSamples = 0;
 
@@ -113,6 +114,9 @@ function sessionOptions() {
             relayUrl: config.relayUrl ?? '',
             rendezvousPort: config.rendezvousPort,
             relayPort: config.relayPort,
+            // Set by a host that always knows the server key, so an unverifiable peer is
+            // a failure rather than a peer without a registered key.
+            requireEncryption: config.requireEncryption === true,
         };
     }
     return {
@@ -135,14 +139,43 @@ function populateDisplays(info) {
         opt.textContent = `Monitor ${i + 1} · ${d.width}×${d.height}`;
         sel.appendChild(opt);
     });
-    const current = info.current_display ?? 0;
+    // Preserve the operator's chosen monitor across a topology change, rather than
+    // yanking them back to the peer's idea of "current".
+    const current = sel.querySelector(`option[value="${chosenDisplay}"]`)
+        ? chosenDisplay
+        : (info.current_display ?? 0);
+    chosenDisplay = current;
     sel.value = String(current);
     activeDisplay = info.displays[current] ?? {};
     document.body.classList.add('connected');
     setStatus(`${info.username || 'peer'}@${info.hostname} · ${info.platform}`, 'ok');
+    showEncryptionState();
 }
 
+/**
+ * Surfaces the encryption state. A downgrade means the password proof, keystrokes and
+ * screen content cross the relay in plaintext, so it must be visible rather than buried
+ * in a debug overlay the operator never opens.
+ */
+function showEncryptionState() {
+    const warn = $('insecure');
+    if (session?.encrypted === false) {
+        warn.textContent = `NOT ENCRYPTED — ${session.downgradeReason ?? 'handshake failed'}`;
+        warn.hidden = false;
+    } else {
+        warn.hidden = true;
+    }
+}
+
+/** Removes the document-level paste listener; see setupInput. */
+let detachPaste = null;
+
 function setupInput(canvas) {
+    // peer_info is re-delivered mid-session whenever the peer's monitor topology changes,
+    // so this must be idempotent. Without the guard a monitor hot-plug attached a second
+    // InputController to the same canvas and every keystroke and click was sent twice.
+    if (input) return;
+
     input = new InputController({
         element: canvas,
         send: (b) => (mode === 'worker' ? session.sendRaw(b) : session.socket.send(session.stream.encrypt(b))),
@@ -165,15 +198,25 @@ function setupInput(canvas) {
 
     // Outbound is paste-driven: browsers expose no clipboard-change event, so a copy on
     // this side is not visible to us until the user pastes into the viewer.
-    document.addEventListener('paste', (ev) => {
+    const onPaste = (ev) => {
         if ($('viewonly').checked) return;
+        // Scoped to the stage. A document-level handler also swallowed pastes into the
+        // chat box — sending the operator's clipboard to the peer and blocking the local
+        // paste, which is unfortunate given paste is the only outbound trigger.
+        if (!$('stage').contains(ev.target) || ev.target === $('chatInput')) return;
         if (clipboard?.sendFromPaste(ev)) ev.preventDefault();
-    });
+    };
+    document.addEventListener('paste', onPaste);
+    detachPaste = () => document.removeEventListener('paste', onPaste);
 
-    // Inbound needs a transient user activation, so it is flushed on the next gesture
-    // rather than when it arrives.
+    // Both the clipboard write and the AudioContext need a transient user activation, so
+    // they are flushed on the next gesture rather than when they arrive. Audio in
+    // particular has no other trigger under autoConnect, where no gesture ever occurs.
     for (const type of ['pointerdown', 'keydown', 'focus']) {
-        canvas.addEventListener(type, () => { clipboard?.flush(); });
+        canvas.addEventListener(type, () => {
+            clipboard?.flush();
+            audio?.unlock().catch(() => {});
+        });
     }
 
     applyViewOnly();
@@ -321,6 +364,7 @@ function doRefresh() {
 function switchDisplay() {
     if (!session) return;
     const display = Number(/** @type {HTMLSelectElement} */ ($('display')).value || 0);
+    chosenDisplay = display;
     activeDisplay = session.peerInfo?.displays?.[display] ?? activeDisplay;
     if (mode === 'worker') { session.switchDisplay(display); return; }
     if (session.state !== 'connected') return;
@@ -381,6 +425,7 @@ function paintStats() {
 function teardown() {
     jank.stop();
     input?.detach(); input = null;
+    detachPaste?.(); detachPaste = null;
     clipboard = null;
     chat = null;
     $('chatLog').innerHTML = '<div class="empty">No messages yet.</div>';
@@ -429,8 +474,11 @@ if (config) {
     $('hint').textContent = `Ready to connect to ${config.peerLabel ?? config.peerId}.`;
     if (config.autoConnect) connect();
 } else {
+    // Server details may be prefilled from the query string for development, but never
+    // the password: a peer secret in a URL lands in browser history, the Referer header
+    // and every access log between here and the server.
     const params = new URLSearchParams(location.search);
-    for (const k of ['host', 'peer', 'key', 'password', 'mode']) {
+    for (const k of ['host', 'peer', 'key', 'mode']) {
         if (params.has(k)) $(k).value = params.get(k);
     }
     if (params.get('auto') === '1') connect();

@@ -129,6 +129,11 @@ class WebClientController extends Controller
             'peerLabel' => $device->alias ?: ($device->hostname ?: $device->rustdesk_id),
             // Shown in the peer's connection manager, so the operator is identifiable there.
             'myName' => (string) ($actor->username ?: 'operator'),
+            // Fail closed. This deployment always knows the server key, so a handshake
+            // that cannot verify the peer is an attack or a misconfiguration — never a
+            // legitimate peer without a registered key. Continuing would put the password
+            // proof, keystrokes and screen content on the relay in plaintext.
+            'requireEncryption' => $this->serverKey() !== '',
             'secure' => str_starts_with((string) config('app.url'), 'https://'),
         ];
     }

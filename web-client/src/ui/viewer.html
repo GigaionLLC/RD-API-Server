@@ -35,6 +35,12 @@
   #status { margin-left: auto; color: var(--muted); white-space: nowrap; }
   #status.ok { color: var(--ok); } #status.err { color: var(--err); }
   #status.warn { color: var(--warn); }
+  /* Deliberately loud. A downgraded session puts the password proof, keystrokes and
+     screen content on the relay in plaintext; that cannot live in a debug overlay. */
+  #insecure {
+    background: var(--err); color: #fff; padding: 4px 10px; border-radius: 6px;
+    font-weight: 600; font-size: 12px; letter-spacing: .02em;
+  }
 
   #connectBar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   #toolbar { display: none; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -121,6 +127,7 @@
       <button id="disconnect">Disconnect</button>
     </div>
 
+    <span id="insecure" hidden></span>
     <span id="status">idle</span>
   </header>
 
