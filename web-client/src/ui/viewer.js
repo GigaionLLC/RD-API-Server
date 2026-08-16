@@ -102,6 +102,10 @@ function sessionOptions() {
             myName: config.myName ?? 'Web Client',
             secure: config.secure ?? location.protocol === 'https:',
             pathRouted: config.pathRouted ?? false,
+            rendezvousUrl: config.rendezvousUrl ?? '',
+            relayUrl: config.relayUrl ?? '',
+            rendezvousPort: config.rendezvousPort,
+            relayPort: config.relayPort,
         };
     }
     return {

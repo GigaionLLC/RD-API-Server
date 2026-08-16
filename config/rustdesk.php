@@ -18,6 +18,22 @@ return [
     'key' => env('RUSTDESK_KEY', ''),
     'key_file' => env('RUSTDESK_KEY_FILE', ''),
 
+    /*
+     * WebSocket endpoints for the browser remote-desktop viewer.
+     *
+     * hbbs binds rendezvous+2 (21118) and hbbr binds relay+2 (21119) unconditionally, but
+     * both speak plain ws only. An https console therefore CANNOT reach them directly:
+     * the browser blocks ws:// from a secure page. Put a TLS terminator in front and set
+     * these to its wss URLs — see docs/web-client-deployment.md for nginx and Caddy.
+     *
+     * Leave empty to derive ws://<id_server host>:21118 and :21119, which only works when
+     * the console itself is served over http (localhost during development).
+     */
+    'web_client' => [
+        'ws_id_url' => env('RUSTDESK_WS_ID_URL', ''),
+        'ws_relay_url' => env('RUSTDESK_WS_RELAY_URL', ''),
+    ],
+
     // Server-command targets (ports the API talks to on hbbs/hbbr).
     'id_server_port' => (int) env('RUSTDESK_ID_SERVER_PORT', 21116),
     'relay_server_port' => (int) env('RUSTDESK_RELAY_SERVER_PORT', 21117),

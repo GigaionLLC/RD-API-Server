@@ -121,6 +121,10 @@ class WebClientController extends Controller
             'relayHost' => $this->hostOf($relayServer),
             'relayPort' => $this->portOf($relayServer, 21117),
             'serverKey' => $this->serverKey(),
+            // Explicit wss endpoints win over the derived ports. Behind a reverse proxy
+            // the ports are usually not exposed at all, and a secure page cannot open ws://.
+            'rendezvousUrl' => trim((string) config('rustdesk.web_client.ws_id_url')),
+            'relayUrl' => trim((string) config('rustdesk.web_client.ws_relay_url')),
             'peerId' => $device->rustdesk_id,
             'peerLabel' => $device->alias ?: ($device->hostname ?: $device->rustdesk_id),
             // Shown in the peer's connection manager, so the operator is identifiable there.

@@ -165,7 +165,14 @@ export class FrameSocket {
  * @param {boolean} [opts.secure]
  * @param {boolean} [opts.pathRouted] Use `/ws/id` and `/ws/relay` instead of ports.
  */
-export function endpoints({ host, rendezvousPort = 21116, relayPort = 21117, secure = false, pathRouted = false }) {
+export function endpoints({
+    host, rendezvousPort = 21116, relayPort = 21117, secure = false, pathRouted = false,
+    rendezvousUrl = '', relayUrl = '',
+}) {
+    // Explicit URLs win. A deployment behind a reverse proxy rarely exposes the ports at
+    // all, and its wss endpoints may live on another hostname entirely.
+    if (rendezvousUrl && relayUrl) return { rendezvous: rendezvousUrl, relay: relayUrl };
+
     const scheme = secure ? 'wss' : 'ws';
     const bare = host.split(':')[0];
     if (pathRouted) {

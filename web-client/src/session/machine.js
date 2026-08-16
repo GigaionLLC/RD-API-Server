@@ -106,6 +106,8 @@ export class RustDeskSession {
             relayPort: this.opts.relayPort ?? 21117,
             secure: this.opts.secure ?? false,
             pathRouted: this.opts.pathRouted ?? false,
+            rendezvousUrl: this.opts.rendezvousUrl ?? '',
+            relayUrl: this.opts.relayUrl ?? '',
         });
 
         const relayInfo = await this._rendezvous(urls.rendezvous);
@@ -170,14 +172,16 @@ export class RustDeskSession {
      */
     async _openRelay(fallbackUrl, info) {
         this._setState('relay');
-        const url = info.relayServer
+        // An explicit relay URL is authoritative: behind a reverse proxy the peer's
+        // advertised relay host is usually not reachable from a browser at all.
+        const url = this.opts.relayUrl || (info.relayServer
             ? endpoints({
                 host: info.relayServer,
                 relayPort: this.opts.relayPort ?? 21117,
                 secure: this.opts.secure ?? false,
                 pathRouted: this.opts.pathRouted ?? false,
             }).relay
-            : fallbackUrl;
+            : fallbackUrl);
 
         this.socket = await FrameSocket.open(url);
         this.socket.send(encode(RendezvousMessage, {
