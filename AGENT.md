@@ -43,6 +43,41 @@ Client-facing JSON keys and routes are **fixed by the RustDesk client** — neve
 test-isolation, and migration rules live in [Wiki/database/database-index.md](Wiki/database/database-index.md).
 Schema lives in `database/migrations/` (PHP) with the Go `model/` package as the reference.
 
+### 5. 🔐 Encrypted notes vault — check this at session start
+
+Commercially sensitive working notes (competitive analysis, unreleased strategy) live
+**encrypted** in [`DevOps/vault/vault.enc`](DevOps/vault/), which **is** committed. The
+decrypted `DevOps/vault/notes/` directory is gitignored, as is the passphrase.
+
+**If `VAULT_PASSPHRASE` is set in `.env`, unlock the vault before planning work** — it
+holds context you would otherwise be missing, and its absence is why some public docs read
+thinner than they should.
+
+```bash
+docker run --rm -v "$PWD:/app" -w /app node:22-alpine node scripts/vault.mjs status   # peek, no decrypt
+docker run --rm -v "$PWD:/app" -w /app node:22-alpine node scripts/vault.mjs unlock   # -> notes/
+```
+
+To change a vaulted note: `unlock` → edit under `DevOps/vault/notes/` → `lock` → commit
+**`vault.enc` only**. Editing the plaintext without re-locking loses the change; the
+commit will not contain it.
+
+```bash
+docker run --rm -v "$PWD:/app" -w /app node:22-alpine node scripts/vault.mjs lock
+git add DevOps/vault/vault.enc
+```
+
+Rules that matter:
+
+- **Never `git add` anything under `DevOps/vault/notes/`.** `.gitignore` only governs
+  *untracked* files, so `git mv`-ing a tracked file into the vault stages the **plaintext**
+  as a rename. Check `git status` before committing whenever files move in.
+- **No passphrase, no access.** There is no recovery path — one would be a bypass. If
+  `VAULT_PASSPHRASE` is absent, say so rather than guessing at the contents.
+- **Nothing that must never exist in git** — credentials, keys, customer data — belongs
+  here. A leaked passphrase exposes every historical revision, not just the current one.
+- Full details: [DevOps/vault/README.md](DevOps/vault/README.md).
+
 ## 🔎 Task lookup
 
 | Task | Read first | Then drill into |
@@ -54,6 +89,8 @@ Schema lives in `database/migrations/` (PHP) with the Go `model/` package as the
 | Borrow from other OSS servers | [Reference impls](docs/modernization/06-reference-implementations.md) | the cited files |
 | Check roadmap / parked items | [Backlog Index](DevOps/backlog/backlog-index.md) | specific backlog plan |
 | Review project state before coding | [Agent Changelog](DevOps/logs/agent-changelog.md) | last 3 entries |
+| Competitive / strategic context | [Encrypted vault](DevOps/vault/README.md) — `vault.mjs unlock` | `DevOps/vault/notes/` |
+| Work on the browser remote desktop | [web-client/README.md](web-client/README.md) | `web-client/docs/spec/`, then `web-client/src/` |
 
 ## ⚡ Core development rules
 1. **No Vue / SPA frameworks.** Admin UI = Blade + jQuery + Bootstrap 5 + original CSS
@@ -89,6 +126,12 @@ When a task/feature is complete (or the user says "wrap up", "ship it", "we're d
 3. **Version history:** if a deploy/push happened, log it in
    [DevOps/logs/version-history.md](DevOps/logs/version-history.md).
 4. **Archive plans:** move finished plans from `DevOps/plans/` to `DevOps/archive-plans/`.
+5. **Re-lock the vault** if anything under `DevOps/vault/notes/` changed, and commit
+   `vault.enc`. An unlocked edit that is never re-locked is simply lost.
+6. **Publishing the web client?** Re-run `node web-client/scripts/install-assets.mjs`
+   (there is no build step, so stale copies in `public/assets/webclient/` are silent),
+   and keep competitor names and third-party source paths out of shipped code — see the
+   Provenance section of [web-client/README.md](web-client/README.md).
 
 ## 🛠️ Build & test (quick reference)
 ```bash
@@ -98,6 +141,17 @@ docker compose -f docker/compose.toolchain.yml run --rm app composer install
 docker compose -f docker/compose.toolchain.yml run --rm app php artisan migrate
 docker compose -f docker/compose.toolchain.yml --profile test run --rm test php artisan test
 docker compose -f docker/compose.toolchain.yml --profile e2e run --rm e2e bash docker/e2e.sh
+```
+
+The **web client** is plain ES modules with no build step, so it needs only Node:
+```bash
+# tests, vendored-dependency integrity, and publishing to public/assets/webclient/
+docker run --rm -v "$PWD/web-client:/app" -w /app node:22-alpine node --test
+docker run --rm -v "$PWD/web-client:/app" -w /app node:22-alpine node scripts/vendor.mjs --check
+docker run --rm -v "$PWD:/app" -w /app node:22-alpine node web-client/scripts/install-assets.mjs
+
+# the encrypted notes vault (see §5 above)
+docker run --rm -v "$PWD:/app" -w /app node:22-alpine node scripts/vault.mjs status
 ```
 Stack: Laravel 13 (PHP 8.5) · Blade + jQuery + Bootstrap 5 · MariaDB/InnoDB · Mailpit (SMTP
 testing) · Playwright (E2E) · Pint/PHPStan/ESLint (gates).
