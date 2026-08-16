@@ -112,6 +112,109 @@ case "${NGINX_ACCESS_LOG_ENABLED:-true}" in
         ;;
 esac
 
+# --- Browser remote desktop transport -------------------------------------------------
+#
+# Optional. When both upstreams are set, this runtime terminates the viewer's WebSocket on
+# the console's own hostname and certificate and forwards it to hbbs and hbbr, which speak
+# plain ws only. That removes the separate TLS terminator, the second certificate and the
+# two extra public ports a direct deployment needs — at the cost of putting this container
+# in the media path, since relayed session video then passes through it.
+#
+# Values are interpolated into the Nginx configuration, so they are validated strictly
+# rather than trusted: a hostname or IPv4 literal and a port, nothing else.
+ws_upstream() {
+    local name="$1"
+    local raw="${!name:-}"
+    local host port
+
+    [ -n "$raw" ] || { printf ''; return 0; }
+    [[ "$raw" =~ ^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?):([0-9]{1,5})$ ]] \
+        || fail "$name must be host:port, for example hbbs:21118."
+
+    host="${BASH_REMATCH[1]}"
+    port="${BASH_REMATCH[3]}"
+    [ "$port" -ge 1 ] && [ "$port" -le 65535 ] \
+        || fail "$name port must be between 1 and 65535."
+
+    printf '%s:%s' "$host" "$port"
+}
+
+ws_id_upstream="$(ws_upstream RUSTDESK_WS_ID_UPSTREAM)"
+ws_relay_upstream="$(ws_upstream RUSTDESK_WS_RELAY_UPSTREAM)"
+
+if { [ -n "$ws_id_upstream" ] && [ -z "$ws_relay_upstream" ]; } \
+    || { [ -z "$ws_id_upstream" ] && [ -n "$ws_relay_upstream" ]; }; then
+    # Half a configuration produces a rendezvous endpoint with no matching relay: the
+    # session would connect and then stop, which is harder to diagnose than not starting.
+    fail "RUSTDESK_WS_ID_UPSTREAM and RUSTDESK_WS_RELAY_UPSTREAM must be set together."
+fi
+
+ws_map=''
+ws_locations=''
+if [ -n "$ws_id_upstream" ]; then
+    # Nginx resolves a literal hostname in proxy_pass once, at startup, and refuses to
+    # start when it does not resolve. Written that way this container would fail to boot
+    # whenever hbbs happened to be slower to start — and would then hold that first IP for
+    # the life of the process, so a restarted hbbs would be proxied into a black hole. A
+    # variable defers resolution to request time and re-resolves on the TTL below, which
+    # needs an explicit resolver: take the container's own, as Docker's embedded DNS is
+    # what makes the service names resolvable in the first place.
+    ws_resolver="$(awk '/^nameserver[[:space:]]/ { print $2; exit }' /etc/resolv.conf 2>/dev/null || true)"
+    [[ "$ws_resolver" =~ ^[0-9a-fA-F:.]+$ ]] || ws_resolver='127.0.0.11'
+
+    ws_map="$(cat <<MAP
+    # A WebSocket upgrade must be forwarded as such; anything else closes the hop cleanly.
+    map \$http_upgrade \$connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    resolver $ws_resolver valid=30s ipv6=off;
+MAP
+)"
+    ws_locations="$(cat <<LOCATIONS
+        # Browser remote desktop transport. \`^~\` so no regex location can claim these.
+        #
+        # X-Real-IP and X-Forwarded-For are blanked rather than forwarded, and that is the
+        # single most important line here: hbbs overwrites the connection's address with
+        # X-Real-IP — falling back to X-Forwarded-For, unvalidated — and then keys its
+        # pending-response map on the result. Forward them and every operator arriving
+        # through the same proxy collapses onto one key and they take each other's
+        # PunchHoleResponse. Two people behind one public IP is enough to see it.
+        location ^~ /ws/id {
+            # Through a variable, so the name is resolved per request rather than pinned at
+            # startup. See the resolver note above.
+            set \$ws_id_upstream "$ws_id_upstream";
+            proxy_pass http://\$ws_id_upstream;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade \$http_upgrade;
+            proxy_set_header Connection \$connection_upgrade;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP "";
+            proxy_set_header X-Forwarded-For "";
+            proxy_read_timeout 120s;
+            proxy_send_timeout 120s;
+        }
+
+        # The relay carries the session itself: long-lived, and quiet whenever the remote
+        # screen is static, so the timeout is generous and responses are never buffered.
+        location ^~ /ws/relay {
+            set \$ws_relay_upstream "$ws_relay_upstream";
+            proxy_pass http://\$ws_relay_upstream;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade \$http_upgrade;
+            proxy_set_header Connection \$connection_upgrade;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP "";
+            proxy_set_header X-Forwarded-For "";
+            proxy_read_timeout 600s;
+            proxy_send_timeout 600s;
+            proxy_buffering off;
+        }
+LOCATIONS
+)"
+fi
+
 if [ -L /run/php ] || { [ -e /run/php ] && [ ! -d /run/php ]; }; then
     fail "/run/php must be a real directory, not a link or another file type."
 fi
@@ -127,12 +230,19 @@ php_tmp="$(mktemp "$PHP_INI_DIR/conf.d/zz-runtime-limits.ini.XXXXXX")"
 validation_log="$(mktemp /tmp/runtime-config-validation.XXXXXX)"
 trap 'rm -f "$nginx_tmp" "$fpm_tmp" "$php_tmp" "$validation_log"' EXIT
 
+# The two WebSocket placeholders are multi-line, which `sed s|||` cannot express; awk
+# substitutes them whole, and leaves an empty line behind when the feature is off.
 sed \
     -e "s|__NGINX_WORKER_PROCESSES__|$worker_processes|g" \
     -e "s|__NGINX_WORKER_CONNECTIONS__|$worker_connections|g" \
     -e "s|__NGINX_CLIENT_MAX_BODY_BYTES__|$client_max_body_bytes|g" \
     -e "s|__NGINX_ACCESS_LOG_DIRECTIVE__|$access_log_directive|g" \
-    "$NGINX_TEMPLATE" > "$nginx_tmp"
+    "$NGINX_TEMPLATE" \
+    | awk -v ws_map="$ws_map" -v ws_locations="$ws_locations" '
+        $0 == "__NGINX_WS_MAP__"       { if (ws_map != "") print ws_map; next }
+        $0 == "__NGINX_WS_LOCATIONS__" { if (ws_locations != "") print ws_locations; next }
+        { print }
+    ' > "$nginx_tmp"
 
 sed \
     -e "s|__PHP_FPM_MAX_CHILDREN__|$fpm_max_children|g" \

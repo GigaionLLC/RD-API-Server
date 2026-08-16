@@ -30,8 +30,21 @@ return [
      * the console itself is served over http (localhost during development).
      */
     'web_client' => [
+        // Explicit wss endpoints, for a deployment that terminates TLS in front of hbbs
+        // and hbbr itself. These always win.
         'ws_id_url' => env('RUSTDESK_WS_ID_URL', ''),
         'ws_relay_url' => env('RUSTDESK_WS_RELAY_URL', ''),
+
+        // Or let this container carry the WebSocket. Set both to the hbbs and hbbr
+        // WebSocket ports as reachable from here — on a Compose network that is the
+        // service name, e.g. `hbbs:21118` and `hbbr:21119` — and the runtime proxies
+        // /ws/id and /ws/relay to them on the console's own hostname and certificate.
+        // Nothing else needs configuring: the endpoints are derived from APP_URL.
+        //
+        // The trade-off is that relayed session video then passes through this container,
+        // which is otherwise never in the media path. See docs/web-client-deployment.md.
+        'ws_id_upstream' => trim((string) env('RUSTDESK_WS_ID_UPSTREAM', '')),
+        'ws_relay_upstream' => trim((string) env('RUSTDESK_WS_RELAY_UPSTREAM', '')),
     ],
 
     // Server-command targets (ports the API talks to on hbbs/hbbr).

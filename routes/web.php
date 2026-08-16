@@ -71,6 +71,8 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     // Browser remote desktop. The frame route returns the viewer document itself; the
     // browser then speaks the RustDesk protocol straight to hbbs/hbbr over WebSocket, so
     // this application is never in the media path.
+    // Before the {device} routes: 'diagnostics' would otherwise be bound as a device id.
+    Route::get('/admin/web-client/diagnostics', [WebClientController::class, 'diagnostics'])->middleware('permission:settings.view')->name('admin.web-client.diagnostics');
     Route::get('/admin/devices/{device}/connect', [WebClientController::class, 'show'])->middleware('permission:devices.view')->name('admin.devices.connect');
     Route::get('/admin/devices/{device}/connect/frame', [WebClientController::class, 'frame'])->middleware('permission:devices.view')->name('admin.devices.connect.frame');
     Route::get('/admin/devices/{device}/edit', [DeviceController::class, 'edit'])->middleware('permission:devices.view')->name('admin.devices.edit');

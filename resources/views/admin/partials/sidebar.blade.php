@@ -280,6 +280,11 @@
                        @if (str_starts_with($nav, 'admin/settings')) aria-current="page" @endif>
                         <i class="ri-tools-line" aria-hidden="true"></i><span>Settings</span>
                     </a>
+                    <a href="/admin/web-client/diagnostics"
+                       class="rd-nav__item {{ str_starts_with($nav, 'admin/web-client') ? 'active' : '' }}"
+                       @if (str_starts_with($nav, 'admin/web-client')) aria-current="page" @endif>
+                        <i class="ri-stethoscope-line" aria-hidden="true"></i><span>Remote desktop</span>
+                    </a>
                 </div>
             </section>
         @endif

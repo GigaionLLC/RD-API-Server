@@ -38,6 +38,25 @@
             <strong>No ID server configured.</strong>
             Set <code>RUSTDESK_ID_SERVER</code> so the viewer knows where to connect.
         </div>
+    @elseif ($needsWsUrls)
+        {{-- The one setup step with no other symptom: everything below would render and
+             then fail to connect, which reads as an unreachable server rather than a
+             configuration gap. --}}
+        <div class="alert alert-warning">
+            <strong>WebSocket endpoints are not configured.</strong>
+            This console is served over HTTPS, and a secure page cannot open a plain
+            <code>ws://</code> socket — but <code>hbbs</code> and <code>hbbr</code> speak
+            only plain <code>ws</code>. Terminate TLS in front of ports 21118 and 21119, then
+            set both:
+            <pre class="mb-0 mt-2"><code>RUSTDESK_WS_ID_URL=wss://your-host/ws/id
+RUSTDESK_WS_RELAY_URL=wss://your-host/ws/relay</code></pre>
+            <div class="mt-2">
+                Setting only one has no effect. See
+                <code>docs/web-client-deployment.md</code> for nginx and Caddy configuration,
+                including why the proxy must <em>not</em> forward <code>X-Real-IP</code> or
+                <code>X-Forwarded-For</code> to port 21118.
+            </div>
+        </div>
     @else
         @if (! $config['secure'])
             <div class="alert alert-info py-2">

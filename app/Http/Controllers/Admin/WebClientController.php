@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\AdminScopeService;
+use App\Services\WebClientDiagnosticsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
@@ -30,7 +31,25 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 class WebClientController extends Controller
 {
-    public function __construct(private readonly AdminScopeService $scope) {}
+    public function __construct(
+        private readonly AdminScopeService $scope,
+        private readonly WebClientDiagnosticsService $diagnostics,
+    ) {}
+
+    /**
+     * A read-only account of whether this deployment can actually run the viewer.
+     *
+     * Every way this feature fails to start looks the same from the browser — a connection
+     * error against a server that is running fine — and none of the causes appear in a log.
+     * They are all in the deployment: a missing TLS terminator, an untrusted proxy, an
+     * upstream on the wrong network. The page names each one.
+     */
+    public function diagnostics(Request $request): View
+    {
+        return view('admin.web_client.diagnostics', [
+            'report' => $this->diagnostics->report($request),
+        ]);
+    }
 
     /**
      * The viewer page for one device.
@@ -51,10 +70,13 @@ class WebClientController extends Controller
             throw new NotFoundHttpException;
         }
 
+        $config = $this->clientConfig($device, $actor);
+
         return view('admin.web_client.show', [
             'device' => $device,
-            'config' => $this->clientConfig($device, $actor),
+            'config' => $config,
             'assetsPresent' => $this->assetsPresent(),
+            'needsWsUrls' => $this->needsWsUrls($config),
         ]);
     }
 
@@ -114,6 +136,7 @@ class WebClientController extends Controller
     {
         $idServer = (string) config('rustdesk.id_server');
         $relayServer = (string) config('rustdesk.relay_server');
+        [$rendezvousUrl, $relayUrl] = $this->wsEndpoints();
 
         return [
             'host' => $this->hostOf($idServer),
@@ -123,8 +146,8 @@ class WebClientController extends Controller
             'serverKey' => $this->serverKey(),
             // Explicit wss endpoints win over the derived ports. Behind a reverse proxy
             // the ports are usually not exposed at all, and a secure page cannot open ws://.
-            'rendezvousUrl' => trim((string) config('rustdesk.web_client.ws_id_url')),
-            'relayUrl' => trim((string) config('rustdesk.web_client.ws_relay_url')),
+            'rendezvousUrl' => $rendezvousUrl,
+            'relayUrl' => $relayUrl,
             'peerId' => $device->rustdesk_id,
             'peerLabel' => $device->alias ?: ($device->hostname ?: $device->rustdesk_id),
             // Shown in the peer's connection manager, so the operator is identifiable there.
@@ -155,6 +178,60 @@ class WebClientController extends Controller
         return $path !== '' && File::isFile($path) ? trim((string) File::get($path)) : '';
     }
 
+    /**
+     * The viewer's two WebSocket endpoints.
+     *
+     * Explicitly configured URLs win: a deployment that terminates TLS in front of hbbs
+     * and hbbr has already said exactly where those endpoints are, and they may not be on
+     * this hostname at all.
+     *
+     * Otherwise, when this runtime is configured to carry the WebSocket itself, the
+     * endpoints are this console's own origin. Deriving them rather than asking for them
+     * again is the point of that mode: the operator sets two upstreams and nothing else,
+     * and the pair cannot drift out of step with the Nginx configuration that serves them.
+     *
+     * @return array{0: string, 1: string} Rendezvous and relay, both empty when neither is
+     *                                     configured.
+     */
+    private function wsEndpoints(): array
+    {
+        $id = trim((string) config('rustdesk.web_client.ws_id_url'));
+        $relay = trim((string) config('rustdesk.web_client.ws_relay_url'));
+        if ($id !== '' && $relay !== '') {
+            return [$id, $relay];
+        }
+
+        if (! $this->wsProxied()) {
+            return [$id, $relay];
+        }
+
+        $appUrl = (string) config('app.url');
+        $host = (string) (parse_url($appUrl, PHP_URL_HOST) ?: '');
+        if ($host === '') {
+            return [$id, $relay];
+        }
+
+        $port = parse_url($appUrl, PHP_URL_PORT);
+        $authority = $host.($port ? ':'.$port : '');
+        $scheme = str_starts_with($appUrl, 'https://') ? 'wss' : 'ws';
+
+        return ["{$scheme}://{$authority}/ws/id", "{$scheme}://{$authority}/ws/relay"];
+    }
+
+    /**
+     * Whether this runtime proxies the viewer's WebSocket to hbbs and hbbr.
+     *
+     * Both upstreams are required: half a configuration renders one Nginx location and
+     * produces a session that connects and then stops, which is harder to diagnose than
+     * one that never starts. The runtime configuration script refuses to boot on that,
+     * so this only ever disagrees with Nginx on a source deployment that renders its own.
+     */
+    private function wsProxied(): bool
+    {
+        return trim((string) config('rustdesk.web_client.ws_id_upstream')) !== ''
+            && trim((string) config('rustdesk.web_client.ws_relay_upstream')) !== '';
+    }
+
     private function hostOf(string $endpoint): string
     {
         $endpoint = trim($endpoint);
@@ -177,5 +254,31 @@ class WebClientController extends Controller
     private function assetsPresent(): bool
     {
         return File::isFile(public_path('assets/webclient/ui/viewer.js'));
+    }
+
+    /**
+     * Whether this console will fail to connect for want of the two `wss` endpoints.
+     *
+     * An HTTPS page cannot open a plain `ws://` socket, and hbbs and hbbr speak plain `ws`
+     * only — so a TLS terminator in front of 21118 and 21119 is mandatory here, not a
+     * preference. Without it the viewer derives `wss://<id host>:21118`, finds no TLS
+     * listening, and reports a connection failure that reads as an unreachable server.
+     *
+     * Both must be set: one alone is ignored, because half a configuration would produce a
+     * rendezvous endpoint with no matching relay.
+     *
+     * `localhost` is exempt — it is a secure context without TLS, which is what makes a
+     * local evaluation work with no proxy at all.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function needsWsUrls(array $config): bool
+    {
+        if ($config['secure'] !== true) {
+            return false;
+        }
+
+        return trim((string) $config['rendezvousUrl']) === ''
+            || trim((string) $config['relayUrl']) === '';
     }
 }

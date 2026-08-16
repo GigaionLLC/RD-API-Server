@@ -30,22 +30,85 @@ non-localhost host cannot decode video, because WebCodecs requires a secure cont
 
 ---
 
-## 2. Configuration
+## 2. Two ways to arrange it
+
+| | **Proxied** (§3) | **Direct** (§4, §5) |
+|---|---|---|
+| Configure | Two upstreams | Two URLs plus a reverse-proxy vhost |
+| Certificates | The console's own | A second one for the WebSocket host |
+| Public ports | None beyond the console | 21118 and 21119, behind TLS |
+| Media path | Through this container | Browser to hbbr, this server uninvolved |
+| Best for | Most deployments | Many concurrent sessions |
 
 ```env
-# wss endpoints for the browser viewer. Leave empty only for http://localhost.
+# Proxied: this container serves /ws/id and /ws/relay and forwards them.
+RUSTDESK_WS_ID_UPSTREAM=hbbs:21118
+RUSTDESK_WS_RELAY_UPSTREAM=hbbr:21119
+
+# Direct: you terminate TLS in front of hbbs and hbbr and name the endpoints.
 RUSTDESK_WS_ID_URL=wss://rustdesk.example.com/ws/id
 RUSTDESK_WS_RELAY_URL=wss://rustdesk.example.com/ws/relay
 ```
 
-When empty, the viewer derives `ws://<RUSTDESK_ID_SERVER host>:21118` and `:21119`.
+Explicit URLs always win, so a deployment can move from one arrangement to the other by
+setting or clearing them.
+
+With neither set, the viewer derives `ws://<RUSTDESK_ID_SERVER host>:21118` and `:21119` —
+which works only for a console on `http://localhost`, because a secure page cannot open a
+plain `ws://` socket.
 
 The server ignores the request path entirely, so `/ws/id` and `/ws/relay` are purely a
 routing convention — use whatever paths suit the proxy.
 
 ---
 
-## 3. nginx
+## 3. Letting this container carry the WebSocket
+
+The simplest arrangement, and the one to reach for first. Set two upstreams:
+
+```yaml
+- RUSTDESK_WS_ID_UPSTREAM=hbbs:21118
+- RUSTDESK_WS_RELAY_UPSTREAM=hbbr:21119
+```
+
+The values are `host:port` as reachable *from this container* — on a Compose network that
+is the service name. The runtime then serves `/ws/id` and `/ws/relay` on the console's own
+hostname and certificate and forwards them to hbbs and hbbr.
+
+Nothing else needs configuring. The viewer derives its endpoints from `APP_URL`, so there
+is no second place to keep in step, and `RUSTDESK_WS_ID_URL` / `RUSTDESK_WS_RELAY_URL` are
+not needed.
+
+What this buys you:
+
+- **One hostname and one certificate.** No second TLS terminator, no extra DNS name.
+- **No reverse-proxy edit.** Your existing vhost already forwards everything for that
+  domain — provided it forwards WebSocket upgrades, which is the one thing to verify.
+- **No extra public ports.** 21118 and 21119 need only be reachable from this container,
+  so they can be bound to a private interface, or not published at all.
+- **The X-Real-IP trap is handled for you.** This runtime blanks those headers toward
+  hbbs; §5 explains why that matters and why it is easy to get wrong by hand.
+
+What it costs:
+
+- **This container joins the media path.** Relayed session video passes through it, which
+  is exactly what the direct arrangement avoids. For a handful of concurrent sessions this
+  is not measurable; for many, prefer §4.
+- **Two proxy hops** if your console is already behind one.
+
+Both upstreams must be set. Setting one is refused at start-up rather than accepted,
+because half a configuration produces a rendezvous endpoint with no matching relay — a
+session that connects and then stops, which is harder to diagnose than one that never
+starts.
+
+The **Remote desktop** page under System in the console reports what is configured, whether
+the upstreams answer from inside the container, and whether the browser can actually reach
+the endpoint. That last check is the one that matters and the only one this server cannot
+make on its own.
+
+---
+
+## 4. nginx
 
 ```nginx
 map $http_upgrade $connection_upgrade {
@@ -66,7 +129,7 @@ server {
         proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
 
-        # Deliberately NOT forwarding X-Real-IP / X-Forwarded-For. See §5.
+        # Deliberately NOT forwarding X-Real-IP / X-Forwarded-For. See §6.
 
         proxy_read_timeout 120s;
         proxy_send_timeout 120s;
@@ -87,7 +150,7 @@ server {
 }
 ```
 
-## 4. Caddy
+## 5. Caddy
 
 ```caddyfile
 rustdesk.example.com {
@@ -109,7 +172,7 @@ rustdesk.example.com {
 
 ---
 
-## 5. Do not forward client-IP headers to 21118
+## 6. Do not forward client-IP headers to 21118
 
 This one is counter-intuitive and breaks concurrent sessions in a way that looks like a
 client bug.
@@ -128,7 +191,7 @@ proxy's address rather than the operator's.
 
 ---
 
-## 6. Never TCP-proxy 21115 or 21117 from localhost
+## 7. Never TCP-proxy 21115 or 21117 from localhost
 
 `hbbs` and `hbbr` treat a **non-WebSocket loopback TCP connection as an unauthenticated
 admin console** — `blacklist-add`, `limit-speed`, `total-bandwidth` and friends. The guard
@@ -139,7 +202,7 @@ caller appear to arrive from `127.0.0.1`, handing them that console.
 
 ---
 
-## 7. Installing the viewer assets
+## 8. Installing the viewer assets
 
 There is no build step — the viewer ships as ES modules.
 
@@ -156,7 +219,7 @@ canvas.
 
 ---
 
-## 8. Requirements and limits
+## 9. Requirements and limits
 
 | | |
 |---|---|
@@ -176,7 +239,7 @@ defence in depth.
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Cause |
 |---|---|
@@ -185,5 +248,5 @@ defence in depth.
 | "WebCodecs unavailable" | Not a secure context. Use HTTPS or `localhost`. |
 | Connects, then "ID does not exist" | Peer is offline, or `RUSTDESK_KEY` does not match the server's `id_ed25519.pub`. |
 | "Wrong Password" | The peer's own connection password, which this server does not hold. |
-| Two operators disconnect each other | Client-IP headers are being forwarded to 21118. See §5. |
+| Two operators disconnect each other | Client-IP headers are being forwarded to 21118. See §6. |
 | Black screen, no error | Almost always the relay endpoint: `/ws/relay` must reach **21119**, not 21117. |

@@ -32,6 +32,7 @@ http {
     etag on;
     if_modified_since exact;
 
+__NGINX_WS_MAP__
     server {
         listen 80 default_server;
         listen [::]:80 default_server;
@@ -53,6 +54,8 @@ http {
         location ~ (^|/)\. {
             return 404;
         }
+
+__NGINX_WS_LOCATIONS__
 
         location / {
             try_files $uri $uri/ @laravel;
