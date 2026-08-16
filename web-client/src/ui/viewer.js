@@ -15,6 +15,7 @@ import { CodecCapabilities, probeDecodable } from '../media/codec.js';
 import { VideoStreamDecoder } from '../media/decoder.js';
 import { VideoSurface } from '../render/surface.js';
 import { CursorLayer } from '../render/cursor.js';
+import { AudioStreamPlayer } from '../media/audio.js';
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
@@ -28,6 +29,8 @@ let decoder = null;
 let surface = null;
 /** @type {CursorLayer | null} */
 let cursor = null;
+/** @type {AudioStreamPlayer | null} */
+let audio = null;
 
 let frames = 0;
 let bytes = 0;
@@ -48,7 +51,9 @@ globalThis.__viewer = {
     get displays() { return session?.peerInfo?.displays?.length ?? 0; },
     get error() { return lastError; },
     get cursor() { return cursor?.stats() ?? null; },
+    get audio() { audio?.requestStats(); return audio?.stats() ?? null; },
     switchTo(i) { $('display').value = String(i); switchDisplay(); },
+    setMuted(v) { audio?.setMuted(v); $('mute').checked = v; },
 };
 
 let lastError = null;
@@ -64,6 +69,7 @@ function paintStats() {
     const d = decoder?.stats() ?? {};
     const s = surface?.stats() ?? {};
     const c = cursor?.stats() ?? {};
+    const a = audio?.stats() ?? {};
     const secs = (performance.now() - startedAt) / 1000;
     statsEl.textContent = [
         `state    ${session.state}${session.encrypted ? ' · encrypted' : ' · PLAINTEXT'}`,
@@ -75,6 +81,9 @@ function paintStats() {
         `rtt      ${session.lastDelayMs ?? '—'} ms`,
         `cursor   ${c.cached ?? 0} cached · ${c.decoded ?? 0} decoded · ${c.missing ?? 0} missing` +
             `${c.embedded ? ' · embedded' : ''}`,
+        `audio    ${a.format ? `${a.format.sampleRate}Hz x${a.format.channels}` : '—'} · ` +
+            `${a.packets ?? 0} pkt · ${a.decoded ?? 0} dec · ${a.errors ?? 0} err` +
+            `${a.muted ? ' · muted' : ''}`,
     ].join('\n');
 }
 
@@ -86,6 +95,9 @@ async function connect() {
     const canvas = /** @type {HTMLCanvasElement} */ ($('video'));
     surface = new VideoSurface(canvas);
     cursor = new CursorLayer(/** @type {HTMLCanvasElement} */ ($('cursor')));
+    // Muted by default: when the peer is this machine, playing its audio back through
+    // its own speakers is a feedback loop.
+    audio = new AudioStreamPlayer({ muted: $('mute').checked });
     // Keep the overlay the same pixel size as the video so one coordinate space serves
     // both; CSS object-fit then scales them identically.
     surface.onResize = (w, h) => cursor.resize(w, h);
@@ -141,6 +153,15 @@ async function connect() {
         cursor.setDisplay(info.displays[info.current_display ?? 0] ?? {});
         setStatus(`${info.username}@${info.hostname} · ${info.platform}`, 'ok');
     };
+
+    session.onAudioFormat = async (f) => {
+        // Re-sent whenever the peer's audio service restarts, so this rebuilds rather
+        // than initialising once.
+        await audio.setFormat(f);
+        // Connect was a click, so the gesture requirement is already satisfied.
+        await audio.unlock();
+    };
+    session.onAudioFrame = (bytes) => audio.push(bytes);
 
     session.onCursor = (c) => {
         if (c.type === 'shape') cursor.setShape(c);
@@ -208,7 +229,9 @@ function switchDisplay() {
 function teardown() {
     decoder?.close();
     session?.close();
+    audio?.close();
     cursor = null;
+    audio = null;
     $('connect').disabled = false;
     $('disconnect').disabled = true;
     paintStats();
@@ -217,6 +240,7 @@ function teardown() {
 $('connect').addEventListener('click', () => { connect(); });
 $('disconnect').addEventListener('click', () => { setStatus('disconnected'); teardown(); });
 $('display').addEventListener('change', switchDisplay);
+$('mute').addEventListener('change', (e) => audio?.setMuted(e.target.checked));
 
 // Prefill from the query string so a harness can drive this without typing. Values are
 // never persisted; this is a development page.

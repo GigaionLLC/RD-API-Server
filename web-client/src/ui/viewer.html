@@ -60,6 +60,9 @@
     <input id="key" placeholder="server key (base64)" autocomplete="off">
     <input id="password" type="password" placeholder="password" autocomplete="off">
     <select id="display" title="Monitor" disabled><option>display</option></select>
+    <label title="Muted by default: if the peer is this machine, its own audio played back is a feedback loop">
+      <input type="checkbox" id="mute" checked> mute
+    </label>
     <button id="connect">Connect</button>
     <button id="disconnect" class="ghost" disabled>Disconnect</button>
     <span id="status">idle</span>
