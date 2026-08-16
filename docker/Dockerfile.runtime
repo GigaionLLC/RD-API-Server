@@ -39,6 +39,21 @@ COPY . /app
 RUN composer dump-autoload --no-dev --no-interaction --optimize --no-scripts \
     && composer check-platform-reqs --no-dev
 
+# Publish the browser remote desktop into the served document root.
+#
+# The viewer has no build step — `web-client/src` and `web-client/vendor` are the artifact —
+# so this is a copy, and it is done here rather than left to the host because the published
+# copy is gitignored. A clean checkout has no `public/assets/webclient`, so an image built
+# without this step serves a Connect button that leads to a 404.
+#
+# Mirrors web-client/scripts/install-assets.mjs, which does the same for a development
+# checkout; scripts/ci-runtime-smoke.sh fetches one of these files from the built image so
+# the two cannot drift apart unnoticed.
+RUN rm -rf /app/public/assets/webclient \
+    && mkdir -p /app/public/assets/webclient \
+    && cp -R /app/web-client/src/. /app/public/assets/webclient/ \
+    && cp -R /app/web-client/vendor /app/public/assets/webclient/vendor
+
 # ---- Stage 3: production image ----
 FROM php_runtime AS runtime
 
