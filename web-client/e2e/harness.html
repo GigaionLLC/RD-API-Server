@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>web-client browser harness</title>
+</head>
+<body>
+<canvas id="video"></canvas>
+<canvas id="cursor"></canvas>
+<script type="module">
+/**
+ * Loads the browser-only modules and exposes them for Playwright to drive.
+ *
+ * These are the pieces that cannot be covered under Node: real WebCodecs, real canvas
+ * compositing, real AudioContext and AudioWorklet, and a real Worker. Everything else is
+ * covered by test/conformance under `node --test`.
+ *
+ * Served from localhost, which is a secure context — WebCodecs is unavailable otherwise
+ * and every capability check below would report false for the wrong reason.
+ */
+import { VideoSurface } from '../src/render/surface.js';
+import { CursorLayer } from '../src/render/cursor.js';
+import { VideoStreamDecoder } from '../src/media/decoder.js';
+import { AudioStreamPlayer } from '../src/media/audio.js';
+import { probeDecodable, decoderConfig, CODEC_FAMILIES } from '../src/media/codec.js';
+import { decompress } from '../../vendor/fzstd/index.js';
+
+globalThis.H = {
+    VideoSurface, CursorLayer, VideoStreamDecoder, AudioStreamPlayer,
+    probeDecodable, decoderConfig, CODEC_FAMILIES,
+    /** Builds a real VideoFrame from a painted canvas. */
+    makeFrame(w, h, colour = '#c04030') {
+        const c = new OffscreenCanvas(w, h);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = colour;
+        ctx.fillRect(0, 0, w, h);
+        return new VideoFrame(c, { timestamp: 0 });
+    },
+    decompress,
+    ready: true,
+};
+</script>
+</body>
+</html>

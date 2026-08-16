@@ -16,9 +16,11 @@
     ],
     "scripts": {
         "test": "node --test",
+        "test:browser": "playwright test",
         "typecheck": "tsc --noEmit -p jsconfig.json"
     },
     "devDependencies": {
+        "@playwright/test": "^1.48.0",
         "typescript": "^5.6.0"
     }
 }

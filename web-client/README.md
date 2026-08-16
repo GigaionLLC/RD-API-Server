@@ -139,8 +139,9 @@ scale with resolution and bitrate.
 ## Tests
 
 ```bash
-npm test          # node --test, no browser needed
-npm run typecheck # tsc --noEmit --checkJs (JSDoc types, zero build output)
+npm test           # node --test, no browser needed
+npm run test:browser  # Playwright, real Chromium
+npm run typecheck  # tsc --noEmit --checkJs (JSDoc types, zero build output)
 ```
 
 124 conformance tests over the protocol, crypto and session layers. They encode the
@@ -148,8 +149,15 @@ protocol's silent-failure modes: pre-incremented secretbox counters, the `<= 1` 
 passthrough rule, per-field zigzag, packed vs unpacked repeated fields, negatively
 signalled permissions, and the mouse mask requiring exactly one button bit.
 
-**Known gap:** `surface`, `cursor`, `audio`, `decoder` and the worker are browser-only and
-are covered by manual runs rather than CI. A Playwright harness is the obvious fix.
+The browser suite covers what Node cannot: real WebCodecs, canvas compositing,
+`AudioContext`/`AudioWorklet`, and the module worker. It encodes a frame with a real
+`VideoEncoder`, pushes it through the decoder, and asserts the pixels land — and that
+every `VideoFrame` is released, since leaking them exhausts a small GPU pool and stalls
+decoding permanently.
+
+```bash
+docker run --rm -v "$PWD:/app" -w /app mcr.microsoft.com/playwright:v1.48.0-jammy   bash -lc "npm i --no-save @playwright/test@1.48.0 && npx playwright test"
+```
 
 Live integration tools, which need a real peer:
 
