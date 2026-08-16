@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
@@ -23,6 +25,8 @@ use Tests\TestCase;
  */
 class WebClientAssetsTest extends TestCase
 {
+    use RefreshDatabase;
+
     private string $root;
 
     protected function setUp(): void
@@ -101,6 +105,103 @@ class WebClientAssetsTest extends TestCase
 
         $this->assertSame([], $stale,
             "The published viewer is out of step with web-client/:\n".implode("\n", $stale));
+    }
+
+    public function test_the_served_document_can_load_its_own_scripts(): void
+    {
+        // The bug this exists for: the viewer's HTML is served from an application route,
+        // not from the directory it lives in, and relative URLs resolve against the
+        // document's address. `src="./viewer.js"` on `/admin/remote/frame` asks for
+        // `/admin/remote/viewer.js`, which does not exist. The browser reports one 404, and
+        // a failed module takes its whole graph with it, so nothing runs at all — the
+        // viewer renders as bare HTML, offering a manual connection form on a page whose
+        // configuration had been injected correctly a line above.
+        //
+        // This loads the real route and resolves what the document references the way a
+        // browser would: against the URL it was served from.
+        $admin = User::create([
+            'username' => 'asset-probe',
+            'password' => 'secret12345',
+            'status' => User::STATUS_NORMAL,
+        ]);
+        $admin->is_admin = true;
+        $admin->save();
+
+        $url = route('admin.remote.frame', ['peer' => '345890346'], false);
+        $html = $this->actingAs($admin)->get($url)->assertOk()->getContent();
+
+        $base = $this->baseHrefIn($html) ?? $this->directoryOf($url);
+        $this->assertNotSame('', $base, 'the document must resolve its assets somewhere');
+
+        $references = $this->referencesIn($html);
+        $this->assertNotSame([], $references, 'the document must reference its module');
+
+        foreach ($references as $reference) {
+            $resolved = $this->resolveUrl($base, $reference);
+            $this->assertFileExists(
+                public_path(ltrim($resolved, '/')),
+                "The served document references \"{$reference}\", which resolves to {$resolved} — "
+                .'a 404 in the browser, and one failed module stops the entire graph.'
+            );
+        }
+    }
+
+    /** @return array<int, string> Relative src/href values in the document. */
+    private function referencesIn(string $html): array
+    {
+        preg_match_all('/(?:src|href)\s*=\s*"([^"]+)"/i', $html, $matches);
+
+        return array_values(array_filter(
+            $matches[1],
+            static fn (string $v): bool => $v !== '' && preg_match('#^(?:[a-z]+:|//|/|data:|\#)#i', $v) !== 1,
+        ));
+    }
+
+    /**
+     * The base exactly as a browser reads it — no tidying.
+     *
+     * An earlier version appended a missing trailing slash here, which quietly repaired
+     * the defect it was supposed to catch: `asset()` strips the slash, and a base without
+     * one has its last segment treated as a filename, so every relative URL resolves a
+     * directory too high. The test passed while the page stayed broken.
+     */
+    private function baseHrefIn(string $html): ?string
+    {
+        preg_match('/<base[^>]+href\s*=\s*"([^"]+)"/i', $html, $m);
+        if (! isset($m[1])) {
+            return null;
+        }
+
+        $path = parse_url(html_entity_decode($m[1]), PHP_URL_PATH) ?: '/';
+
+        // Everything up to and including the last slash, which is what a relative
+        // reference is resolved against.
+        return substr($path, 0, (int) strrpos($path, '/') + 1);
+    }
+
+    private function directoryOf(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH) ?: '/';
+
+        return substr($path, 0, (int) strrpos($path, '/') + 1);
+    }
+
+    private function resolveUrl(string $base, string $reference): string
+    {
+        $parts = [];
+        foreach (explode('/', $base.$reference) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                array_pop($parts);
+
+                continue;
+            }
+            $parts[] = $segment;
+        }
+
+        return '/'.implode('/', $parts);
     }
 
     /* ------------------------------------------------------------------ */

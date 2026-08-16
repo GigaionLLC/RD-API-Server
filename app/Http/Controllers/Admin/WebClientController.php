@@ -34,6 +34,9 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 class WebClientController extends Controller
 {
+    /** Where install-assets.mjs and the image build publish the viewer. */
+    private const ASSET_BASE = 'assets/webclient/src/ui';
+
     public function __construct(
         private readonly AdminScopeService $scope,
         private readonly WebClientDiagnosticsService $diagnostics,
@@ -166,7 +169,7 @@ class WebClientController extends Controller
      */
     private function viewerDocument(array $config): Response
     {
-        $path = public_path('assets/webclient/src/ui/viewer.html');
+        $path = public_path(self::ASSET_BASE.'/viewer.html');
         if (! File::isFile($path)) {
             throw new NotFoundHttpException('viewer assets are not installed');
         }
@@ -187,6 +190,26 @@ class WebClientController extends Controller
                 .'`node web-client/scripts/install-assets.mjs`.'
             );
         }
+
+        // A <base> is not decoration here, it is what makes the document work at all.
+        //
+        // This route serves the viewer's HTML from an application URL, not from the
+        // directory the file lives in, and relative URLs resolve against the document's
+        // address. `src="./viewer.js"` therefore asks for `/admin/remote/viewer.js`, which
+        // does not exist. The browser reports one 404 and stops; a module that fails to
+        // load takes its whole graph with it, so nothing runs — and the viewer renders as
+        // bare HTML, offering its manual connection form on a page whose configuration was
+        // injected correctly a line above. That is what an operator saw for three releases.
+        //
+        // Everything inside the module graph then resolves correctly on its own, because
+        // an import resolves against the importing module's URL rather than the document's.
+        // The trailing slash is load-bearing and `asset()` strips it: without one, the last
+        // segment is treated as a filename and every relative URL resolves one directory
+        // too high — the same 404, from a <base> that looks right.
+        $base = '<base href="'.e(asset(self::ASSET_BASE)).'/">';
+        $document = str_contains($document, '<head>')
+            ? str_replace('<head>', '<head>'."\n".$base, $document)
+            : $base.$document;
 
         return response(str_replace($needle, $inject."\n".$needle, $document))
             ->header('Content-Type', 'text/html; charset=utf-8')
@@ -389,7 +412,7 @@ class WebClientController extends Controller
      */
     private function assetsPresent(): bool
     {
-        return File::isFile(public_path('assets/webclient/src/ui/viewer.js'));
+        return File::isFile(public_path(self::ASSET_BASE.'/viewer.js'));
     }
 
     /**

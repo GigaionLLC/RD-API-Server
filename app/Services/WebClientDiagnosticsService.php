@@ -128,13 +128,35 @@ class WebClientDiagnosticsService
         // Without a key the viewer cannot verify the peer it is talking to, and a session
         // that cannot be verified is one whose password proof and keystrokes could be read
         // by whatever is in the middle. It still works; it is simply no longer private.
-        return $this->check(
-            'Server key',
-            $key === '' ? self::WARN : self::OK,
-            $key === ''
-                ? 'Not configured. Sessions cannot be verified end to end, and the viewer will not refuse an unverifiable peer.'
-                : 'Configured. The viewer refuses a peer it cannot verify.',
-        );
+        if ($key === '') {
+            return $this->check('Server key', self::WARN,
+                'Not configured. Sessions cannot be verified end to end, and the viewer will not refuse an unverifiable peer.');
+        }
+
+        // An Ed25519 signing key is 64 bytes of seed followed by the 32-byte public key,
+        // and RustDesk writes both to disk with confusingly similar names. Configuring the
+        // private half here is a serious mistake rather than a typo: this value is handed
+        // to every client and to the viewer, so the key that exists to prove the server's
+        // identity would be published to anyone who asks. It also does not work — hbbs
+        // compares it against its own and refuses the connection.
+        $raw = base64_decode($key, true);
+        if ($raw !== false && strlen($raw) === 64) {
+            return $this->check('Server key', self::FAIL,
+                'This is the server PRIVATE key (64 bytes), not the public key. It is handed to every client, '
+                .'so anyone who receives it can impersonate your ID server — and hbbs refuses connections that '
+                .'present it. Use the 32-byte public key from id_ed25519.pub: '
+                .base64_encode(substr($raw, 32)).' — and rotate the key pair, because the private half has been '
+                .'distributed.');
+        }
+
+        if ($raw === false || strlen($raw) !== 32) {
+            return $this->check('Server key', self::FAIL,
+                'Not a valid RustDesk server key. Expected 32 bytes of base64 from id_ed25519.pub; got '
+                .($raw === false ? 'something that is not base64' : strlen($raw).' bytes').'.');
+        }
+
+        return $this->check('Server key', self::OK,
+            'Configured, and the right half of the pair. The viewer refuses a peer it cannot verify.');
     }
 
     /** @return array<string, mixed> */

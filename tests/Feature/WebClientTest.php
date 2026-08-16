@@ -345,7 +345,10 @@ class WebClientTest extends TestCase
         config([
             'rustdesk.web_client.ws_id_url' => 'wss://console.example.com/ws/id',
             'rustdesk.web_client.ws_relay_url' => 'wss://console.example.com/ws/relay',
-            'rustdesk.key' => 'a-public-server-key',
+            // A real 32-byte public key: the diagnostics now check the shape, and a
+            // placeholder string is exactly the misconfiguration they exist to report.
+            'rustdesk.key' => base64_encode(random_bytes(32)),
+            'rustdesk.key_file' => '',
         ]);
 
         $admin = $this->admin();

@@ -4,6 +4,32 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.4.4] - 2026-08-16
+
+### Fixed
+
+- **The viewer's scripts could not load, so the remote desktop never started.** Its HTML is served
+  from an application route rather than from the directory the file lives in, and relative URLs
+  resolve against the document's address — so `src="./viewer.js"` asked for
+  `/admin/remote/viewer.js`, which does not exist. One 404 stops the entire module graph, and the
+  page rendered as bare HTML: a manual connection form asking for an ID server and a key that had
+  been injected correctly a line above. The document now carries a `<base>` pointing at the
+  published assets.
+
+  This was the last of three separate faults with one symptom. Together with the layout fix in
+  1.4.3, the browser remote desktop now runs: **verified end to end against a live peer** —
+  rendezvous, relay, encrypted handshake, login, H.265 decode and 41 frames painted, with all four
+  of the peer's monitors enumerated.
+
+### Added
+
+- **The diagnostics page now checks which half of the server key pair is configured.** An Ed25519
+  signing key is 64 bytes — a seed followed by the 32-byte public key — and RustDesk writes both to
+  disk with confusingly similar names. Configuring the private half is not a typo: this value is
+  handed to every client, so the key that exists to prove the server's identity is published to
+  anyone who asks, and `hbbs` refuses connections that present it. The check reports the mistake,
+  prints the correct public key, and says to rotate the pair.
+
 ## [1.4.3] - 2026-08-16
 
 ### Fixed
@@ -337,7 +363,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.3...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.4...HEAD
+[1.4.4]: docs/releases/v1.4.4.md
 [1.4.3]: docs/releases/v1.4.3.md
 [1.4.2]: docs/releases/v1.4.2.md
 [1.4.1]: docs/releases/v1.4.1.md
