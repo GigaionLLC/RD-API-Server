@@ -4,7 +4,7 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
-## [Unreleased]
+## [1.4.0] - 2026-08-16
 
 ### Added
 
@@ -28,8 +28,28 @@ notes.
   neither holds nor transmits it. See **[docs/web-client-deployment.md](docs/web-client-deployment.md)**
   for nginx and Caddy configuration and two traps worth reading before deploying.
 
-  The viewer is a standalone package under `web-client/` with no build step. Publish it with
+  The session survives a dropped connection: a relayed link is not a reliable one, so the viewer
+  reconnects with exponential backoff and full jitter. What it will **not** retry is the point —
+  a wrong password would spend the peer's remaining attempts toward a lockout, and a refused
+  encryption downgrade would invite whatever stripped it to keep asking.
+
+  What the peer says is shown. Its message boxes — "waiting for the user to accept", a locked-out
+  account, an elevation refusal — appear as notices instead of being dropped, and so do permission
+  denials, which are signalled only as negatives and previously made a peer with keyboard control
+  switched off indistinguishable from a broken client.
+
+  **Windows elevation** is handled. A UAC prompt runs on the secure desktop, where the operating
+  system discards injected input by design, and an elevated foreground window ignores input from a
+  lower-integrity session — both of which look like a frozen screen. The viewer names the state and
+  offers either a consent prompt at the remote machine or administrator credentials.
+
+  The viewer is a standalone package under `web-client/` with no build step. The Docker image
+  publishes it during the build; a source deployment runs
   `node web-client/scripts/install-assets.mjs` after upgrading.
+
+- **A contributor assignment agreement** ([CLA.md](CLA.md)) and
+  [CONTRIBUTING.md](CONTRIBUTING.md). Both are drafts pending legal review, and no contribution so
+  far is affected.
 
 - **An encrypted notes vault** (`scripts/vault.mjs`) keeps commercially sensitive working notes in
   the repository and its history without exposing them publicly. `DevOps/vault/vault.enc` is
@@ -224,7 +244,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.0...HEAD
+[1.4.0]: docs/releases/v1.4.0.md
 [1.3.0]: docs/releases/v1.3.0.md
 [1.2.0]: docs/releases/v1.2.0.md
 [#1]: https://github.com/GigaionLLC/RD-API-Server/issues/1

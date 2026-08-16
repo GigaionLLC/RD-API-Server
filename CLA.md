@@ -1,13 +1,14 @@
 # Contributor Assignment Agreement
 
-**Draft — not yet in force.** Fill in the legal entity name below and have this reviewed by a
-lawyer before requiring anyone to sign it. It is a copyright assignment, which is the strongest
+**Draft — not yet in force.** Confirm the legal entity name and governing law below, and have this
+reviewed by a lawyer before requiring anyone to sign it. It is a copyright assignment, which is the strongest
 form of contributor agreement and the hardest to undo; a template is a starting point, not advice.
 
 ---
 
 **Project:** RD-API-Server (`rustdesk-api`)
-**Owner:** **[LEGAL ENTITY OR INDIVIDUAL NAME]** ("the Owner")
+**Owner:** **Gigaion LLC** ("the Owner") — taken from the repository owner and the Composer vendor
+name; replace with the exact registered name if it differs.
 **Version:** 1.0
 
 Thank you for contributing. This agreement records who owns the copyright in what you contribute,
