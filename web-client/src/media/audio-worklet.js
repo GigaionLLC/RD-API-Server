@@ -23,8 +23,7 @@ class RingProcessor extends AudioWorkletProcessor {
     constructor(options) {
         super();
         const channels = options?.processorOptions?.channels ?? 2;
-        // Sized like the reference client: enough to ride out a stall without adding
-        // seconds of latency on top.
+        // Enough to ride out a network stall without adding seconds of latency on top.
         const capacity = Math.ceil(sampleRate * TARGET_SECONDS);
 
         this.channels = channels;

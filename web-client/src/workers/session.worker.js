@@ -5,9 +5,10 @@
  * decoding, video decode, and compositing into an OffscreenCanvas. Frame bytes never
  * cross a thread boundary, so main-thread cost does not scale with bitrate.
  *
- * That last point is the whole reason for this file. Both competing implementations run
- * decode and render on the main thread, which means their jank grows with the stream —
- * pure-JS XSalsa20-Poly1305 alone is meaningful work at 4K bitrates, before any decoding.
+ * That last point is the whole reason for this file. Compositing, secretbox decryption and
+ * protobuf decoding all scale with resolution and bitrate, and on the main thread they
+ * show up directly as dropped animation frames. Pure-JS XSalsa20-Poly1305 alone is
+ * meaningful work at 4K bitrates, before any decoding happens.
  *
  * Stays on the main thread, deliberately:
  *  - Audio. AudioContext and AudioWorklet are not available to workers, so Opus packets

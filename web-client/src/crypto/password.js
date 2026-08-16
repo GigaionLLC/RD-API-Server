@@ -10,11 +10,11 @@
  * peer's persistent per-device value; `challenge` is regenerated every connection, which
  * is why `h1` may be cached across sessions but `h2` never may.
  *
- * SHA-256 comes from WebCrypto, which is why this client requires a secure context —
- * `crypto.subtle` is unavailable on plain HTTP. That is a feature: it is exactly the
- * constraint that would otherwise push us toward a hand-written SHA-256, and a
- * hand-written SHA-256 in a competing implementation has a padding bug that silently
- * breaks passwords 42-49 characters long.
+ * SHA-256 comes from WebCrypto, which is part of why this client requires a secure
+ * context — `crypto.subtle` is unavailable on plain HTTP. That is a feature rather than a
+ * limitation: the alternative is hand-writing a hash function, and a padding bug there
+ * fails silently for only some input lengths, which is close to undiagnosable in the
+ * field.
  */
 
 const encoder = new TextEncoder();

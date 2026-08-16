@@ -14,10 +14,10 @@
  * Both blobs carry the peer id, and both must match the id we asked for — otherwise a
  * server could splice in another peer's material.
  *
- * Every failure here degrades to an unencrypted session rather than aborting, because
- * that is what the reference client does and a peer with no registered key is a normal
- * situation. Callers get the reason so a policy that fails closed can be layered on top;
- * see `HandshakeResult.downgradeReason`.
+ * Every failure here degrades to an unencrypted session rather than aborting, because a
+ * peer with no registered key is a normal situation the protocol allows. Callers get the
+ * reason so a policy that fails closed can be layered on top; see
+ * `HandshakeResult.downgradeReason`.
  */
 
 import { decode } from '../protocol/codec.js';

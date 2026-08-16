@@ -82,9 +82,9 @@ export function isPrintable(key) {
 /**
  * Modifier list for a key event.
  *
- * The reference client omits the modifier that IS the key being pressed — reporting
- * Shift as held while sending Shift itself confuses the host's state synchronisation.
- * Lock state is appended only where it is meaningful.
+ * The modifier that IS the key being pressed must be omitted: reporting Shift as held
+ * while sending Shift itself confuses the peer's state synchronisation. Lock state is
+ * appended only where it is meaningful.
  *
  * @param {object} ev
  * @param {number | null} [selfKey] The ControlKey being sent, if any.

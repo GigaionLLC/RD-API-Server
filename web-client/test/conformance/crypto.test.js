@@ -22,7 +22,7 @@ import { SecretStream } from '../../src/crypto/stream.js';
 
 const utf8 = (s) => new TextEncoder().encode(s);
 
-/** Independent reference implementation, using node:crypto rather than WebCrypto. */
+/** Cross-check against node:crypto, so the WebCrypto path is not verified by itself. */
 function refSha256(...parts) {
     const h = createHash('sha256');
     for (const p of parts) h.update(Buffer.from(p));

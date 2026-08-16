@@ -7,8 +7,8 @@
  * no separate "embedded" variant to drift.
  *
  * Two pipelines are selectable. `worker` is the real one: socket, decryption, protobuf,
- * decode and compositing all off the main thread. `main` exists only as the measurement
- * baseline, and is what competing implementations do.
+ * decode and compositing all off the main thread. `main` runs the same pipeline on the
+ * main thread and exists only as a measurement baseline.
  */
 
 import { RustDeskSession } from '../session/machine.js';

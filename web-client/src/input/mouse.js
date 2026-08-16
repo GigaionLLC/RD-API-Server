@@ -31,7 +31,7 @@ export function buttonFor(index) {
 }
 
 /**
- * Modifiers currently held, in the order the reference client emits them.
+ * Modifiers currently held, in the order the peer expects them.
  * @param {{altKey?: boolean, shiftKey?: boolean, ctrlKey?: boolean, metaKey?: boolean}} ev
  * @returns {number[]}
  */
@@ -67,8 +67,8 @@ export function toVirtualDesktop(display, localX, localY) {
  * Browser wheel delta → protocol notch counts.
  *
  * The sign is inverted relative to the DOM: `deltaY > 0` means scrolling down, which the
- * protocol expresses as -1. A dominant-axis lock matches the reference client and avoids
- * spurious horizontal scroll from trackpad noise.
+ * protocol expresses as -1. A dominant-axis lock avoids spurious horizontal scroll from
+ * trackpad noise.
  *
  * @param {{deltaX: number, deltaY: number, deltaMode?: number}} ev
  * @returns {{x: number, y: number}}

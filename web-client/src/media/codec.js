@@ -86,8 +86,8 @@ export class CodecCapabilities {
     }
 
     /**
-     * Records a decode failure. Three consecutive failures retire the codec, matching
-     * the reference client's threshold.
+     * Records a decode failure. Three consecutive failures retire the codec — enough to
+     * rule out a transient glitch without persisting with a decoder that cannot work.
      * @param {string} family
      * @returns {boolean} True if the codec was just retired and we should re-advertise.
      */

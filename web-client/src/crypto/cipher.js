@@ -2,12 +2,12 @@
  * Adapter binding the vendored NaCl implementation to the interfaces the rest of the
  * client consumes.
  *
- * tweetnacl is used because its API is a 1:1 match for the primitives RustDesk speaks:
- * `sign.open` is combined-mode Ed25519 verification (signature prepended to the
- * message), `box` is crypto_box_easy, and `secretbox` is crypto_secretbox_easy — the
- * same three calls sodiumoxide makes on the peer side. The alternative considered
- * (@noble) has secretbox and x25519 but no crypto_box, which would have meant composing
- * the box construction from hsalsa + x25519 by hand. That is not a thing to hand-roll.
+ * tweetnacl is used because its API maps 1:1 onto the NaCl primitives the wire format
+ * requires: combined-mode Ed25519 verification (signature prepended to the message),
+ * crypto_box (X25519 + XSalsa20-Poly1305), and crypto_secretbox (XSalsa20-Poly1305).
+ * The alternative considered (@noble) provides secretbox and x25519 but no crypto_box,
+ * which would have meant composing the box construction from hsalsa + x25519 by hand.
+ * That is not a thing to hand-roll.
  *
  * If per-frame secretbox ever shows up in a profile, only `secretboxCipher` below needs
  * to change — SecretStream takes the cipher by injection, and `box`/`sign` run once per

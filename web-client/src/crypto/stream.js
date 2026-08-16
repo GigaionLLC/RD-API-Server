@@ -13,7 +13,7 @@
  *      counter 1, not 0.
  *   2. Send and receive counters are independent.
  *   3. Payloads of length <= 1 bypass the cipher entirely AND do not advance the
- *      receive counter. That is how the zero-byte heartbeat works; treating it as
+ *      receive counter. That is how the zero-byte heartbeat is carried; treating one as
  *      ciphertext desynchronises everything after it.
  *
  * There is no rekeying and no nonce on the wire, so a single dropped or reordered
@@ -40,9 +40,9 @@ export function nonceFor(counter) {
 }
 
 /**
- * A payload short enough to bypass the cipher. RustDesk uses a zero-length frame as a
- * heartbeat, and the reference implementation passes anything of length <= 1 through
- * untouched without touching the receive counter.
+ * A payload short enough to bypass the cipher. A zero-length frame is the protocol's
+ * heartbeat, and anything of length <= 1 passes through untouched without advancing the
+ * receive counter.
  * @param {Uint8Array} payload
  */
 export function isPassthrough(payload) {
