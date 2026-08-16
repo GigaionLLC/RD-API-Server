@@ -312,3 +312,103 @@ test('the viewer page loads cleanly and exposes its diagnostics', async ({ page 
     expect(state.hasConnect).toBe(true);
     expect(state.hasChat).toBe(true);
 });
+
+test('notices render, deduplicate and dismiss', async ({ page }) => {
+    // Peers repeat the same box for as long as they are waiting for a decision, so an
+    // append-only list buries the canvas within seconds of a click-to-accept prompt.
+    await page.goto('/src/ui/viewer.html');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+
+    const box = { msgtype: 'custom-nocancel', title: 'Waiting', text: 'Accept on the remote machine' };
+    const after = await page.evaluate((b) => {
+        globalThis.__viewer.notify.messageBox(b);
+        globalThis.__viewer.notify.messageBox(b);
+        globalThis.__viewer.notify.messageBox(b);
+        return {
+            cards: document.querySelectorAll('#notices .notice').length,
+            titles: globalThis.__viewer.notices.map((n) => n.title),
+        };
+    }, box);
+
+    expect(after.cards).toBe(1);
+    expect(after.titles).toEqual(['Waiting']);
+
+    await page.click('#notices .notice .dismiss');
+    expect(await page.locator('#notices .notice').count()).toBe(0);
+});
+
+test('peer text is rendered as text, never as markup', async ({ page }) => {
+    // Every field in a MessageBox arrives from a machine the operator has not yet decided
+    // to trust, and the notice sits in trusted chrome.
+    await page.goto('/src/ui/viewer.html');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+
+    const result = await page.evaluate(() => {
+        globalThis.__viewer.notify.messageBox({
+            msgtype: 'error',
+            title: '<img src=x onerror="globalThis.__pwned=1">',
+            text: '<b>bold</b>',
+            link: 'javascript:globalThis.__pwned=1',
+        });
+        const card = document.querySelector('#notices .notice');
+        return {
+            injected: card.querySelectorAll('img, b, a, script').length,
+            pwned: globalThis.__pwned ?? false,
+            titleText: card.querySelector('.title').textContent,
+            linkIsAnchor: !!card.querySelector('a'),
+        };
+    });
+
+    expect(result.injected).toBe(0);
+    expect(result.pwned).toBe(false);
+    expect(result.titleText).toContain('<img');
+    expect(result.linkIsAnchor).toBe(false);
+});
+
+test('a permission granted back takes its banner away', async ({ page }) => {
+    // Permission state is a level, not an edge. A stale banner tells the operator input is
+    // dead while it is working, which is worse than never having shown one.
+    await page.goto('/src/ui/viewer.html');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+
+    const seq = await page.evaluate(() => {
+        const snap = () => globalThis.__viewer.notices.map((n) => n.key);
+        globalThis.__viewer.notify.permissions(['Keyboard', 'Clipboard']);
+        const both = snap();
+        globalThis.__viewer.notify.permissions(['Clipboard']);
+        const one = snap();
+        globalThis.__viewer.notify.permissions([]);
+        return { both, one, none: snap(), denied: globalThis.__viewer.denied };
+    });
+
+    expect(seq.both).toEqual(['perm:Keyboard', 'perm:Clipboard']);
+    expect(seq.one).toEqual(['perm:Clipboard']);
+    expect(seq.none).toEqual([]);
+    expect(seq.denied).toEqual([]);
+});
+
+test('a UAC prompt offers elevation and clears on success', async ({ page }) => {
+    await page.goto('/src/ui/viewer.html');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+
+    const shown = await page.evaluate(() => {
+        globalThis.__viewer.notify.elevation({ uac: true, elevated: false, portable: false, pending: false, response: null });
+        return {
+            keys: globalThis.__viewer.notices.map((n) => n.key),
+            hasForm: !!document.querySelector('#notices .notice form'),
+            // The credential field must not be a password manager target on a page that
+            // is not this machine's login.
+            passwordType: document.querySelector('#notices .notice form input[type=password]')?.type,
+        };
+    });
+    expect(shown.keys).toEqual(['elev:uac']);
+    expect(shown.hasForm).toBe(true);
+    expect(shown.passwordType).toBe('password');
+
+    const after = await page.evaluate(() => {
+        globalThis.__viewer.notify.elevation({ uac: false, elevated: false, portable: false, pending: false, response: '' });
+        return globalThis.__viewer.notices.map((n) => n.key);
+    });
+    // The block is gone and the success is reported in its place.
+    expect(after).toEqual(['elev:response']);
+});

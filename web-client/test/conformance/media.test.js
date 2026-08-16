@@ -61,15 +61,17 @@ const frame = (codec, key, units) => ({ codec, key, units: units ?? [unit(key)] 
 /** Minimal canvas stand-in: records draws and reports its own size. */
 function fakeCanvas() {
     const calls = [];
+    const puts = [];
     return {
         width: 0,
         height: 0,
         calls,
+        puts,
         getContext() {
             return {
                 drawImage: (...a) => calls.push(a),
                 clearRect: () => {},
-                putImageData: () => {},
+                putImageData: (...a) => puts.push(a),
             };
         },
     };
@@ -354,4 +356,82 @@ test('cursor position is stored in virtual-desktop space', { skip: !zstdAvailabl
     layer.setPosition(2000, 300);
     assert.deepEqual(layer.stats().position, { x: 2000, y: 300 });
     assert.deepEqual(layer.origin, { x: 1920, y: 0 }, 'origin is subtracted at draw time');
+});
+
+/** A CursorLayer with one 32x32 shape selected, sized to `canvas`. */
+async function cursorWith(canvas, display) {
+    globalThis.ImageData = class {
+        constructor(data, width, height) { this.data = data; this.width = width; this.height = height; }
+    };
+    const { CursorLayer } = await import('../../src/render/cursor.js');
+    const layer = new CursorLayer(canvas);
+    layer.resize(canvas.width, canvas.height);
+    layer.setDisplay(display);
+    const colors = new Uint8Array(zlib.zstdCompressSync(Buffer.alloc(32 * 32 * 4, 0x40)));
+    await layer.setShape({ id: 1n, width: 32, height: 32, hotx: 4, hoty: 6, colors });
+    canvas.puts.length = 0;
+    return layer;
+}
+
+test('cursor position is mapped from the peer’s units to canvas pixels', { skip: !zstdAvailable }, async () => {
+    // A HiDPI display reports geometry in logical points while the captured video — and
+    // the cursor bitmap with it — is in physical pixels. Ignoring the difference drew the
+    // pointer at half the distance from the top-left corner, growing with the offset, so
+    // it looked correct near the origin and was wildly wrong at the far edge.
+    const canvas = fakeCanvas();
+    canvas.width = 2880; canvas.height = 1800;
+    const layer = await cursorWith(canvas, { x: 0, y: 0, width: 1440, height: 900 });
+
+    layer.setPosition(1000, 500);
+    const [, x, y] = canvas.puts.at(-1);
+    assert.equal(x, 1000 * 2 - 4, 'position scales, the bitmap hotspot does not');
+    assert.equal(y, 500 * 2 - 6);
+});
+
+test('a display whose units already match the video is left alone', { skip: !zstdAvailable }, async () => {
+    // The overwhelmingly common case. The mapping must collapse to identity, or every
+    // ordinary session acquires an offset in the name of fixing an unusual one.
+    const canvas = fakeCanvas();
+    canvas.width = 1920; canvas.height = 1080;
+    const layer = await cursorWith(canvas, { x: 1920, y: 0, width: 1920, height: 1080 });
+
+    layer.setPosition(2500, 400);
+    const [, x, y] = canvas.puts.at(-1);
+    assert.equal(x, 2500 - 1920 - 4);
+    assert.equal(y, 400 - 6);
+});
+
+test('a display of unknown size does not scale the cursor away', { skip: !zstdAvailable }, async () => {
+    // peer_info can arrive with zeroes for a monitor that is offline or still enumerating.
+    const canvas = fakeCanvas();
+    canvas.width = 1920; canvas.height = 1080;
+    const layer = await cursorWith(canvas, { x: 0, y: 0 });
+
+    layer.setPosition(300, 200);
+    const [, x, y] = canvas.puts.at(-1);
+    assert.equal(x, 296);
+    assert.equal(y, 194);
+});
+
+test('a slow shape decode does not overwrite a newer cursor selection', { skip: !zstdAvailable }, async () => {
+    // Cursor changes arrive in bursts — hovering a window edge emits several at once — and
+    // setShape awaits createImageBitmap. Resolving out of order left the pointer showing
+    // the wrong shape until the next change.
+    globalThis.ImageData = class {
+        constructor(data, width, height) { this.data = data; this.width = width; this.height = height; }
+    };
+    const { CursorLayer } = await import('../../src/render/cursor.js');
+
+    const layer = new CursorLayer(fakeCanvas());
+    const colors = new Uint8Array(zlib.zstdCompressSync(Buffer.alloc(8 * 8 * 4, 1)));
+    await layer.setShape({ id: 7n, width: 8, height: 8, hotx: 7, hoty: 7, colors });
+
+    // A shape still decoding when a cursor_id selects an already-cached one.
+    const slow = layer.setShape({ id: 9n, width: 8, height: 8, hotx: 9, hoty: 9, colors });
+    layer.useShape(7n);
+    await slow;
+
+    assert.equal(layer.current.hotx, 7, 'the newer selection wins');
+    assert.equal(layer.stats().cached, 2, 'the late shape is still cached — it is sent only once');
+    assert.equal(layer.useShape(9n), true, 'and is therefore still selectable');
 });

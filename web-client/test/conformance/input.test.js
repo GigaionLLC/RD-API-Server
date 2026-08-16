@@ -13,8 +13,9 @@ import { decode } from '../../src/protocol/codec.js';
 import { Message } from '../../src/protocol/message.js';
 import { ControlKey, KeyboardMode, MouseButton, MouseType } from '../../src/protocol/enums.js';
 import {
-    MouseEncoder, buttonFor, modifiersOf, toVirtualDesktop, wheelNotches,
+    MouseEncoder, ScrollRouter, buttonFor, modifiersOf, toVirtualDesktop, wheelNotches,
 } from '../../src/input/mouse.js';
+import { supportsTrackpadScroll } from '../../src/protocol/version.js';
 import {
     KeyboardEncoder, namedKey, isPrintable, modifiersFor, isModifier,
 } from '../../src/input/keyboard.js';
@@ -83,6 +84,98 @@ test('a zero wheel is not emitted', () => {
     const { sent, fn } = capture();
     assert.equal(new MouseEncoder(fn).wheel(0, 0), false);
     assert.equal(sent.length, 0);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Scroll routing                                                             */
+/* -------------------------------------------------------------------------- */
+
+test('a coalesced flick becomes proportional notches, not one', () => {
+    // Browsers coalesce fast wheel input into a single large delta. Emitting ±1 per event
+    // meant a three-notch flick scrolled one notch, so long documents took three times
+    // the wrist.
+    const r = new ScrollRouter();
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 300 }, false), { kind: 'wheel', x: 0, y: -3 });
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: -100 }, false), { kind: 'wheel', x: 0, y: 1 });
+});
+
+test('sub-notch scrolling accumulates instead of being truncated away', () => {
+    // A trackpad against a peer too old for TRACKPAD. Truncating each event to zero makes
+    // the trackpad feel dead; rounding each up to a full notch makes a nudge jump a page.
+    const r = new ScrollRouter();
+    for (let i = 0; i < 9; i++) {
+        assert.equal(r.push({ deltaX: 0, deltaY: 10 }, true), null, `event ${i} accumulates`);
+    }
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 10 }, true), { kind: 'wheel', x: 0, y: -1 });
+});
+
+test('remainders carry, so a slow drag does not lose distance', () => {
+    const r = new ScrollRouter();
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 150 }, false), { kind: 'wheel', x: 0, y: -1 });
+    // The leftover 50 plus another 50 is the second notch, not a discarded half.
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 50 }, false), { kind: 'wheel', x: 0, y: -1 });
+});
+
+test('a wheel locks to the dominant axis and drops the stale cross-axis residue', () => {
+    const r = new ScrollRouter();
+    assert.equal(r.push({ deltaX: 60, deltaY: 0 }, false), null, 'part of a horizontal notch');
+    // Switching to vertical mid-gesture must not later emit the abandoned horizontal one.
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 100 }, false), { kind: 'wheel', x: 0, y: -1 });
+    assert.equal(r.push({ deltaX: 60, deltaY: 0 }, false), null, 'horizontal restarted from zero');
+});
+
+test('trackpad pixels are sent verbatim when the peer supports them', () => {
+    // TRACKPAD is applied as pixels without the wheel's ×120, which is what makes a
+    // trackpad feel continuous rather than stepped.
+    const r = new ScrollRouter({ allowTrackpad: true });
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 7 }, true), { kind: 'trackpad', x: 0, y: -7 });
+    // Both axes: a diagonal gesture is deliberate on a trackpad.
+    assert.deepEqual(r.push({ deltaX: 4, deltaY: -6 }, true), { kind: 'trackpad', x: -4, y: 6 });
+});
+
+test('a large pixel delta is a wheel even where trackpads are supported', () => {
+    const r = new ScrollRouter({ allowTrackpad: true });
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 100 }, true), { kind: 'wheel', x: 0, y: -1 });
+});
+
+test('line and page mode are never treated as a trackpad', () => {
+    // Firefox reports wheels in line mode. Converted to pixels these can be small, and
+    // classifying them as a precise device would send TRACKPAD to a peer that may ignore it.
+    const r = new ScrollRouter({ allowTrackpad: true });
+    assert.equal(r.push({ deltaX: 0, deltaY: 16 }, false), null, 'accumulates as a wheel');
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 84 }, false), { kind: 'wheel', x: 0, y: -1 });
+});
+
+test('trackpad output is suppressed by default', () => {
+    // The default must be the safe one: a host that predates TRACKPAD ignores it silently,
+    // which is indistinguishable from broken scrolling.
+    const r = new ScrollRouter();
+    for (let i = 0; i < 5; i++) assert.equal(r.push({ deltaX: 0, deltaY: 5 }, true), null);
+});
+
+test('sub-pixel trackpad deltas accumulate rather than rounding to zero', () => {
+    // macOS momentum scrolling ends in a tail of fractional deltas.
+    const r = new ScrollRouter({ allowTrackpad: true });
+    assert.equal(r.push({ deltaX: 0, deltaY: 0.4 }, true), null);
+    assert.deepEqual(r.push({ deltaX: 0, deltaY: 0.7 }, true), { kind: 'trackpad', x: 0, y: -1 });
+});
+
+test('reset clears carried remainders between sessions', () => {
+    const r = new ScrollRouter();
+    r.push({ deltaX: 0, deltaY: 90 }, false);
+    r.reset();
+    assert.equal(r.push({ deltaX: 0, deltaY: 90 }, false), null, 'no carry from the old session');
+});
+
+test('a zero delta produces nothing', () => {
+    assert.equal(new ScrollRouter().push({ deltaX: 0, deltaY: 0 }, true), null);
+});
+
+test('the trackpad gate is conservative about peer versions', () => {
+    // Wrong in this direction is coarse scrolling; wrong in the other is none at all.
+    assert.equal(supportsTrackpadScroll({ version: '1.4.0' }), true);
+    assert.equal(supportsTrackpadScroll({ version: '1.2.3' }), false);
+    assert.equal(supportsTrackpadScroll({}), false, 'an unknown peer gets the safe path');
 });
 
 test('coordinates map into the peer virtual desktop, including negative origins', () => {

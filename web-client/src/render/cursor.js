@@ -49,10 +49,21 @@ export class CursorLayer {
         this.position = { x: 0, y: 0 };
         /** Origin of the display being viewed, subtracted to get canvas-local pixels. */
         this.origin = { x: 0, y: 0 };
+        /** Size of that display in the peer's own units. See `render`. */
+        this.size = { width: 0, height: 0 };
         this.visible = true;
         this.embedded = false;
         this.decoded = 0;
         this.missing = 0;
+        /**
+         * Orders shape selection against the async decode in `setShape`.
+         *
+         * Cursor changes arrive in bursts — hovering a window edge produces several in a
+         * frame — and `setShape` awaits `createImageBitmap`. Without a sequence, a slow
+         * decode resolving after a later `cursor_id` overwrites the newer selection and
+         * the pointer shows the wrong shape until the next change.
+         */
+        this._seq = 0;
     }
 
     /**
@@ -61,6 +72,7 @@ export class CursorLayer {
      * @returns {Promise<void>}
      */
     async setShape(data) {
+        const seq = ++this._seq;
         const width = data.width | 0;
         const height = data.height | 0;
         if (!width || !height) return;
@@ -91,9 +103,13 @@ export class CursorLayer {
             hoty: data.hoty ?? 0,
             image,
         };
+        // Cache unconditionally — a shape is only ever sent once, and a late arrival is
+        // still the only copy we will get — but do not steal the current selection from a
+        // `cursor_id` that arrived while this was decoding.
         this.shapes.set(String(data.id), shape);
-        this.current = shape;
         this.decoded++;
+        if (seq !== this._seq) return;
+        this.current = shape;
         this.render();
     }
 
@@ -103,6 +119,8 @@ export class CursorLayer {
      * @returns {boolean} False when the id is unknown — which means a shape was evicted.
      */
     useShape(id) {
+        // Claims the selection: a `setShape` still decoding will now yield to this.
+        this._seq++;
         const shape = this.shapes.get(String(id));
         if (!shape) {
             this.missing++;
@@ -123,10 +141,11 @@ export class CursorLayer {
     }
 
     /**
-     * @param {{x?: number, y?: number, cursor_embedded?: boolean}} display
+     * @param {{x?: number, y?: number, width?: number, height?: number, cursor_embedded?: boolean}} display
      */
     setDisplay(display) {
         this.origin = { x: display.x ?? 0, y: display.y ?? 0 };
+        this.size = { width: display.width ?? 0, height: display.height ?? 0 };
         this.embedded = display.cursor_embedded === true;
         this.render();
     }
@@ -139,13 +158,35 @@ export class CursorLayer {
         this.render();
     }
 
+    /**
+     * Ratio between the peer's coordinate space and this canvas.
+     *
+     * They are not always the same space. A HiDPI display reports its geometry in logical
+     * points — which is what `DisplayInfo.scale` exists to describe — while the captured
+     * video, and the cursor bitmap with it, are in physical pixels. Taking the ratio from
+     * the two numbers we already have is better than interpreting `scale`: it is measured
+     * rather than assumed, it collapses to 1 whenever the units already agree, and it also
+     * absorbs a mid-session resolution change that has not yet reached the display list.
+     */
+    _mapping() {
+        const w = this.size.width;
+        const h = this.size.height;
+        return {
+            sx: w > 0 && this.canvas.width > 0 ? this.canvas.width / w : 1,
+            sy: h > 0 && this.canvas.height > 0 ? this.canvas.height / h : 1,
+        };
+    }
+
     render() {
         const { ctx, canvas } = this;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (!this.visible || this.embedded || !this.current) return;
 
-        const x = this.position.x - this.origin.x - this.current.hotx;
-        const y = this.position.y - this.origin.y - this.current.hoty;
+        // Position is in the peer's units; the hotspot belongs to the bitmap, which is
+        // already in canvas pixels — so the mapping applies to one and not the other.
+        const { sx, sy } = this._mapping();
+        const x = (this.position.x - this.origin.x) * sx - this.current.hotx;
+        const y = (this.position.y - this.origin.y) * sy - this.current.hoty;
 
         // Cheap reject: a cursor on another monitor maps outside this canvas.
         if (x + this.current.width < 0 || y + this.current.height < 0

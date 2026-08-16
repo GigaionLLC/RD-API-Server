@@ -8,6 +8,10 @@
 # --- Deps / build artifacts (rebuilt inside the image) ---
 vendor/
 node_modules/
+# The published browser client, republished by the build from web-client/. Excluded so the
+# image can never accidentally inherit a stale host copy — the build behaves the same here
+# as it does on a clean CI checkout, which has no copy at all.
+public/assets/webclient/
 release/
 bin/
 *.exe

@@ -80,6 +80,33 @@
      is closed — the protocol has no notification of its own. */
   #chatBtn.unread { background: var(--warn); border-color: transparent; color: #14161a; }
 
+  /* Notices sit over the video, top-centre: a permission denial or a UAC prompt makes the
+     picture misleading, so the explanation belongs on top of it rather than in a panel. */
+  #notices {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: min(560px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 8px;
+    z-index: 5;
+  }
+  .notice {
+    background: #0d0f13f2; border: 1px solid var(--line); border-left-width: 4px;
+    border-radius: 8px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start;
+  }
+  .notice.warn { border-left-color: var(--warn); }
+  .notice.error { border-left-color: var(--err); }
+  .notice.info { border-left-color: var(--accent); }
+  .notice .body { flex: 1; min-width: 0; }
+  .notice .title { font-weight: 600; margin-bottom: 2px; }
+  .notice .detail { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  /* Rendered as text, never as an href — see notices.js. */
+  .notice .link { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; }
+  .notice .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .notice .dismiss {
+    background: none; border: none; color: var(--muted); font-size: 18px;
+    line-height: 1; padding: 0 2px; cursor: pointer;
+  }
+  .notice form { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .notice form input { min-width: 0; flex: 1 1 140px; }
+
   #hint {
     position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
     color: var(--muted); pointer-events: none; padding: 24px;
@@ -103,12 +130,13 @@
 
     <div id="toolbar">
       <select id="display" title="Monitor"></select>
+      <!-- The protocol's own three presets. An "Auto" entry mapped to NotSet looked like a
+           fourth choice but means "leave unchanged", so it did nothing at all once any
+           other option had been picked. -->
       <select id="quality" title="Image quality">
-        <option value="0">Auto</option>
-        <option value="30">Speed</option>
-        <option value="50" selected>Balanced</option>
-        <option value="80">Quality</option>
-        <option value="100">Best</option>
+        <option value="speed">Speed</option>
+        <option value="balanced" selected>Balanced</option>
+        <option value="best">Best</option>
       </select>
       <label class="check" title="When the peer is this machine, sending input drives this desktop">
         <input type="checkbox" id="viewonly"> view only
@@ -137,6 +165,7 @@
   <div id="stage">
     <canvas id="video"></canvas>
     <canvas id="cursor"></canvas>
+    <div id="notices"></div>
     <div id="hint">Enter connection details and press Connect.<br>Requires a secure context — <code>localhost</code> counts.</div>
     <div id="stats">no session</div>
 

@@ -16,7 +16,7 @@
  * re-advertise without that codec and the peer switches encoder.
  */
 
-import { PreferCodec } from '../protocol/enums.js';
+import { PreferCodec, ImageQuality } from '../protocol/enums.js';
 
 /** WebCodecs config strings for each family the protocol can carry. */
 const WEBCODECS_CONFIG = {
@@ -68,6 +68,13 @@ export async function probeDecodable(decoder = globalThis.VideoDecoder) {
 }
 
 /**
+ * Clean frames that must decode before a codec's failure streak is forgiven. Roughly a
+ * second of video: long enough to mean "this codec is working", short enough that a
+ * genuinely recovered stream is not held against its history for the whole session.
+ */
+export const RECOVERY_FRAMES = 30;
+
+/**
  * Tracks what we can decode and produces the `SupportedDecoding` we advertise.
  */
 export class CodecCapabilities {
@@ -78,7 +85,10 @@ export class CodecCapabilities {
     constructor(decodable = [], prefer = undefined) {
         this.decodable = new Set(decodable);
         this.prefer = prefer;
-        /** @type {Map<string, number>} */
+        /**
+         * Per-codec failure streak, plus the clean frames decoded since the last one.
+         * @type {Map<string, {count: number, clean: number}>}
+         */
         this.failures = new Map();
         // VP9 is the peer's universal fallback and has no host-side gate, so it is added
         // when the probe found nothing — a viewer advertising no codec at all cannot be
@@ -95,16 +105,36 @@ export class CodecCapabilities {
      * @returns {boolean} True if the codec was just retired and we should re-advertise.
      */
     markFailure(family) {
-        const n = (this.failures.get(family) ?? 0) + 1;
-        this.failures.set(family, n);
-        if (n < 3 || !this.decodable.has(family)) return false;
+        const entry = this.failures.get(family) ?? { count: 0, clean: 0 };
+        entry.count += 1;
+        entry.clean = 0;
+        this.failures.set(family, entry);
+        if (entry.count < 3 || !this.decodable.has(family)) return false;
         this.decodable.delete(family);
         return true;
     }
 
-    /** @param {string} family */
+    /**
+     * Records a frame that decoded cleanly.
+     *
+     * The streak is only forgiven after a sustained run, not on the first good frame.
+     * Every decoder error is followed by a refresh, so the very next key frame usually
+     * decodes: crediting that single frame would reset the counter between every pair of
+     * failures, and a codec failing steadily once a second would never reach three in a
+     * row — the retirement rule would be unreachable in exactly the case it exists for.
+     *
+     * @param {string} family
+     * @returns {boolean} True when a streak was just forgiven.
+     */
     markSuccess(family) {
+        // Hot path: called once per decoded frame, and almost always has nothing to do.
+        if (this.failures.size === 0) return false;
+        const entry = this.failures.get(family);
+        if (!entry) return false;
+        entry.clean += 1;
+        if (entry.clean < RECOVERY_FRAMES) return false;
         this.failures.delete(family);
+        return true;
     }
 
     /** @param {string} family */
@@ -141,6 +171,22 @@ export class CodecCapabilities {
 export function customQuality(percent) {
     const p = Math.max(10, Math.min(2000, Math.round(percent)));
     return { custom_image_quality: p << 8 };
+}
+
+/**
+ * The protocol's own quality presets, which are what the peer's bitrate controller is
+ * tuned around.
+ *
+ * `NotSet` deliberately has no name here: it means "leave unchanged", so offering it as a
+ * choice produces a control that does nothing once anything else has been selected —
+ * which is exactly what an "Auto" entry mapped to zero did.
+ *
+ * @param {'speed'|'balanced'|'best'} name
+ * @returns {{image_quality: number}}
+ */
+export function presetQuality(name) {
+    const value = { speed: ImageQuality.Low, balanced: ImageQuality.Balanced, best: ImageQuality.Best }[name];
+    return { image_quality: value ?? ImageQuality.Balanced };
 }
 
 /**

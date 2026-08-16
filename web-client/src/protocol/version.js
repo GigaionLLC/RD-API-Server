@@ -46,6 +46,12 @@ export const MIN_VERSION = {
     screenshot: '1.4.0',
     terminal: '1.4.1',
     fileTransferResume: '1.4.2',
+    // Deliberately conservative: the oldest peer this client has been verified against
+    // for pixel-precise scrolling. A host that predates `MouseType.TRACKPAD` ignores the
+    // message entirely, which reads as a dead trackpad rather than a coarse one, so the
+    // fallback below this version accumulates pixels into whole notches instead. Lower it
+    // only with a tested older peer.
+    trackpadScroll: '1.4.0',
 };
 
 /**
@@ -70,4 +76,13 @@ export function supportsMultiClipboard(peerInfo) {
  */
 export function supportsPerDisplayRefresh(peerInfo) {
     return atLeast(peerInfo?.version ?? '', MIN_VERSION.refreshVideoDisplay);
+}
+
+/**
+ * Whether the peer applies `MouseType.TRACKPAD` — pixel deltas without the wheel's ×120
+ * multiplication. Below this, scrolling is accumulated into whole notches instead.
+ * @param {{version?: string}} peerInfo
+ */
+export function supportsTrackpadScroll(peerInfo) {
+    return atLeast(peerInfo?.version ?? '', MIN_VERSION.trackpadScroll);
 }

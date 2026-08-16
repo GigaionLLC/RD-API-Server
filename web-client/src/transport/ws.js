@@ -85,7 +85,7 @@ export class FrameSocket {
         const bytes = new Uint8Array(ev.data);
         const waiter = this._waiters.shift();
         if (waiter) {
-            clearTimeout(waiter.timer);
+            if (waiter.timer) clearTimeout(waiter.timer);
             waiter.resolve(bytes);
         } else {
             this._pending.push(bytes);
@@ -97,7 +97,7 @@ export class FrameSocket {
         this._closed = new TransportError(`socket closed (code ${ev.code}${ev.reason ? `: ${ev.reason}` : ''})`);
         while (this._waiters.length) {
             const w = this._waiters.shift();
-            clearTimeout(w.timer);
+            if (w.timer) clearTimeout(w.timer);
             w.reject(this._closed);
         }
     }
@@ -110,20 +110,30 @@ export class FrameSocket {
 
     /**
      * @param {string} [label] Used in the timeout message.
+     * @param {number} [timeoutMs] Override; pass 0 to wait indefinitely.
      * @returns {Promise<Uint8Array>}
      */
-    next(label = 'frame') {
+    next(label = 'frame', timeoutMs = this.timeoutMs) {
         const buffered = this._pending.shift();
         if (buffered) return Promise.resolve(buffered);
         if (this._closed) return Promise.reject(this._closed);
         return new Promise((resolve, reject) => {
+            // A zero timeout means "wait for the socket". Steady-state reads use it: a
+            // handshake that stalls is broken, but an established session legitimately
+            // goes quiet — the peer only sends video when the screen changes — and a
+            // per-read deadline would kill a session that a suspend, a Wi-Fi roam or a
+            // busy host would otherwise have survived.
+            if (!timeoutMs) {
+                this._waiters.push({ resolve, reject, timer: null });
+                return;
+            }
             const timer = setTimeout(
                 () => {
                     const i = this._waiters.findIndex((w) => w.timer === timer);
                     if (i >= 0) this._waiters.splice(i, 1);
                     reject(new TransportError(`timed out waiting for ${label}`));
                 },
-                this.timeoutMs,
+                timeoutMs,
             );
             this._waiters.push({ resolve, reject, timer });
         });
@@ -147,11 +157,55 @@ export class FrameSocket {
     }
 }
 
+export const DEFAULT_RENDEZVOUS_PORT = 21116;
+export const DEFAULT_RELAY_PORT = 21117;
+
+/**
+ * Splits `host`, `host:port`, `[v6]:port` or a bare IPv6 literal.
+ *
+ * Naively splitting on the first colon works for every address a small deployment will
+ * ever produce and fails on the one that matters: `[::1]:21117` becomes the host `[` with
+ * no port, which then silently connects somewhere else.
+ *
+ * @param {string} endpoint
+ * @returns {{host: string, port: number | null}}
+ */
+export function splitHostPort(endpoint) {
+    const s = String(endpoint ?? '').trim();
+    if (!s) return { host: '', port: null };
+
+    if (s.startsWith('[')) {
+        const end = s.indexOf(']');
+        if (end < 0) return { host: s, port: null };
+        const host = s.slice(0, end + 1);
+        const rest = s.slice(end + 1);
+        const port = rest.startsWith(':') ? Number(rest.slice(1)) : NaN;
+        return { host, port: Number.isInteger(port) && port > 0 ? port : null };
+    }
+
+    // More than one colon and no brackets: a bare IPv6 literal, which carries no port.
+    const first = s.indexOf(':');
+    if (first < 0) return { host: s, port: null };
+    if (s.indexOf(':', first + 1) >= 0) return { host: `[${s}]`, port: null };
+
+    const port = Number(s.slice(first + 1));
+    return {
+        host: s.slice(0, first),
+        port: Number.isInteger(port) && port > 0 ? port : null,
+    };
+}
+
 /**
  * WebSocket URLs for a deployment.
  *
  * Ports are derived, not configured: hbbs binds `port + 2` and hbbr binds `port + 2`,
  * unconditionally, in every stock build since server 1.1.6.
+ *
+ * A port written into the host string is honoured, because that is how a non-default
+ * deployment is described everywhere else — including in the address the client itself is
+ * configured with. Following the same convention, hbbr sits one above hbbs, so a host of
+ * `example.com:31116` yields WebSocket ports 31118 and 31119. Explicit port options
+ * override both.
  *
  * `wss` is mandatory in production — the servers speak plain `ws` only, so a TLS
  * terminator must sit in front, and an HTTPS page cannot open `ws://` anyway. A
@@ -160,13 +214,14 @@ export class FrameSocket {
  *
  * @param {object} opts
  * @param {string} opts.host
+ * @param {string} [opts.relayHost] When the relay is not on the id server's host.
  * @param {number} [opts.rendezvousPort]
  * @param {number} [opts.relayPort]
  * @param {boolean} [opts.secure]
  * @param {boolean} [opts.pathRouted] Use `/ws/id` and `/ws/relay` instead of ports.
  */
 export function endpoints({
-    host, rendezvousPort = 21116, relayPort = 21117, secure = false, pathRouted = false,
+    host, relayHost = '', rendezvousPort, relayPort, secure = false, pathRouted = false,
     rendezvousUrl = '', relayUrl = '',
 }) {
     // Explicit URLs win. A deployment behind a reverse proxy rarely exposes the ports at
@@ -174,12 +229,26 @@ export function endpoints({
     if (rendezvousUrl && relayUrl) return { rendezvous: rendezvousUrl, relay: relayUrl };
 
     const scheme = secure ? 'wss' : 'ws';
-    const bare = host.split(':')[0];
+    const id = splitHostPort(host);
+    const relay = splitHostPort(relayHost || host);
+
     if (pathRouted) {
-        return { rendezvous: `${scheme}://${bare}/ws/id`, relay: `${scheme}://${bare}/ws/relay` };
+        return {
+            rendezvous: `${scheme}://${id.host}/ws/id`,
+            relay: `${scheme}://${relay.host}/ws/relay`,
+        };
     }
+
+    const rp = rendezvousPort ?? id.port ?? DEFAULT_RENDEZVOUS_PORT;
+    // A port on a shared host string belongs to hbbs, so hbbr is one above it. A separate
+    // relay host speaks for itself, and falls back to the standard port rather than to an
+    // offset from a machine it has nothing to do with.
+    const lp = relayPort ?? (relayHost
+        ? (relay.port ?? DEFAULT_RELAY_PORT)
+        : (id.port !== null ? id.port + 1 : DEFAULT_RELAY_PORT));
+
     return {
-        rendezvous: `${scheme}://${bare}:${rendezvousPort + 2}`,
-        relay: `${scheme}://${bare}:${relayPort + 2}`,
+        rendezvous: `${scheme}://${id.host}:${rp + 2}`,
+        relay: `${scheme}://${relay.host}:${lp + 2}`,
     };
 }

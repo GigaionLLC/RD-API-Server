@@ -11,8 +11,11 @@ import assert from 'node:assert/strict';
 
 import { PermissionSet } from '../../src/session/permissions.js';
 import { FrameQueue, MAX_REFRESHES, REFRESH_INTERVAL_MS } from '../../src/media/frame-queue.js';
-import { CodecCapabilities, customQuality, fpsLimit, decoderConfig, probeDecodable } from '../../src/media/codec.js';
-import { Permission, PreferCodec } from '../../src/protocol/enums.js';
+import {
+    CodecCapabilities, RECOVERY_FRAMES, customQuality, presetQuality, fpsLimit, decoderConfig,
+    probeDecodable,
+} from '../../src/media/codec.js';
+import { Permission, PreferCodec, ImageQuality } from '../../src/protocol/enums.js';
 
 /* -------------------------------------------------------------------------- */
 /* Permissions — the inverted convention                                      */
@@ -211,13 +214,43 @@ test('three consecutive failures retire a codec and trigger re-advertisement', (
     assert.equal(caps.toSupportedDecoding().ability_av1, 0);
 });
 
-test('a success resets the failure counter', () => {
+test('a sustained run of clean frames resets the failure counter', () => {
     const caps = new CodecCapabilities(['vp9', 'h264']);
     caps.markFailure('h264');
     caps.markFailure('h264');
-    caps.markSuccess('h264');
+    for (let i = 0; i < RECOVERY_FRAMES; i++) caps.markSuccess('h264');
     assert.equal(caps.markFailure('h264'), false, 'counter must have reset');
     assert.equal(caps.supports('h264'), true);
+});
+
+test('one good frame does not forgive a failing codec', () => {
+    // Every decoder error is followed by a refresh, so the next key frame usually decodes.
+    // Crediting that single frame would reset the streak between every pair of failures
+    // and a codec failing steadily would never reach three in a row — making the
+    // retirement rule unreachable in precisely the case it exists for.
+    const caps = new CodecCapabilities(['vp9', 'av1']);
+    for (let i = 0; i < 3; i++) {
+        const retired = caps.markFailure('av1');
+        caps.markSuccess('av1'); // the post-refresh key frame
+        if (i < 2) assert.equal(retired, false);
+        else assert.equal(retired, true, 'a codec failing once per key frame still retires');
+    }
+    assert.equal(caps.supports('av1'), false);
+});
+
+test('clean frames for one codec do not forgive another', () => {
+    const caps = new CodecCapabilities(['vp9', 'av1']);
+    caps.markFailure('av1');
+    caps.markFailure('av1');
+    for (let i = 0; i < RECOVERY_FRAMES * 2; i++) caps.markSuccess('vp9');
+    assert.equal(caps.markFailure('av1'), true, 'av1 still had two failures against it');
+});
+
+test('marking success with no failures on record is free', () => {
+    // Called once per decoded frame, so the common case must not allocate or look up.
+    const caps = new CodecCapabilities(['vp9']);
+    assert.equal(caps.markSuccess('vp9'), false);
+    assert.equal(caps.failures.size, 0);
 });
 
 test('retiring an already-retired codec does not re-trigger', () => {
@@ -256,6 +289,22 @@ test('probeDecodable collects only families the browser confirms', async () => {
 test('custom image quality is shifted left by 8', () => {
     assert.deepEqual(customQuality(50), { custom_image_quality: 50 << 8 });
     assert.equal(customQuality(50).custom_image_quality, 12800);
+});
+
+test('presets map to the protocol enum, and never to NotSet', () => {
+    // NotSet means "leave unchanged". Offering it as a choice produces a control that
+    // silently does nothing once any other quality has been selected.
+    assert.deepEqual(presetQuality('speed'), { image_quality: ImageQuality.Low });
+    assert.deepEqual(presetQuality('balanced'), { image_quality: ImageQuality.Balanced });
+    assert.deepEqual(presetQuality('best'), { image_quality: ImageQuality.Best });
+    assert.deepEqual(presetQuality('nonsense'), { image_quality: ImageQuality.Balanced });
+    assert.notEqual(presetQuality('speed').image_quality, ImageQuality.NotSet);
+});
+
+test('a preset carries no custom value, which would override it', () => {
+    // The two are mutually exclusive on the wire: sending both drops the custom one.
+    assert.equal('custom_image_quality' in presetQuality('best'), false);
+    assert.equal('image_quality' in customQuality(80), false);
 });
 
 test('quality is clamped to the range the peer accepts', () => {

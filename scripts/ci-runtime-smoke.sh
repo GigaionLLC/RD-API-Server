@@ -317,6 +317,18 @@ curl -fsS -D "$work_dir/css.headers" -o "$work_dir/theme.css" \
 grep -Eiq '^content-type:[[:space:]]*text/css' "$work_dir/css.headers" \
     || fail 'The static theme stylesheet has the wrong content type.'
 
+# The browser remote desktop is published into the document root during the image build,
+# because the copy is gitignored and a clean checkout does not carry it. Without this
+# assertion an image can ship a Connect button that opens a 404, which no other test in the
+# suite would notice: every PHP test runs against a working tree that has the copy.
+curl -fsS -D "$work_dir/viewer.headers" -o "$work_dir/viewer.js" \
+    "${proxy_headers[@]}" "$base_url/assets/webclient/ui/viewer.js" \
+    || fail 'The browser remote desktop was not published into the image.'
+grep -Eiq '^content-type:[[:space:]]*(text|application)/javascript' "$work_dir/viewer.headers" \
+    || fail 'The viewer module is not served as JavaScript; a module script would be rejected.'
+curl -fsS -o /dev/null "${proxy_headers[@]}" "$base_url/assets/webclient/vendor/fzstd/index.js" \
+    || fail 'The viewer vendor tree is missing from the image.'
+
 curl -fsS -D "$work_dir/login.headers" -o "$work_dir/login.html" \
     "${proxy_headers[@]}" "$base_url/admin/login"
 grep -Fq "https://${public_host}/assets/css/theme-dark.css" "$work_dir/login.html" \
