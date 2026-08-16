@@ -166,7 +166,7 @@ class WebClientController extends Controller
      */
     private function viewerDocument(array $config): Response
     {
-        $path = public_path('assets/webclient/ui/viewer.html');
+        $path = public_path('assets/webclient/src/ui/viewer.html');
         if (! File::isFile($path)) {
             throw new NotFoundHttpException('viewer assets are not installed');
         }
@@ -389,7 +389,7 @@ class WebClientController extends Controller
      */
     private function assetsPresent(): bool
     {
-        return File::isFile(public_path('assets/webclient/ui/viewer.js'));
+        return File::isFile(public_path('assets/webclient/src/ui/viewer.js'));
     }
 
     /**

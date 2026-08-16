@@ -4,6 +4,30 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.4.3] - 2026-08-16
+
+### Fixed
+
+- **The browser remote desktop never ran.** The published copy of the viewer flattened `src/*` to
+  the document root while leaving `vendor/` beside it, which moved every vendored import — zstd for
+  cursors, NaCl for the session handshake — one directory up and out of the tree. The browser 404ed
+  on the first one, the entire module graph failed to evaluate, and the viewer rendered as bare
+  HTML: its manual connection form, asking the operator for an ID server and a base64 key that the
+  server had already injected two lines above.
+
+  There is no build step, so nothing rewrote those paths; the published layout simply had to match
+  the source, and did not. It now does, and the publisher clears the whole target first so a
+  previous layout cannot leave files behind at a path nothing serves. The viewer is served from
+  `/assets/webclient/src/ui/viewer.html`.
+
+  Nothing caught this because every test loaded the viewer from `web-client/`, where the layout is
+  correct. A test now resolves every import in the published tree the way a browser resolves it,
+  and asserts the published copy is byte-identical to the source.
+
+- The feature test suite deleted the published viewer. Its stub checked a path that had moved, so
+  it believed the assets were absent on every run, and its teardown removed the whole tree rather
+  than the two files it had created.
+
 ## [1.4.2] - 2026-08-16
 
 ### Added
@@ -313,7 +337,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.3...HEAD
+[1.4.3]: docs/releases/v1.4.3.md
 [1.4.2]: docs/releases/v1.4.2.md
 [1.4.1]: docs/releases/v1.4.1.md
 [1.4.0]: docs/releases/v1.4.0.md

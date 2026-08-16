@@ -46,12 +46,18 @@ RUN composer dump-autoload --no-dev --no-interaction --optimize --no-scripts \
 # copy is gitignored. A clean checkout has no `public/assets/webclient`, so an image built
 # without this step serves a Connect button that leads to a 404.
 #
+# The source layout is preserved rather than flattened. The modules import the vendored
+# trees relative to it — `../vendor/...` from `src/`, `../../vendor/...` from `src/crypto/`
+# — and with no build step nothing rewrites those paths, so `src` and `vendor` have to stay
+# siblings. Flattening `src/*` to the root moved every vendor import a directory up, out of
+# the tree, and the browser's 404 took the whole module graph down with it.
+#
 # Mirrors web-client/scripts/install-assets.mjs, which does the same for a development
-# checkout; scripts/ci-runtime-smoke.sh fetches one of these files from the built image so
-# the two cannot drift apart unnoticed.
+# checkout; scripts/ci-runtime-smoke.sh fetches from the built image so the two cannot
+# drift apart unnoticed.
 RUN rm -rf /app/public/assets/webclient \
     && mkdir -p /app/public/assets/webclient \
-    && cp -R /app/web-client/src/. /app/public/assets/webclient/ \
+    && cp -R /app/web-client/src /app/public/assets/webclient/src \
     && cp -R /app/web-client/vendor /app/public/assets/webclient/vendor
 
 # ---- Stage 3: production image ----

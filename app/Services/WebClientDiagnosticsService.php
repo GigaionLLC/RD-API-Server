@@ -97,7 +97,7 @@ class WebClientDiagnosticsService
     /** @return array<string, mixed> */
     private function assetCheck(): array
     {
-        $present = is_file(public_path('assets/webclient/ui/viewer.js'));
+        $present = is_file(public_path('assets/webclient/src/ui/viewer.js'));
 
         return $this->check(
             'Viewer assets',

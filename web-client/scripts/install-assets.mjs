@@ -20,9 +20,22 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(packageRoot, '..');
 const target = resolve(repoRoot, 'public/assets/webclient');
 
-/** Directories copied verbatim, in the layout viewer.js expects at runtime. */
+/**
+ * Directories copied verbatim, preserving the source layout exactly.
+ *
+ * `src` must NOT be flattened to the root. The modules import the vendored trees with
+ * paths relative to the source layout — `../vendor/fzstd/index.js` from `src/`,
+ * `../../vendor/tweetnacl/nacl.js` from `src/crypto/` — which are correct only while
+ * `src` and `vendor` are siblings. Publishing `src/*` at the root while leaving `vendor`
+ * beside it moves every one of those paths up a directory, so the browser resolves them
+ * outside the tree, 404s, and the whole module graph fails to evaluate. The viewer then
+ * renders its bare HTML with no script having run: the manual connection form, asking for
+ * details the deployment had already injected.
+ *
+ * There is no build step, so nothing rewrites these paths. Published must equal source.
+ */
 const TREES = [
-    { from: 'src', to: '.' },
+    { from: 'src', to: 'src' },
     { from: 'vendor', to: 'vendor' },
 ];
 
@@ -46,6 +59,14 @@ const digest = (b) => createHash('sha256').update(b).digest('hex').slice(0, 12);
 let failed = false;
 let copied = 0;
 let bytes = 0;
+
+// Clear the whole target, not each tree in turn. Removing only the destinations leaves
+// behind whatever a previous layout published elsewhere under it — files that are then
+// served by nothing, drift silently, and make it impossible to tell by looking which copy
+// the application is actually reading.
+if (!check) {
+    await rm(target, { recursive: true, force: true });
+}
 
 for (const tree of TREES) {
     const source = resolve(packageRoot, tree.from);
@@ -95,7 +116,7 @@ if (check) {
     console.log(failed ? '✗ public assets differ from web-client/' : '✓ public assets match web-client/');
 } else {
     console.log(`✓ installed ${copied} files (${(bytes / 1024).toFixed(0)} KiB) to ${relative(repoRoot, target)}`);
-    console.log('  the viewer is served from /assets/webclient/ui/viewer.html');
+    console.log('  the viewer is served from /assets/webclient/src/ui/viewer.html');
 }
 
 process.exit(failed ? 1 : 0);

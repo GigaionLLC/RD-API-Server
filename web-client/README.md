@@ -78,7 +78,7 @@ form is replaced by injected settings:
     relayUrl:      'wss://example.com/ws/relay',
   };
 </script>
-<script type="module" src="/assets/webclient/ui/viewer.js"></script>
+<script type="module" src="/assets/webclient/src/ui/viewer.js"></script>
 ```
 
 As a library, without the bundled UI:

@@ -322,7 +322,7 @@ grep -Eiq '^content-type:[[:space:]]*text/css' "$work_dir/css.headers" \
 # assertion an image can ship a Connect button that opens a 404, which no other test in the
 # suite would notice: every PHP test runs against a working tree that has the copy.
 curl -fsS -D "$work_dir/viewer.headers" -o "$work_dir/viewer.js" \
-    "${proxy_headers[@]}" "$base_url/assets/webclient/ui/viewer.js" \
+    "${proxy_headers[@]}" "$base_url/assets/webclient/src/ui/viewer.js" \
     || fail 'The browser remote desktop was not published into the image.'
 grep -Eiq '^content-type:[[:space:]]*(text|application)/javascript' "$work_dir/viewer.headers" \
     || fail 'The viewer module is not served as JavaScript; a module script would be rejected.'

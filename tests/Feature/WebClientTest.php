@@ -31,10 +31,15 @@ class WebClientTest extends TestCase
         // The routes report missing assets before anything else, which would mask every
         // other assertion in this file. The published copy is generated at image build
         // time and is absent from a source checkout.
-        if (! File::isFile(public_path('assets/webclient/ui/viewer.js'))) {
-            File::ensureDirectoryExists(public_path('assets/webclient/ui'));
-            File::put(public_path('assets/webclient/ui/viewer.js'), "// test stub\n");
-            File::put(public_path('assets/webclient/ui/viewer.html'),
+        //
+        // Only the two files this creates are removed again. An earlier version deleted
+        // the whole published tree in tearDown, so running the suite in a checkout that
+        // HAD published assets destroyed them — and because the stub tested a path that
+        // later moved, it did so on every single run.
+        if (! File::isFile(public_path('assets/webclient/src/ui/viewer.js'))) {
+            File::ensureDirectoryExists(public_path('assets/webclient/src/ui'));
+            File::put(public_path('assets/webclient/src/ui/viewer.js'), "// test stub\n");
+            File::put(public_path('assets/webclient/src/ui/viewer.html'),
                 "<!doctype html><html><body><script type=\"module\" src=\"./viewer.js\"></script></body></html>\n");
             $this->stubbedAssets = true;
         }
@@ -55,7 +60,10 @@ class WebClientTest extends TestCase
     protected function tearDown(): void
     {
         if ($this->stubbedAssets) {
-            File::deleteDirectory(public_path('assets/webclient'));
+            File::delete([
+                public_path('assets/webclient/src/ui/viewer.js'),
+                public_path('assets/webclient/src/ui/viewer.html'),
+            ]);
         }
 
         parent::tearDown();
