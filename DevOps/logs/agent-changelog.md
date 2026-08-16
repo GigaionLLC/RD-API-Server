@@ -3,6 +3,38 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-16 19:00] - Released v1.4.1: WebSocket transport in the container, plus diagnostics
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `docker/render-runtime-config.sh`, `docker/nginx.conf.template` (optional /ws/id and /ws/relay locations)
+- `config/rustdesk.php`, `app/Http/Controllers/Admin/WebClientController.php`, `app/Services/WebClientDiagnosticsService.php`
+- `resources/views/admin/web_client/{show,diagnostics}.blade.php`, `resources/views/admin/partials/sidebar.blade.php`, `routes/web.php`
+- `tests/Feature/WebClientTest.php` (16 tests, the first server-side coverage of these routes)
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.4.1.md`, `docs/web-client-deployment.md`
+**Database/API Changes:** None. `/api/version` reports `1.4.1`; one new admin route, `/admin/web-client/diagnostics`.
+**Summary:** Published v1.4.1 at manifest digest
+`sha256:99658c5b876646fcdc8b40a7d3c7fc26b4aff391065b6cca86e590aac2429b82`. Prompted by the operator
+discovering that using the 1.4.0 remote desktop required editing their reverse proxy: setting
+`RUSTDESK_WS_ID_UPSTREAM` and `RUSTDESK_WS_RELAY_UPSTREAM` now makes this runtime carry the
+WebSocket on the console's own hostname and certificate. Three problems were caught before release
+rather than after. Nginx resolves a literal `proxy_pass` hostname once at startup and refuses to
+start when it fails, so the container would not have booted when hbbs was slower to start, and
+would then have pinned that address for the life of the process — resolution goes through a
+variable and the container's own resolver. `X-Real-IP`/`X-Forwarded-For` are blanked toward hbbs,
+because hbbs overwrites the connection address with them and keys its pending-response map on the
+result. Upstream values reach a config file, so they are validated to host:port and injection was
+tested and refused. Also added the diagnostics page the operator asked for, deliberately read-only:
+the transport is part of the Nginx configuration rendered at startup, so a console-editable value
+could not change it without a restart and the two would disagree in between. **Corrected a claim
+made earlier in the session** — the release notes said the device page states plainly when a setup
+step has been missed; it detected missing assets and a missing ID server but not the case an HTTPS
+operator actually hits, a missing WebSocket endpoint. **Not verified:** the proxied transport
+against a live hbbs behind a second reverse proxy; the likeliest remaining obstacle is an outer
+proxy that does not forward Upgrade/Connection headers, which the browser probe reports. The
+v1.4.0 GitHub Release page was deleted at the owner's request so its superseded setup would not be
+followed; the tag, the image and `docs/releases/v1.4.0.md` remain, and the body was archived to
+the session scratchpad first.
+
 ## [2026-08-16 18:20] - Released v1.4.0: browser remote desktop published
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
