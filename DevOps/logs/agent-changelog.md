@@ -3,6 +3,35 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-16 19:40] - Released v1.4.2: Remote control screen; no accidental connections
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `resources/views/admin/web_client/remote.blade.php` (new), `show.blade.php` (deleted), `diagnostics.blade.php`
+- `app/Http/Controllers/Admin/WebClientController.php`, `routes/web.php`, `resources/views/admin/{devices/index,partials/sidebar}.blade.php`
+- `web-client/src/ui/viewer.js`, `web-client/e2e/browser.spec.mjs`
+- `docker/entrypoint.sh` (view:clear before view:cache)
+- `tests/Feature/WebClientTest.php`, `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.4.2.md`
+**Database/API Changes:** None. `/api/version` reports `1.4.2`; two new admin routes, `/admin/remote` and `/admin/remote/frame`.
+**Summary:** Published v1.4.2 at manifest digest
+`sha256:84d08d4c0de2724dc935dd51f56e7f512064c7f5d2bc04f1d65169c21683af61`. The operator's first real
+use of the feature found what no test had: clicking Connect produced a 300x150 box asking for an ID
+server, peer id and base64 key. **Cause one:** both web_client views pushed their stylesheet to
+`@push('head')`, and the admin layout renders `styles` and `scripts` only — every rule was discarded
+and the iframe fell back to its intrinsic 300x150. They were the only two views in the codebase
+using that stack name, which is why nothing else showed it. **Cause two, not fully explained:** the
+manual form was visible at all, which requires `window.RD_CONFIG` to have been absent; the injection
+is verified correct in tests and in the published image, so rather than guess further, the injection
+now fails loudly instead of silently degrading to the manual form, and `view:clear` was added before
+`view:cache` because storage/ is a persistent volume that can carry compiled views across an image
+upgrade. **Design decision, made explicit at the operator's direction:** nothing connects on its own.
+Connect redirects to a new Remote control screen with the id pre-filled; auto-connect was removed
+outright rather than defaulted off so no config value or URL can restore it, and a browser test loads
+the viewer with both former switches set and asserts no socket opens. Remote control also accepts an
+id typed by hand — a support desk gets ids over the phone — gated so that only an operator with
+unrestricted device permission may reach an id outside the device list. **Not verified:** the 1.4.1
+proxied WebSocket transport against a live hbbs behind a second reverse proxy, and this release's
+screens have not been exercised in a browser against the operator's deployment.
+
 ## [2026-08-16 19:00] - Released v1.4.1: WebSocket transport in the container, plus diagnostics
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
