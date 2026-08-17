@@ -444,3 +444,60 @@ test('the viewer never connects on its own', async ({ page }) => {
     expect(await page.evaluate(() => document.getElementById('peer'))).toBeNull();
     expect(await page.textContent('#hint')).toContain('Workstation');
 });
+
+test('a connection in progress can be cancelled', async ({ page }) => {
+    // Reported from a real deployment: connecting to a machine that asks its user to accept
+    // left the viewer waiting with no way out. Disconnect lives in the toolbar, which is
+    // only rendered once a session is established, so during negotiation there was nothing.
+    await page.goto('/src/ui/viewer.html');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+
+    expect(await page.locator('#cancel').isVisible(), 'hidden while idle').toBe(false);
+
+    // A host that accepts the socket and never replies is exactly the "waiting for accept"
+    // shape; an unroutable one is the closest we can get without a peer.
+    await page.fill('#host', '198.51.100.7');
+    await page.fill('#peer', '345890346');
+    await page.click('#connect');
+
+    await expect(page.locator('#cancel')).toBeVisible();
+    expect(await page.locator('#connect').isVisible(), 'Connect is replaced, not doubled').toBe(false);
+
+    await page.click('#cancel');
+
+    await expect(page.locator('#cancel')).toBeHidden();
+    await expect(page.locator('#connect')).toBeVisible();
+    expect(await page.textContent('#status')).toContain('Cancelled');
+
+    // And it stays cancelled: a deliberate close must not be retried as a dropped session.
+    await page.waitForTimeout(2500);
+    expect(await page.textContent('#status')).toContain('Cancelled');
+    expect(await page.evaluate(() => globalThis.__viewer.state)).toBe('idle');
+});
+
+test('the operator always keeps a pointer to aim with', async ({ page }) => {
+    // The reported defect: "I can click but I cannot see the mouse". The local pointer was
+    // hidden unconditionally, and the peer suppresses cursor-position updates toward
+    // whoever is sending input — so while controlling, the remote pointer lags or stops
+    // and there was nothing left to aim with.
+    await page.goto('/src/ui/viewer.html');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+
+    const cursorStyle = () => page.evaluate(() =>
+        getComputedStyle(document.getElementById('video')).cursor);
+
+    expect(await cursorStyle(), 'idle: the pointer is visible').not.toBe('none');
+
+    // Controlling, with a remote cursor being drawn: the local pointer still wins, because
+    // it is the one that tracks the operator's hand.
+    await page.evaluate(() => document.body.classList.add('remotecursor'));
+    expect(await cursorStyle(), 'controlling: never hidden').not.toBe('none');
+
+    // Watching: the remote pointer is the interesting one, and two would be noise.
+    await page.evaluate(() => globalThis.__viewer.setViewOnly(true));
+    expect(await cursorStyle(), 'view-only with a remote cursor: hidden').toBe('none');
+
+    // Watching with no remote cursor to show is still better than no cursor at all.
+    await page.evaluate(() => document.body.classList.remove('remotecursor'));
+    expect(await cursorStyle(), 'view-only without one: visible again').not.toBe('none');
+});

@@ -4,6 +4,44 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.6.1] - 2026-08-17
+
+### Fixed
+
+- **You can see your pointer again.** The viewer hid the local cursor unconditionally, expecting the
+  peer's to replace it — but the peer suppresses cursor-position updates toward whoever is sending
+  input, so while controlling, the remote pointer lags or stops entirely and there was nothing left
+  to aim with. The local pointer is now hidden only while *watching*, and only once a remote pointer
+  is actually being drawn. The viewer also asks the peer for its cursor at login, which it otherwise
+  has no reason to send.
+
+- **A connection in progress can be cancelled.** Connecting to a machine that asks its user to
+  accept left the viewer waiting with no way out: Disconnect lives in the toolbar, which is only
+  rendered once a session is established. A Cancel button now appears during negotiation, and a
+  deliberate cancel is not retried as a dropped session.
+
+- **A configured WebSocket endpoint is validated.** `RUSTDESK_WS_ID_URL=rustdesk-hbbs:21118` — an
+  upstream pasted into the browser-facing setting — reached the browser, which refused it with an
+  error naming nothing useful, while the diagnostics page reported a healthy deployment because it
+  only checked the value was non-empty. Unusable values are now reported with the fix, and are not
+  handed to the browser at all, so a deployment whose upstreams are correct keeps working.
+
+- A `peer_info` re-delivered on a monitor change carries a display list without the identity fields,
+  and it was overwriting the session header — turning a working session into `peer@undefined` some
+  minutes in, which reads like a fault rather than a monitor being plugged in.
+
+### Documentation
+
+- **The two WebSocket variable pairs**, which are the most common setup mistake:
+  `_UPSTREAM` is where *this container* dials and takes container names; `_URL` is where *the
+  browser* dials and takes public `wss://` URLs. Explained with a table in the README, at length in
+  `.env.example`, and inline where the settings appear in the examples.
+
+- **[examples/simple.docker-compose.yml](examples/simple.docker-compose.yml)** — the whole stack in
+  one file with no `.env` and nothing optional: change four passwords and two hostnames. The
+  existing full-stack example keeps the pinned digests and hardening notes, and `.env.example`
+  remains the complete reference.
+
 ## [1.6.0] - 2026-08-17
 
 ### Added
@@ -465,7 +503,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.6.1...HEAD
+[1.6.1]: docs/releases/v1.6.1.md
 [1.6.0]: docs/releases/v1.6.0.md
 [1.5.0]: docs/releases/v1.5.0.md
 [1.4.6]: docs/releases/v1.4.6.md

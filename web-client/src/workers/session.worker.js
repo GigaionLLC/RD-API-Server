@@ -28,6 +28,8 @@ import { CursorLayer } from '../render/cursor.js';
 
 /** @type {RustDeskSession | null} */
 let session = null;
+/** Whether the main thread has been told a remote cursor is being drawn. */
+let cursorReported = false;
 /** @type {VideoStreamDecoder | null} */
 let decoder = null;
 /** @type {VideoSurface | null} */
@@ -94,6 +96,7 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
         onKeyFrameNeeded: () => refresh(),
     });
 
+    cursorReported = false;
     session = new RustDeskSession({ ...opts, codecs });
 
     session.onState = (s) => post({ type: 'state', state: s });
@@ -147,6 +150,14 @@ async function connect({ video, cursor: cursorCanvas, opts }) {
         if (c.type === 'shape') cursor.setShape(c);
         else if (c.type === 'id') cursor.useShape(c.id);
         else if (c.type === 'position') cursor.setPosition(c.x, c.y);
+
+        // Told once, when there is actually something drawn. The main thread hides the
+        // local pointer only on this signal — before it, hiding would leave the operator
+        // with no cursor at all, which is what happens when a peer sends none.
+        if (!cursorReported && cursor.current) {
+            cursorReported = true;
+            post({ type: 'cursorReady' });
+        }
     };
     session.onDisplaySwitch = (d) => {
         cursor.setDisplay(d);

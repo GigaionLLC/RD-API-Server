@@ -45,6 +45,7 @@
   #connectBar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   #toolbar { display: none; gap: 8px; flex-wrap: wrap; align-items: center; }
   body.connected #connectBar { display: none; }
+  body.connecting #connect { display: none; }
   body.connected #toolbar { display: flex; }
 
   #stage { flex: 1 1 auto; position: relative; overflow: hidden; background: #000; min-height: 0; }
@@ -52,7 +53,13 @@
      the frame rate, and peers only send frames when the screen changes. */
   #video, #cursor { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   #cursor { pointer-events: none; }
-  #video { cursor: none; }
+  /* The local pointer is hidden only while WATCHING, and only once a remote pointer is
+     actually being drawn to replace it.
+     While CONTROLLING it always stays visible: the peer suppresses cursor-position updates
+     toward whoever is sending input, so the remote pointer lags or stops entirely — and an
+     operator whose own pointer was also hidden had nothing at all to aim with. That is the
+     "I can click but I cannot see the mouse" report. */
+  body.viewonly.remotecursor #video { cursor: none; }
   body.viewonly #video { cursor: default; }
 
   #stats {
@@ -126,6 +133,10 @@
         <option value="main">main thread</option>
       </select>
       <button id="connect" class="primary">Connect</button>
+      <!-- Shown while a connection is being negotiated. Without it there was no way out of
+           a peer that never answers — a machine set to ask its user for approval leaves the
+           viewer waiting with the toolbar, and its Disconnect, not yet rendered. -->
+      <button id="cancel" hidden>Cancel</button>
     </div>
 
     <div id="toolbar">

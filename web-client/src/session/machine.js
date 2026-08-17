@@ -26,7 +26,7 @@
 import { encode, decode } from '../protocol/codec.js';
 import { RendezvousMessage } from '../protocol/rendezvous.js';
 import { Message, CODEC_BY_FIELD } from '../protocol/message.js';
-import { NatType, ConnType, PunchHoleFailure } from '../protocol/enums.js';
+import { NatType, ConnType, PunchHoleFailure, BoolOption } from '../protocol/enums.js';
 import { FrameSocket, endpoints, splitHostPort, TransportError } from '../transport/ws.js';
 import { negotiate, decodeBase64 } from '../crypto/handshake.js';
 import { derivePassword } from '../crypto/password.js';
@@ -301,7 +301,16 @@ export class RustDeskSession {
                 // Real flow control: the peer will not capture frame N+1 until we ACK N.
                 video_ack_required: true,
                 session_id: this._sessionId(),
-                option: { supported_decoding: this.codecs.toSupportedDecoding() },
+                option: {
+                    supported_decoding: this.codecs.toSupportedDecoding(),
+                    // Ask for the peer's cursor. Without this the host sends no cursor
+                    // shape or position at all, because a native client draws its own
+                    // local pointer over the window instead. A browser viewer that hides
+                    // its local cursor — which it must, or the user sees two — then shows
+                    // none, and the operator is clicking blind. Requested at login rather
+                    // than after it, so the very first frame already has a pointer.
+                    show_remote_cursor: BoolOption.Yes,
+                },
             },
         });
 

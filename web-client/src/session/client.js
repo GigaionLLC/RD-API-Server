@@ -83,6 +83,9 @@ export class WorkerSession {
                 this.denied = msg.denied;
                 this.onPermissions?.(msg.denied);
                 break;
+            case 'cursorReady':
+                this.onCursorReady?.();
+                break;
             case 'messageBox':
                 this.onMessageBox?.(msg.box);
                 break;

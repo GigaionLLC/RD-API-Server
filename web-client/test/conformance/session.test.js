@@ -317,3 +317,18 @@ test('fps is clamped to 1..120 — outside that the peer ignores it silently', (
     assert.equal(fpsLimit(0).custom_fps, 1);
     assert.equal(fpsLimit(500).custom_fps, 120);
 });
+
+/* -------------------------------------------------------------------------- */
+/* Login options                                                              */
+/* -------------------------------------------------------------------------- */
+
+test('login asks the peer for its cursor', async () => {
+    // Without this the host sends no cursor at all: a native client draws its own local
+    // pointer over the window, so the peer has no reason to. A browser viewer must hide
+    // its local pointer or the user sees two — and then sees none, and clicks blind.
+    const { LoginRequest } = await import('../../src/protocol/message.js');
+    const { BoolOption } = await import('../../src/protocol/enums.js');
+
+    assert.ok(LoginRequest.fields, 'LoginRequest carries an option field');
+    assert.equal(BoolOption.Yes, 2, 'NotSet is the proto3 default, so Yes must be explicit');
+});

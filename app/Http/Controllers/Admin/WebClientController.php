@@ -376,12 +376,22 @@ class WebClientController extends Controller
     {
         $id = trim((string) config('rustdesk.web_client.ws_id_url'));
         $relay = trim((string) config('rustdesk.web_client.ws_relay_url'));
-        if ($id !== '' && $relay !== '') {
+
+        // Unusable values are dropped rather than handed to the browser, which passes them
+        // straight to `new WebSocket()`. A container-internal address like
+        // `rustdesk-hbbs:21118` belongs in the _UPSTREAM settings; sent here it fails in
+        // the browser with an error that names nothing useful. Dropping it also means a
+        // deployment whose upstreams are correct keeps working despite the leftover.
+        $usable = $id !== '' && $relay !== ''
+            && $this->diagnostics->wsUrlProblem($id) === null
+            && $this->diagnostics->wsUrlProblem($relay) === null;
+
+        if ($usable) {
             return [$id, $relay];
         }
 
         if (! $this->wsProxied()) {
-            return [$id, $relay];
+            return ['', ''];
         }
 
         $appUrl = (string) config('app.url');

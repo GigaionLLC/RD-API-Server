@@ -12,13 +12,13 @@ command, backed by MariaDB.
 > compatibility with its open‑source client. This is a **separate implementation** of the
 > client's public API, maintained independently.
 
-> ✅ **Stable release: [v1.6.0](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.6.0).**
+> ✅ **Stable release: [v1.6.1](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.6.1).**
 > **Connect** on any device opens a remote desktop in the browser — screen, sound, mouse, keyboard,
 > clipboard and chat — with no plugin, no download and no client install. Two environment values
 > stand it up on the console's own hostname and certificate, with no reverse-proxy change and no
 > extra public ports, and **System → Remote desktop** says plainly what is missing if it does not
 > connect. **Remote control** takes a RustDesk ID directly, and nothing ever connects on its own.
-> Review the **[release notes](docs/releases/v1.6.0.md)**, and **[v1.4.0](docs/releases/v1.4.0.md)**
+> Review the **[release notes](docs/releases/v1.6.1.md)**, and **[v1.4.0](docs/releases/v1.4.0.md)**
 > for what the viewer does and does not do yet.
 
 > Implements the RustDesk client API contract and adds the features the client supports that
@@ -89,7 +89,7 @@ local `.env` file with your DB password and RustDesk endpoints. `ADMIN_PASS` is 
 and a strong password is generated at first boot and shown once in the container log.
 
 For a deployment that must remain on the current stable release, set
-`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.6.0`; `latest` moves only with a
+`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.6.1`; `latest` moves only with a
 verified, annotated stable release tag.
 
 ```env
@@ -211,10 +211,41 @@ exact observed IP/CIDR. See
 [Production HTTPS and reverse proxies](QUICKSTART.md#production-https-and-reverse-proxies) for safe
 network topologies, diagnosis, recovery, and the executable post-deployment check.
 
-**Full stack** — to run the RustDesk `hbbs`/`hbbr` rendezvous + relay alongside the API, copy
-**[examples/full-stack.docker-compose.yml](examples/full-stack.docker-compose.yml)** and follow
-its header. See **[QUICKSTART.md](QUICKSTART.md)** for all configuration (endpoints, SMTP,
-retention, metrics, updates).
+**Full stack** — to run the RustDesk `hbbs`/`hbbr` rendezvous + relay alongside the API:
+
+- **[examples/simple.docker-compose.yml](examples/simple.docker-compose.yml)** — the whole stack in
+  one file, no `.env`, nothing optional. Change four passwords and two hostnames and it runs.
+- **[examples/full-stack.docker-compose.yml](examples/full-stack.docker-compose.yml)** — the same
+  stack with pinned image digests, health checks and the hardening notes.
+- **[.env.example](.env.example)** — every setting that exists, with what it does. You need none
+  of it to get running; each has a working default.
+
+### Browser remote desktop: which two variables
+
+The console must be HTTPS (browsers only expose the video decoder on a secure page), and `hbbs`
+and `hbbr` speak plain `ws` only — so TLS has to be arranged somewhere. There are two ways, and
+**mixing up their variables is the most common setup mistake**:
+
+| | Who dials it | What goes in it |
+|---|---|---|
+| `RUSTDESK_WS_ID_UPSTREAM`<br>`RUSTDESK_WS_RELAY_UPSTREAM` | **This container**, over the Docker network | `rustdesk-hbbs:21118` — a container or service name |
+| `RUSTDESK_WS_ID_URL`<br>`RUSTDESK_WS_RELAY_URL` | **The operator's browser**, over the internet | `wss://rustdesk.example.com/ws/id` — a public URL |
+
+Set the **UPSTREAM** pair and this server carries the WebSocket on the console's own hostname and
+certificate: no second certificate, no extra public ports, and nothing to add to your reverse
+proxy. Relayed video then passes through this container, which is the trade-off.
+
+Set the **URL** pair instead to keep this server out of the media path, having terminated TLS in
+front of 21118 and 21119 yourself.
+
+A container name in the URL pair cannot work — the browser is on someone's laptop and cannot
+resolve it, and the error it produces names nothing useful. **System → Remote diagnostics** reports
+that specific mistake, and its browser probe is the only way to confirm the path your operators
+actually take.
+
+See **[QUICKSTART.md](QUICKSTART.md)** for all configuration (endpoints, SMTP, retention, metrics,
+updates) and **[docs/web-client-deployment.md](docs/web-client-deployment.md)** for proxy
+configuration.
 
 > **Breaking database boundary:** MariaDB with InnoDB is the only supported database. The
 > runtime and all verification paths reject other drivers. Existing MariaDB deployments that
@@ -243,6 +274,8 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 ## 📚 Documentation
 
 - **[CHANGELOG.md](CHANGELOG.md)** — public release history
+- **[v1.6.1 release notes](docs/releases/v1.6.1.md)** — a visible pointer, a cancellable
+  connection, and the two WebSocket variable pairs explained
 - **[v1.6.0 release notes](docs/releases/v1.6.0.md)** — the version in the console, and a redacted
   support report for issues
 - **[v1.5.0 release notes](docs/releases/v1.5.0.md)** — searchable pickers everywhere a list can

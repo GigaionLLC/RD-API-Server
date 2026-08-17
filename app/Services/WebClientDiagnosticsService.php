@@ -205,9 +205,38 @@ class WebClientDiagnosticsService
                 'Explicit WebSocket endpoints are configured. This server is not in the media path.'),
             'proxied' => $this->check('Transport', self::OK,
                 'This container carries the WebSocket and forwards it to hbbs and hbbr. Relayed session video passes through here.'),
-            default => $this->check('Transport', self::FAIL,
-                'No WebSocket transport configured. Either set RUSTDESK_WS_ID_UPSTREAM and RUSTDESK_WS_RELAY_UPSTREAM to have this container carry it, or set RUSTDESK_WS_ID_URL and RUSTDESK_WS_RELAY_URL to point at your own TLS terminator.'),
+            default => $this->check('Transport', self::FAIL, $this->noTransportDetail()),
         };
+    }
+
+    /**
+     * Why there is no usable transport — naming a configured-but-broken value rather than
+     * reporting "nothing is set", which would send an operator to add what they already had.
+     */
+    private function noTransportDetail(): string
+    {
+        foreach (['ws_id_url' => 'RUSTDESK_WS_ID_URL', 'ws_relay_url' => 'RUSTDESK_WS_RELAY_URL'] as $key => $name) {
+            $value = trim((string) config('rustdesk.web_client.'.$key));
+            if ($value === '') {
+                continue;
+            }
+
+            $problem = $this->wsUrlProblem($value);
+            if ($problem !== null) {
+                return $name.' is set but unusable: it '.$problem;
+            }
+        }
+
+        $id = trim((string) config('rustdesk.web_client.ws_id_url'));
+        $relay = trim((string) config('rustdesk.web_client.ws_relay_url'));
+        if (($id === '') !== ($relay === '')) {
+            return 'Only one of RUSTDESK_WS_ID_URL and RUSTDESK_WS_RELAY_URL is set. Both are '
+                .'required: one endpoint without the other connects and then stops.';
+        }
+
+        return 'No WebSocket transport configured. Either set RUSTDESK_WS_ID_UPSTREAM and '
+            .'RUSTDESK_WS_RELAY_UPSTREAM to have this container carry it, or set RUSTDESK_WS_ID_URL '
+            .'and RUSTDESK_WS_RELAY_URL to point at your own TLS terminator.';
     }
 
     /**
@@ -252,13 +281,63 @@ class WebClientDiagnosticsService
     /* Helpers */
     /* ------------------------------------------------------------------ */
 
-    /** @return array{0: string, 1: string}|null */
+    /**
+     * The configured endpoints, or null when they cannot be used.
+     *
+     * "Configured" is not the same as "usable". These strings are handed to the browser and
+     * passed straight to `new WebSocket()`, so a value without a scheme, or one naming a
+     * host only the container can resolve, fails there and nowhere else — and this page
+     * reported a healthy deployment while it did. Rejecting an unusable value here means a
+     * deployment that also has working upstreams keeps running on those, rather than being
+     * broken by a leftover variable.
+     *
+     * @return array{0: string, 1: string}|null
+     */
     private function explicitUrls(): ?array
     {
         $id = trim((string) config('rustdesk.web_client.ws_id_url'));
         $relay = trim((string) config('rustdesk.web_client.ws_relay_url'));
 
-        return $id !== '' && $relay !== '' ? [$id, $relay] : null;
+        if ($id === '' || $relay === '') {
+            return null;
+        }
+
+        return $this->wsUrlProblem($id) === null && $this->wsUrlProblem($relay) === null
+            ? [$id, $relay]
+            : null;
+    }
+
+    /**
+     * Why a configured WebSocket endpoint cannot work, or null when it can.
+     *
+     * Public because the controller decides what to hand the viewer from the same rule: a
+     * value this rejects must not reach the browser either.
+     */
+    public function wsUrlProblem(string $url): ?string
+    {
+        $scheme = strtolower((string) (parse_url($url, PHP_URL_SCHEME) ?: ''));
+
+        if ($scheme === '') {
+            // The commonest mistake, and the one that produces an error naming nothing
+            // useful: `rustdesk-hbbs:21118` is an upstream, not a URL.
+            return 'has no ws:// or wss:// scheme. A value like `host:21118` is an upstream — '
+                .'set RUSTDESK_WS_ID_UPSTREAM and RUSTDESK_WS_RELAY_UPSTREAM instead, and this '
+                .'container will serve the endpoints itself.';
+        }
+
+        if (! in_array($scheme, ['ws', 'wss'], true)) {
+            return "uses the {$scheme}:// scheme; a WebSocket endpoint must be ws:// or wss://.";
+        }
+
+        if ((string) (parse_url($url, PHP_URL_HOST) ?: '') === '') {
+            return 'has no host.';
+        }
+
+        if ($scheme === 'ws' && str_starts_with((string) config('app.url'), 'https://')) {
+            return 'is ws:// on an HTTPS console. A secure page cannot open an insecure socket; use wss://.';
+        }
+
+        return null;
     }
 
     /** @return array{0: string, 1: string}|null */

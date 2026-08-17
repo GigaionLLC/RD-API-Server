@@ -393,6 +393,98 @@ class WebClientTest extends TestCase
     }
 
     /* ---------------------------------------------------------------- */
+    /* WebSocket endpoint validation */
+    /* ---------------------------------------------------------------- */
+
+    public function test_an_upstream_pasted_into_a_url_setting_is_reported(): void
+    {
+        // Reported from a real deployment: the container-internal address belongs in
+        // RUSTDESK_WS_ID_UPSTREAM, and in the URL setting it reaches the browser, which
+        // refuses it with an error naming nothing useful. The page said everything was
+        // fine, because it only checked the value was non-empty.
+        config(['app.url' => 'https://console.example.com']);
+        config([
+            'rustdesk.web_client.ws_id_url' => 'rustdesk-hbbs:21118',
+            'rustdesk.web_client.ws_relay_url' => 'rustdesk-hbbr:21119',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.web-client.diagnostics'))
+            ->assertOk()
+            ->assertSee('RUSTDESK_WS_ID_URL is set but unusable')
+            ->assertSee('RUSTDESK_WS_ID_UPSTREAM');
+    }
+
+    public function test_an_unusable_url_never_reaches_the_browser(): void
+    {
+        // And a deployment whose upstreams are right keeps working despite the leftover.
+        config(['app.url' => 'https://console.example.com']);
+        config([
+            'rustdesk.web_client.ws_id_url' => 'rustdesk-hbbs:21118',
+            'rustdesk.web_client.ws_relay_url' => 'rustdesk-hbbr:21119',
+            'rustdesk.web_client.ws_id_upstream' => 'hbbs:21118',
+            'rustdesk.web_client.ws_relay_upstream' => 'hbbr:21119',
+        ]);
+
+        $admin = $this->admin();
+        $device = $this->device('345890346', $admin, 'Workstation');
+
+        $html = $this->actingAs($admin)
+            ->get(route('admin.remote.frame', ['peer' => '345890346']))->assertOk()->getContent();
+
+        preg_match('/window\.RD_CONFIG=(\{.*?\});/s', $html, $m);
+        $injected = json_decode($m[1], true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('wss://console.example.com/ws/id', $injected['rendezvousUrl']);
+        $this->assertStringNotContainsString('rustdesk-hbbs', $html);
+    }
+
+    public function test_an_insecure_socket_on_a_secure_console_is_reported(): void
+    {
+        // A browser will not open ws:// from an https:// page, and the failure looks
+        // identical to an unreachable server.
+        config(['app.url' => 'https://console.example.com']);
+        config([
+            'rustdesk.web_client.ws_id_url' => 'ws://console.example.com/ws/id',
+            'rustdesk.web_client.ws_relay_url' => 'ws://console.example.com/ws/relay',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.web-client.diagnostics'))
+            ->assertOk()
+            ->assertSee('secure page cannot open an insecure socket');
+    }
+
+    public function test_half_a_url_configuration_says_which_half(): void
+    {
+        config(['app.url' => 'https://console.example.com']);
+        config([
+            'rustdesk.web_client.ws_id_url' => 'wss://console.example.com/ws/id',
+            'rustdesk.web_client.ws_relay_url' => '',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.web-client.diagnostics'))
+            ->assertOk()
+            ->assertSee('Only one of RUSTDESK_WS_ID_URL and RUSTDESK_WS_RELAY_URL is set');
+    }
+
+    public function test_valid_endpoints_are_still_accepted(): void
+    {
+        config(['app.url' => 'https://console.example.com']);
+        config([
+            'rustdesk.web_client.ws_id_url' => 'wss://edge.example.com/ws/id',
+            'rustdesk.web_client.ws_relay_url' => 'wss://edge.example.com/ws/relay',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.web-client.diagnostics'))
+            ->assertOk()
+            ->assertSee('This server is not in the media path')
+            ->assertDontSee('unusable');
+    }
+
+    /* ---------------------------------------------------------------- */
     /* Peer search */
     /* ---------------------------------------------------------------- */
 

@@ -1,0 +1,120 @@
+# The whole stack, in one file, with no .env and nothing optional.
+#
+#   hbbs  – ID/rendezvous server     hbbr  – relay server
+#   db    – MariaDB                  api   – this project (admin console + client API)
+#
+# Copy it, change the four CENSORED passwords and the two your-domain.com names, and run:
+#
+#   docker compose -f simple.docker-compose.yml up -d
+#
+# Then read the key that hbbs generated on first start and put it in RUSTDESK_PUBLIC_KEY:
+#
+#   cat ./data/hbbs/id_ed25519.pub          # 44 characters, ends with =
+#
+# and run the same command again. Log in at https://api.your-domain.com/admin.
+#
+# Everything not listed here has a working default. `.env.example` in the repository root
+# documents every option that exists; you do not need any of them to get running.
+
+networks:
+  rustdesk:
+
+volumes:
+  api-storage:
+  db-data:
+
+services:
+
+  hbbs:
+    image: rustdesk/rustdesk-server:1.1.16
+    container_name: rustdesk-hbbs
+    # -r is the relay address YOUR CLIENTS will be told to use, so it must be a name or
+    # address they can reach — not a container name.
+    command: hbbs -r rustdesk.your-domain.com:21117 -k _
+    ports:
+      - 21115:21115
+      - 21116:21116
+      - 21116:21116/udp
+      # 21118 is hbbs's WebSocket port. Not published: the api container reaches it over
+      # this network, which is what RUSTDESK_WS_ID_UPSTREAM below is for.
+    volumes:
+      - ./data/hbbs:/root
+    networks: [ rustdesk ]
+    depends_on: [ hbbr ]
+    restart: unless-stopped
+
+  hbbr:
+    image: rustdesk/rustdesk-server:1.1.16
+    container_name: rustdesk-hbbr
+    command: hbbr -k _
+    ports:
+      - 21117:21117
+      # 21119 is hbbr's WebSocket port; same reasoning as 21118 above.
+    volumes:
+      - ./data/hbbr:/root
+    networks: [ rustdesk ]
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11
+    container_name: rustdesk-api-db
+    environment:
+      MARIADB_DATABASE: rustdesk_api
+      MARIADB_USER: rustdesk
+      MARIADB_PASSWORD: CENSORED_db_password
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks: [ rustdesk ]
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/gigaionllc/rustdesk-api-server:latest
+    container_name: rustdesk-api
+    ports:
+      # Put a TLS-terminating reverse proxy in front of this. The console must be HTTPS:
+      # browsers only expose the video decoder on a secure page.
+      - 21114:80
+    environment:
+      APP_URL: https://api.your-domain.com
+      TRUSTED_PROXIES: 10.0.0.5          # your proxy's address; "*" trusts anything
+      SESSION_SECURE_COOKIE: "true"
+
+      # First login. Change the password in the console afterwards.
+      ADMIN_USER: admin
+      ADMIN_PASS: CENSORED_admin_password
+
+      DB_CONNECTION: mariadb
+      DB_HOST: rustdesk-api-db
+      DB_DATABASE: rustdesk_api
+      DB_USERNAME: rustdesk
+      DB_PASSWORD: CENSORED_db_password
+
+      # What this server tells CLIENTS to connect to. Names your users can resolve.
+      RUSTDESK_ID_SERVER: rustdesk.your-domain.com:21116
+      RUSTDESK_RELAY_SERVER: rustdesk.your-domain.com:21117
+      RUSTDESK_API_SERVER: https://api.your-domain.com
+
+      # The PUBLIC key — the contents of ./data/hbbs/id_ed25519.pub, 44 characters.
+      # NEVER id_ed25519 beside it: that is the 64-byte private key, this value is handed
+      # to every client, and anyone holding the private half can impersonate your server.
+      RUSTDESK_PUBLIC_KEY: CENSORED_paste_id_ed25519.pub_here
+
+      # Browser remote desktop.
+      #
+      # UPSTREAM = where THIS CONTAINER dials, over the network above. Container names are
+      # correct here and nowhere else. With these set, the api container serves the
+      # WebSocket on your own console hostname, so there is no second certificate, no extra
+      # public port, and nothing to add to your reverse proxy beyond what it already does.
+      #
+      # (The alternative, RUSTDESK_WS_ID_URL / RUSTDESK_WS_RELAY_URL, is what the BROWSER
+      # dials — full wss:// URLs reachable from the internet. Use those only if you want to
+      # terminate TLS in front of 21118/21119 yourself. Putting a container name in them is
+      # the most common mistake; the browser cannot resolve it.)
+      RUSTDESK_WS_ID_UPSTREAM: rustdesk-hbbs:21118
+      RUSTDESK_WS_RELAY_UPSTREAM: rustdesk-hbbr:21119
+    volumes:
+      - api-storage:/var/www/html/storage
+    networks: [ rustdesk ]
+    depends_on: [ db ]
+    restart: unless-stopped

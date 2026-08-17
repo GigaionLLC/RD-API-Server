@@ -53,6 +53,14 @@ let activeDisplay = {};
 let chosenDisplay = 0;
 /** @type {string[]} Permissions the peer has explicitly denied. */
 let deniedNames = [];
+/** Identity from the login-time peer_info; later copies may omit it. */
+let peerLabel = '';
+/**
+ * Set while the operator is cancelling. A deliberate close surfaces as a transport error,
+ * which the retry policy would otherwise treat as a transient drop and reconnect — turning
+ * Cancel into a pause.
+ */
+let aborted = false;
 
 let mainVideoWorkMs = 0; let mainDrawMs = 0; let mainDrawSamples = 0;
 
@@ -175,7 +183,17 @@ function populateDisplays(info) {
     sel.value = String(current);
     activeDisplay = info.displays[current] ?? {};
     document.body.classList.add('connected');
-    setStatus(`${info.username || 'peer'}@${info.hostname} · ${info.platform}`, 'ok');
+
+    // peer_info is re-delivered on a topology change — docking a laptop, waking a second
+    // monitor — and that copy carries the display list without the identity fields. Writing
+    // it straight to the header turned a connected session into "peer@undefined · undefined"
+    // some minutes in, which reads like a broken session rather than a monitor being
+    // plugged in. Keep whatever was learned at login.
+    if (info.hostname || info.username) {
+        peerLabel = `${info.username || 'peer'}@${info.hostname ?? 'unknown'}`
+            + (info.platform ? ` · ${info.platform}` : '');
+    }
+    if (peerLabel) setStatus(peerLabel, 'ok');
     showEncryptionState();
 }
 
@@ -435,6 +453,11 @@ function applyViewOnly() {
 /** @param {boolean} [isRetry] Suppresses the counter reset, so backoff keeps growing. */
 async function connect(isRetry = false) {
     lastError = null; workerStats = null;
+    aborted = false;
+    peerLabel = '';
+    document.body.classList.add('connecting');
+    document.body.classList.remove('remotecursor');
+    $('cancel').hidden = false;
     // A fresh attempt by the operator starts from a short delay again; a scheduled retry
     // must not, or backoff never grows.
     if (!isRetry) cancelRetry();
@@ -471,6 +494,7 @@ async function connectWorker(video, cursorCanvas) {
     ws.onAudioFrame = (d) => audio.push(d);
     ws.onClipboard = (entries) => clipboard?.receive(entries);
     ws.onChat = (text) => chat?.receive(text);
+    ws.onCursorReady = () => document.body.classList.add('remotecursor');
     ws.onMessageBox = onMessageBox;
     ws.onPermissions = onDenials;
     ws.onElevation = onElevation;
@@ -528,6 +552,8 @@ async function connectMain(video, cursorCanvas) {
         if (c.type === 'shape') cursor.setShape(c);
         else if (c.type === 'id') cursor.useShape(c.id);
         else if (c.type === 'position') cursor.setPosition(c.x, c.y);
+        // Only now is it safe to hide the local pointer: there is a remote one to replace it.
+        if (cursor.current) document.body.classList.add('remotecursor');
     };
     s.onDisplaySwitch = (d) => { cursor.setDisplay(d); decoder.reset(); };
     s.onClipboard = (entries) => clipboard?.receive(entries);
@@ -563,6 +589,10 @@ let retryTimer = null;
  * @param {{code?: string, message?: string}} err
  */
 function fail(err) {
+    // A cancel closes the socket, which arrives here as a transport failure. Retrying it
+    // would reopen the session the operator just stopped.
+    if (aborted) return;
+
     const info = explain(err);
     lastError = `${info.title}: ${info.detail}`;
     teardown();
@@ -675,11 +705,20 @@ function teardown() {
     session?.close();
     audio?.close();
     decoder = null; surface = null; cursor = null; audio = null; session = null;
-    document.body.classList.remove('connected');
+    document.body.classList.remove('connected', 'connecting', 'remotecursor');
+    $('cancel').hidden = true;
     $('connect').disabled = false;
 }
 
 $('connect').addEventListener('click', () => { connect(); });
+$('cancel').addEventListener('click', () => {
+    // Reachable during rendezvous, relay, handshake and login — including while the peer
+    // is waiting for someone at the far end to accept, which can be indefinite.
+    aborted = true;
+    cancelRetry();
+    teardown();
+    setStatus('Cancelled');
+});
 $('disconnect').addEventListener('click', () => {
     // An explicit disconnect must cancel a pending retry, or the session reappears.
     cancelRetry();
