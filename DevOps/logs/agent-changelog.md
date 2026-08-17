@@ -3,6 +3,28 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-17 21:05] - Released v1.6.2: click and cursor agree by construction
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `web-client/src/input/{mouse,controller}.js`, `web-client/src/ui/viewer.{js,html}`
+- `web-client/src/workers/session.worker.js`, `web-client/src/session/client.js`
+- `web-client/test/conformance/input.test.js`, `web-client/e2e/browser.spec.mjs`
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.6.2.md`
+**Database/API Changes:** None. `/api/version` reports `1.6.2`.
+**Summary:** Published v1.6.2 at manifest digest
+`sha256:f3ee79d76afaacd31992b11a02a58b1418844c4cc7e30fb9336acbe410832fb3`. The operator reported
+clicks not landing where the pointer showed. Found by inspection rather than reproduction: cursor
+rendering mapped peer position onto the video with the measured ratio `video.width / display.width`
+(added in 1.4.x), while `toVirtualDesktop` mapped clicks back by dividing by `DisplayInfo.scale`.
+Two independent derivations of one relationship; inverses only when `scale == display.width /
+video.width`. Input is now the literal inverse of the drawing, so they cannot diverge whatever a
+platform means by `scale`, and the no-op case (video size == display size) is pinned separately so
+already-correct deployments cannot acquire an offset. Also added what makes this reportable: a
+remote-cursor toggle and a pointer line in the stats overlay showing both coordinate spaces and the
+display/video geometry. **Not verified against a live peer** — the test machine is sending no video
+frames (established in 1.6.1 as machine state, not a regression), so this rests on construction and
+tests. Recorded as such in the release notes and here rather than implied.
+
 ## [2026-08-17 20:20] - Released v1.6.1: visible pointer, cancellable connection
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
