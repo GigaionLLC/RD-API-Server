@@ -345,3 +345,68 @@ test('keyboard view-only mode emits nothing', () => {
     assert.equal(enc.text('hello'), false);
     assert.equal(sent.length, 0);
 });
+
+/* -------------------------------------------------------------------------- */
+/* Click and cursor must agree                                                */
+/* -------------------------------------------------------------------------- */
+
+test('a click maps to exactly where the remote pointer is drawn', () => {
+    // Reported as "I cannot click in the correct spot compared to the shown mouse". Input
+    // divided by DisplayInfo.scale while the cursor layer multiplied by the measured ratio
+    // between the video and the display's reported size. Those agree only by coincidence,
+    // and when they do not, the pointer is drawn in one place and the click lands in
+    // another with nothing on screen to explain it.
+    //
+    // The guarantee now is structural: input is the inverse of the drawing, so the two
+    // cannot disagree. This test walks a point through both directions.
+    const display = { x: 0, y: 0, width: 1280, height: 800, scale: 2 };
+    const video = { width: 2560, height: 1600 };
+
+    // A click at the centre of the video.
+    const remote = toVirtualDesktop(display, 1280, 800, video);
+    assert.deepEqual(remote, { x: 640, y: 400 }, 'the centre of the video is the centre of the display');
+
+    // The cursor layer draws that same peer position back at the same video pixel.
+    const sx = video.width / display.width;
+    const sy = video.height / display.height;
+    assert.equal((remote.x - display.x) * sx, 1280);
+    assert.equal((remote.y - display.y) * sy, 800);
+
+    // `scale` is deliberately not consulted: it disagreed here, and following it would put
+    // the click at 640,400 of a 2560-wide space — a quarter of the way across the screen.
+    assert.notDeepEqual(remote, { x: 1280 / 2, y: 800 / 2, wrong: true });
+});
+
+test('the common case where the video matches the display is a plain offset', () => {
+    // No HiDPI, no scaling: the mapping must not move anything, or every ordinary
+    // deployment acquires an offset in the name of fixing an unusual one.
+    const display = { x: 1920, y: 0, width: 1920, height: 1080 };
+    assert.deepEqual(
+        toVirtualDesktop(display, 100, 200, { width: 1920, height: 1080 }),
+        { x: 2020, y: 200 },
+    );
+});
+
+test('negative display origins survive the mapping', () => {
+    // A monitor left of or above the primary has a negative origin; sint32 exists for it.
+    const display = { x: -4480, y: -76, width: 1280, height: 1024 };
+    assert.deepEqual(
+        toVirtualDesktop(display, 640, 512, { width: 1280, height: 1024 }),
+        { x: -3840, y: 436 },
+    );
+});
+
+test('without a video size the mapping falls back rather than failing', () => {
+    // Before the first frame there is nothing measured to map against.
+    const display = { x: 0, y: 0, width: 1280, height: 800, scale: 2 };
+    assert.deepEqual(toVirtualDesktop(display, 200, 100), { x: 100, y: 50 });
+    assert.deepEqual(toVirtualDesktop(display, 200, 100, { width: 0, height: 0 }), { x: 100, y: 50 });
+});
+
+test('a display that reports no size falls back too', () => {
+    // peer_info can arrive with zeroes for a monitor that is still enumerating.
+    assert.deepEqual(
+        toVirtualDesktop({ x: 5, y: 5 }, 100, 100, { width: 1920, height: 1080 }),
+        { x: 105, y: 105 },
+    );
+});

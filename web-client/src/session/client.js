@@ -135,6 +135,11 @@ export class WorkerSession {
         this.worker?.postMessage({ type: 'refresh' });
     }
 
+    /** @param {boolean} visible Draw the peer's own pointer. */
+    showRemoteCursor(visible) {
+        this.worker?.postMessage({ type: 'showRemoteCursor', visible });
+    }
+
     /** @param {{username?: string, password?: string}} [creds] Omit for a consent prompt. */
     requestElevation(creds) {
         this.worker?.postMessage({ type: 'elevate', creds });

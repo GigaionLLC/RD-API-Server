@@ -45,21 +45,45 @@ export function modifiersOf(ev) {
 }
 
 /**
- * Maps a point inside one display to the peer's virtual-desktop coordinates.
+ * Maps a point on the video into the peer's virtual-desktop coordinates.
  *
- * `scale` is 1 everywhere except macOS HiDPI and some multi-display Linux, where the
- * host injects in logical points rather than physical pixels.
+ * This is the exact inverse of how the cursor layer draws the peer's pointer, and that is
+ * the whole point: the two used to be derived independently — the cursor from the measured
+ * ratio between the video and the display's reported size, input from `DisplayInfo.scale` —
+ * and they agree only when `scale` happens to equal `display.width / video.width`. When
+ * they disagreed, the pointer was drawn in one place and the click landed in another, with
+ * nothing on screen to explain the gap.
  *
- * @param {{x?: number, y?: number, scale?: number}} display From PeerInfo.displays.
- * @param {number} localX Pixels within the display.
+ * Deriving both from the same measured ratio makes that impossible by construction:
+ * wherever the remote pointer appears under yours, a click there arrives there. It also
+ * needs no assumption about what `scale` means on a given platform, and collapses to a
+ * plain offset when the video and the display report the same dimensions, which is the
+ * common case.
+ *
+ * @param {{x?: number, y?: number, width?: number, height?: number, scale?: number}} display
+ *   From PeerInfo.displays — geometry in the peer's own units.
+ * @param {number} localX Pixels within the decoded video.
  * @param {number} localY
+ * @param {{width: number, height: number}} [video] The decoded video size. Omitting it
+ *   falls back to `scale`, which is all that is available before the first frame.
  * @returns {{x: number, y: number}}
  */
-export function toVirtualDesktop(display, localX, localY) {
+export function toVirtualDesktop(display, localX, localY, video = undefined) {
+    const originX = display.x ?? 0;
+    const originY = display.y ?? 0;
+
+    if (video && video.width > 0 && video.height > 0 && display.width && display.height) {
+        return {
+            x: Math.round(originX + localX * (display.width / video.width)),
+            y: Math.round(originY + localY * (display.height / video.height)),
+        };
+    }
+
     const scale = display.scale && display.scale > 0 ? display.scale : 1;
+
     return {
-        x: Math.round((display.x ?? 0) + localX / scale),
-        y: Math.round((display.y ?? 0) + localY / scale),
+        x: Math.round(originX + localX / scale),
+        y: Math.round(originY + localY / scale),
     };
 }
 

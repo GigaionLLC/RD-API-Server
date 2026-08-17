@@ -40,8 +40,10 @@ export class InputController {
      * @param {boolean} [opts.trackpad] Peer accepts pixel-precise scrolling; gate it on
      *   `supportsTrackpadScroll(peerInfo)`.
      */
-    constructor({ element, send, remoteSize, display, viewOnly = false, trackpad = false }) {
+    constructor({ element, send, remoteSize, display, viewOnly = false, trackpad = false, onMap = null }) {
         this.element = element;
+        /** Reports each mapping, so a viewer can show where a click actually goes. */
+        this.onMap = onMap;
         this.remoteSize = remoteSize;
         this.display = display;
         this.viewOnly = viewOnly;
@@ -72,7 +74,14 @@ export class InputController {
         const localY = ((ev.clientY - rect.top - offY) / drawH) * height;
         if (localX < 0 || localY < 0 || localX >= width || localY >= height) return null;
 
-        return toVirtualDesktop(this.display(), localX, localY);
+        // The video size is passed so the mapping is the inverse of how the cursor layer
+        // draws the peer's pointer. Without it the two derive the same relationship
+        // independently and can disagree — a pointer drawn in one place, a click landing
+        // in another.
+        const remote = toVirtualDesktop(this.display(), localX, localY, { width, height });
+        this.onMap?.({ x: Math.round(localX), y: Math.round(localY) }, remote);
+
+        return remote;
     }
 
     /**

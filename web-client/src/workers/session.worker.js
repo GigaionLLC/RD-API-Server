@@ -295,6 +295,11 @@ globalThis.onmessage = async (ev) => {
         case 'refresh':
             refresh();
             break;
+        case 'showRemoteCursor':
+            // The layer keeps receiving and caching shapes either way: a shape is sent
+            // once and cannot be re-requested, so hiding must not mean discarding.
+            if (cursor) { cursor.visible = msg.visible !== false; cursor.render(); }
+            break;
         case 'elevate':
             // Credentials, when present, are consumed here and never retained: the worker
             // encrypts them into the session stream and drops the message.

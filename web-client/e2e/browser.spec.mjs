@@ -501,3 +501,25 @@ test('the operator always keeps a pointer to aim with', async ({ page }) => {
     await page.evaluate(() => document.body.classList.remove('remotecursor'));
     expect(await cursorStyle(), 'view-only without one: visible again').not.toBe('none');
 });
+
+test('the remote cursor can be turned off', async ({ page }) => {
+    // Asked for so an operator can compare their own pointer against the peer's and see
+    // whether a click lands where they aimed. The two should sit on top of each other.
+    await page.goto('/src/ui/viewer.html');
+    await page.waitForFunction(() => globalThis.__viewer !== undefined, null, { timeout: 15_000 });
+
+    // The toolbar only exists once a session is established, which is the point: this
+    // control belongs beside the other in-session ones rather than on the connect form.
+    await page.evaluate(() => document.body.classList.add('connected'));
+
+    const toggle = page.locator('#remotecursor');
+    expect(await toggle.isChecked(), 'drawn by default').toBe(true);
+
+    await toggle.uncheck();
+    expect(await page.evaluate(() =>
+        document.body.classList.contains('noremotecursor'))).toBe(true);
+
+    await toggle.check();
+    expect(await page.evaluate(() =>
+        document.body.classList.contains('noremotecursor'))).toBe(false);
+});

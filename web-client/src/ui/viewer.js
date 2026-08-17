@@ -56,6 +56,14 @@ let deniedNames = [];
 /** Identity from the login-time peer_info; later copies may omit it. */
 let peerLabel = '';
 /**
+ * The most recent pointer mapping, for the stats overlay.
+ *
+ * Shown because "my clicks do not land where I am pointing" is otherwise impossible to
+ * report usefully — it turns a feeling into two coordinate pairs and the ratio between
+ * them, which is enough to see whether the video and the peer's display disagree.
+ */
+let lastPointer = null;
+/**
  * Set while the operator is cancelling. A deliberate close surfaces as a transport error,
  * which the retry policy would otherwise treat as a transient drop and reconnect — turning
  * Cancel into a pause.
@@ -227,6 +235,7 @@ function setupInput(canvas) {
         remoteSize: () => remote,
         display: () => activeDisplay,
         viewOnly: $('viewonly').checked,
+        onMap: (local, remote) => { lastPointer = { local, remote }; },
         // Pixel-precise scrolling only where the peer is known to apply it; older hosts
         // ignore the message, which would read as a dead trackpad.
         trackpad: supportsTrackpadScroll(session.peerInfo ?? {}),
@@ -686,6 +695,14 @@ function paintStats() {
         `input    ${i.mouse ?? 0} mouse · ${i.keys ?? 0} keys${i.viewOnly ? ' · VIEW ONLY' : ''}${i.locked ? ' · kbd locked' : ''}`,
         `clip     ${cb.received ?? 0} in · ${cb.sent ?? 0} out · ${cb.dropped ?? 0} dropped${cb.pending ? ' · awaiting gesture' : ''}${cb.enabled === false ? ' · off' : ''}`,
         `jank     p95 ${j.p95 ?? '—'}ms · max ${j.max ?? '—'}ms`,
+        ...(lastPointer ? [
+            `pointer  video ${lastPointer.local.x},${lastPointer.local.y}`
+            + ` -> peer ${lastPointer.remote.x},${lastPointer.remote.y}`,
+            `display  ${activeDisplay.width ?? '?'}x${activeDisplay.height ?? '?'}`
+            + ` at ${activeDisplay.x ?? 0},${activeDisplay.y ?? 0}`
+            + ` · video ${remote.width}x${remote.height}`
+            + ` · scale ${activeDisplay.scale ?? 1}`,
+        ] : []),
         ...(deniedNames.length ? [`denied   ${deniedNames.join(', ')}`] : []),
     ].join('\n');
 }
@@ -728,6 +745,12 @@ $('disconnect').addEventListener('click', () => {
 $('display').addEventListener('change', switchDisplay);
 $('quality').addEventListener('change', () => setQuality());
 $('viewonly').addEventListener('change', applyViewOnly);
+$('remotecursor').addEventListener('change', (e) => {
+    const on = e.target.checked;
+    document.body.classList.toggle('noremotecursor', !on);
+    if (mode === 'worker') session?.showRemoteCursor?.(on);
+    else if (cursor) { cursor.visible = on; cursor.render(); }
+});
 $('mute').addEventListener('change', (e) => audio?.setMuted(e.target.checked));
 $('clipboard').addEventListener('change', (e) => clipboard?.setEnabled(e.target.checked));
 $('chatBtn').addEventListener('click', () => {

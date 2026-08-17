@@ -4,6 +4,32 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.6.2] - 2026-08-17
+
+### Fixed
+
+- **A click now lands where the remote pointer is drawn.** Two code paths derived the same
+  relationship independently: the cursor layer mapped the peer's pointer onto the video by the
+  measured ratio between the video and the display's reported size, while input mapped a click back
+  by dividing by `DisplayInfo.scale`. Those agree only when `scale` happens to equal
+  `display.width / video.width`; when they differ, the pointer appears in one place and the click
+  arrives in another, with nothing on screen to explain the gap.
+
+  Input is now derived as the exact inverse of the drawing, so the two cannot disagree — wherever
+  the remote pointer sits under yours, a click there arrives there. It also needs no assumption
+  about what `scale` means on a given platform, and collapses to a plain offset when the video and
+  the display report the same size, which is the common case.
+
+### Added
+
+- **A "remote cursor" toggle** in the session toolbar, so the peer's own pointer can be drawn
+  alongside yours and the two compared. They should sit on top of each other.
+
+- **The pointer mapping is shown in the statistics overlay** — the video coordinate, the peer
+  coordinate it maps to, the display's reported geometry and the video size. "My clicks do not land
+  where I am pointing" is otherwise impossible to report usefully; this turns it into two
+  coordinate pairs and the ratio between them.
+
 ## [1.6.1] - 2026-08-17
 
 ### Fixed
@@ -503,7 +529,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.6.2...HEAD
+[1.6.2]: docs/releases/v1.6.2.md
 [1.6.1]: docs/releases/v1.6.1.md
 [1.6.0]: docs/releases/v1.6.0.md
 [1.5.0]: docs/releases/v1.5.0.md
