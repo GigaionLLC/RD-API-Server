@@ -1481,6 +1481,14 @@ textarea.form-control {
 /* Multi-value combobox: current selections as removable chips above the search box. The
    chips are the control's value — the ids are mirrored into a hidden field — so they read
    as a list rather than as decoration. */
+.rd-sidebar__version {
+  display: block;
+  margin-top: 2px;
+  color: var(--rd-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
 .rd-combo__chips {
   display: flex;
   flex-wrap: wrap;

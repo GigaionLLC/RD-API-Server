@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SsoRoleMappingController;
 use App\Http\Controllers\Admin\StrategyController;
+use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WebClientController;
@@ -72,6 +73,8 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     // browser then speaks the RustDesk protocol straight to hbbs/hbbr over WebSocket, so
     // this application is never in the media path.
     // Before the {device} routes: 'diagnostics' would otherwise be bound as a device id.
+    Route::get('/admin/support', [SupportController::class, 'show'])->middleware('permission:settings.view')->name('admin.support');
+    Route::get('/admin/support/download', [SupportController::class, 'download'])->middleware('permission:settings.view')->name('admin.support.download');
     Route::get('/admin/web-client/diagnostics', [WebClientController::class, 'diagnostics'])->middleware('permission:settings.view')->name('admin.web-client.diagnostics');
     Route::get('/admin/remote', [WebClientController::class, 'remote'])->middleware('permission:devices.view')->name('admin.remote');
     Route::get('/admin/remote/search', [WebClientController::class, 'searchPeers'])->middleware('permission:devices.view')->name('admin.remote.search');

@@ -4,6 +4,30 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.6.0] - 2026-08-17
+
+### Added
+
+- **The version is shown in the console**, in the sidebar footer on every page. It is the first
+  question on every support thread and should be answerable from wherever the operator already is,
+  not from a settings screen they have to find.
+
+- **A support report** at **System → Support report**, for attaching to a GitHub issue. It answers
+  the questions a maintainer otherwise has to ask one at a time — version, PHP, environment,
+  configuration, remote-desktop diagnostics, database, and the last 400 log lines — in one paste.
+
+  **Identifying material is replaced before it leaves the machine.** Addresses, hostnames, URLs,
+  email addresses, MAC addresses, key material, RustDesk peer ids and any value whose name suggests
+  a secret become placeholders. The same value always becomes the same placeholder, so a reader can
+  still follow one machine through a log; `<ip-1>` twice is evidence, `[redacted]` twice is not.
+
+  Values that are secret by name are never read in order to be hidden — the report says whether a
+  key is set and which half of the pair it is, never what it contains.
+
+  The report is shown in full before it can be downloaded, and says so: redaction is a large
+  reduction in what escapes, not a guarantee, and the last check has to be a person who knows their
+  own deployment.
+
 ## [1.5.0] - 2026-08-17
 
 ### Changed
@@ -441,7 +465,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.6.0...HEAD
+[1.6.0]: docs/releases/v1.6.0.md
 [1.5.0]: docs/releases/v1.5.0.md
 [1.4.6]: docs/releases/v1.4.6.md
 [1.4.5]: docs/releases/v1.4.5.md

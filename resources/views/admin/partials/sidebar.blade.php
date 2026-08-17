@@ -288,6 +288,11 @@
                        @if (str_starts_with($nav, 'admin/settings')) aria-current="page" @endif>
                         <i class="ri-tools-line" aria-hidden="true"></i><span>Settings</span>
                     </a>
+                    <a href="/admin/support"
+                       class="rd-nav__item {{ str_starts_with($nav, 'admin/support') ? 'active' : '' }}"
+                       @if (str_starts_with($nav, 'admin/support')) aria-current="page" @endif>
+                        <i class="ri-bug-line" aria-hidden="true"></i><span>Support report</span>
+                    </a>
                     <a href="/admin/web-client/diagnostics"
                        class="rd-nav__item {{ str_starts_with($nav, 'admin/web-client') ? 'active' : '' }}"
                        @if (str_starts_with($nav, 'admin/web-client')) aria-current="page" @endif>
@@ -298,5 +303,11 @@
         @endif
     </nav>
 
-    <div class="rd-sidebar__footer">Self-hosted &middot; Independent</div>
+    {{-- The version is here rather than buried in a settings page because the first
+         question on every support thread is "which version are you on", and an operator
+         should be able to answer it from whatever screen they are already looking at. --}}
+    <div class="rd-sidebar__footer">
+        Self-hosted &middot; Independent
+        <span class="rd-sidebar__version">v{{ config('app.version') }}</span>
+    </div>
 </aside>
