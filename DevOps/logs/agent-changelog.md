@@ -3,6 +3,32 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-17 00:45] - Released v1.4.5: the server cannot hand out a private key
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `app/Services/ServerKeyService.php` (new), `app/Services/WebClientDiagnosticsService.php`
+- `app/Http/Controllers/Admin/{WebClientController,ClientConfigController}.php`, `config/rustdesk.php`
+- `tests/Feature/ServerKeyTest.php` (new), `tests/Feature/WebClientTest.php`
+- `README.md`, `docs/web-client-deployment.md`, `resources/views/admin/web_client/diagnostics.blade.php`
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `docs/releases/v1.4.5.md`
+**Database/API Changes:** None. `/api/version` reports `1.4.5`. New env `RUSTDESK_PUBLIC_KEY` and
+`RUSTDESK_PUBLIC_KEY_FILE`; `RUSTDESK_KEY`/`RUSTDESK_KEY_FILE` retained as permanent aliases.
+**Summary:** Published v1.4.5 at manifest digest
+`sha256:ef622af00af85e3f976973d0bd7ffcb95b8cfd649b9c544948c9d1b08616b62c`. Prompted by the operator
+asking the right question — is there anywhere the API server needs the private key? A grep settled
+it: no signing call exists anywhere in the application, and `rustdesk.key` is read in exactly two
+places, both of which distribute it. So the private half has no legitimate use here, and the server
+should be incapable of passing it on. `ServerKeyService` now mediates both paths and yields only the
+public half, deriving it from a 64-byte value rather than refusing, because hbbs rejects a private
+key anyway and a working deployment plus a loud diagnostic beats a broken one plus a puzzle. A value
+that is neither 32 nor 64 bytes of base64 is dropped rather than distributed. Also added
+`RUSTDESK_PUBLIC_KEY` at the operator's suggestion, keeping `RUSTDESK_KEY` working indefinitely —
+that name is the ecosystem convention and breaking it fails silently, since an unset key disables
+peer verification without raising anything, which is the worst possible upgrade regression.
+**Operator action still outstanding:** their deployment held the private key, so it has been
+distributed to every client that fetched a configuration and the pair must be rotated; correcting
+the setting does not undo that.
+
 ## [2026-08-16 21:30] - Released v1.4.4: remote desktop verified against a live peer
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
