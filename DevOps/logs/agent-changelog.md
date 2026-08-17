@@ -3,6 +3,34 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-17 20:20] - Released v1.6.1: visible pointer, cancellable connection
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `web-client/src/ui/viewer.{js,html}`, `web-client/src/session/{machine,client}.js`, `web-client/src/workers/session.worker.js`
+- `app/Services/WebClientDiagnosticsService.php`, `app/Http/Controllers/Admin/WebClientController.php`
+- `README.md`, `.env.example`, `examples/simple.docker-compose.yml` (new)
+- `tests/Feature/WebClientTest.php`, `web-client/e2e/browser.spec.mjs`, `web-client/test/conformance/session.test.js`
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `docs/releases/v1.6.1.md`
+**Database/API Changes:** None. `/api/version` reports `1.6.1`.
+**Summary:** Published v1.6.1 at manifest digest
+`sha256:9dac880e4e441d480dcc13f23e9bd82b06467f43e14849d8d57cebe4af092ea7`. **The cursor bug needed
+two fixes, and the obvious one alone would not have worked:** the peer sends no cursor unless asked
+(`show_remote_cursor` at login), but it also suppresses cursor-position updates toward whoever is
+sending input — so even with a remote cursor, a controlling operator sees one that lags or stops.
+Since the viewer also hid the local pointer, there was nothing to aim with. The rule is now: local
+pointer always visible while controlling, hidden only while watching and only once a remote one is
+drawn. Cancel was added for the negotiation window, with an abort flag so the deliberate close is
+not classified as a transient transport drop and reconnected. Endpoint validation closes the
+diagnostics gap that let `RUSTDESK_WS_ID_URL=rustdesk-hbbs:21118` report as healthy — the operator's
+second deployment hit exactly that. **Versioning corrected mid-flight:** this was initially prepared
+as 1.7.0 and the operator challenged it; by the policy in version-history.md it is fixes and
+documentation, so a patch. **Verification honesty:** the live peer sent a cursor but no video, which
+initially looked like a regression from the login-option change; running the previous published
+release against the same peer minutes apart showed identical behaviour, establishing it as machine
+state. The codec was also round-tripped directly to rule out the new login field breaking encoding.
+Cursor, cancel, identity retention and encryption were confirmed against the published image; video
+was not re-confirmed today and is recorded as such in the release notes.
+
 ## [2026-08-17 03:20] - Released v1.6.0: version on screen, redacted support report
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
