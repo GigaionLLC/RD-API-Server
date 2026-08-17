@@ -50,7 +50,7 @@ Set these once (e.g. in a `.env` file next to `docker-compose.yml`, or in your s
 RUSTDESK_ID_SERVER=your.server:21116
 RUSTDESK_RELAY_SERVER=your.server:21117
 RUSTDESK_API_SERVER=http://your.server:21114
-RUSTDESK_KEY=<contents of id_ed25519.pub>
+RUSTDESK_PUBLIC_KEY=<contents of id_ed25519.pub>   # never id_ed25519
 PORT=21114
 ```
 

@@ -72,8 +72,17 @@ services:
       RUSTDESK_ID_SERVER: "${RUSTDESK_ID_SERVER:-}"
       RUSTDESK_RELAY_SERVER: "${RUSTDESK_RELAY_SERVER:-}"
       RUSTDESK_API_SERVER: "${RUSTDESK_API_SERVER:-${APP_URL:-http://localhost:21114}}"
-      RUSTDESK_KEY: "${RUSTDESK_KEY:-}"
+      # The PUBLIC key — id_ed25519.pub, never id_ed25519. RUSTDESK_KEY is the older
+      # spelling and still works, so an existing .env needs no edit.
+      RUSTDESK_PUBLIC_KEY: "${RUSTDESK_PUBLIC_KEY:-${RUSTDESK_KEY:-}}"
       RUSTDESK_REQUIRE_DEPLOYMENT: "${RUSTDESK_REQUIRE_DEPLOYMENT:-true}"
+      # Browser remote desktop. Either point these at your own TLS terminator in front of
+      # hbbs/hbbr, or set the two upstreams below to let this container carry the WebSocket
+      # on the console's own hostname. See docs/web-client-deployment.md.
+      RUSTDESK_WS_ID_URL: "${RUSTDESK_WS_ID_URL:-}"
+      RUSTDESK_WS_RELAY_URL: "${RUSTDESK_WS_RELAY_URL:-}"
+      RUSTDESK_WS_ID_UPSTREAM: "${RUSTDESK_WS_ID_UPSTREAM:-}"
+      RUSTDESK_WS_RELAY_UPSTREAM: "${RUSTDESK_WS_RELAY_UPSTREAM:-}"
       RUSTDESK_AUTO_REGISTER: "${RUSTDESK_AUTO_REGISTER:-false}"
       RUSTDESK_AUTO_REGISTER_PER_IP_PER_MINUTE: "${RUSTDESK_AUTO_REGISTER_PER_IP_PER_MINUTE:-30}"
       RUSTDESK_AUTO_REGISTER_GLOBAL_PER_MINUTE: "${RUSTDESK_AUTO_REGISTER_GLOBAL_PER_MINUTE:-100}"

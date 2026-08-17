@@ -4,6 +4,28 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.4.6] - 2026-08-17
+
+### Changed
+
+- **The shipped Compose files and `.env.example` now describe the browser remote desktop and the
+  server key properly.** They were the last place still teaching `RUSTDESK_KEY` without saying
+  which half of the pair belongs there — and since they are what operators copy, they were the most
+  likely source of the mistake. They now name `RUSTDESK_PUBLIC_KEY`, say plainly that
+  `id_ed25519.pub` is wanted and `id_ed25519` is not, and explain the consequence of getting it
+  wrong. An existing `.env` needs no edit: the Compose files read `RUSTDESK_PUBLIC_KEY` and fall
+  back to `RUSTDESK_KEY`.
+
+- `.env.example` gained the RustDesk server settings it never had. It documented enrollment and
+  WebSocket options while omitting the ID server, relay, API server and key entirely, so an
+  operator working from it had nothing to correct their guess against.
+
+- The shipped Compose files pass the four WebSocket settings through, so the browser remote desktop
+  can be configured from them at all. It previously could not.
+
+- The full-stack example wires the container-carried transport, since everything in it already
+  shares a network, and comments out the 21118/21119 publications that are then unnecessary.
+
 ## [1.4.5] - 2026-08-16
 
 ### Security
@@ -391,7 +413,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.5...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.6...HEAD
+[1.4.6]: docs/releases/v1.4.6.md
 [1.4.5]: docs/releases/v1.4.5.md
 [1.4.4]: docs/releases/v1.4.4.md
 [1.4.3]: docs/releases/v1.4.3.md

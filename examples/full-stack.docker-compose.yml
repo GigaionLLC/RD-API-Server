@@ -9,7 +9,8 @@
 #      a host-based proxy. For a containerized proxy, remove that port, attach the proxy + API to
 #      a dedicated internal network, and proxy directly to rustdesk-api:80.
 #   3. docker compose -f full-stack.docker-compose.yml up -d
-#   4. hbbs generates a key on first start. Copy its public key into RUSTDESK_KEY:
+#   4. hbbs generates a key pair on first start. Copy the PUBLIC half into
+#      RUSTDESK_PUBLIC_KEY — id_ed25519.pub, never id_ed25519:
 #        cat ./data/hbbs/id_ed25519.pub
 #      then re-run:  docker compose -f full-stack.docker-compose.yml up -d
 #   5. Log in at https://api.your-domain.com/admin  (ADMIN_USER / ADMIN_PASS).
@@ -24,7 +25,9 @@ services:
       - 21115:21115
       - 21116:21116
       - 21116:21116/udp
-      - 21118:21118
+      # 21118 is the WebSocket port. The api service reaches it over this Compose network,
+      # so publish it only if something outside the stack needs it directly.
+      # - 21118:21118
     volumes:
       - ./data/hbbs:/root
     networks: [ rustdesk ]
@@ -37,7 +40,8 @@ services:
     command: hbbr -k _
     ports:
       - 21117:21117
-      - 21119:21119
+      # 21119 is the WebSocket port; see the note on hbbs 21118.
+      # - 21119:21119
     volumes:
       - ./data/hbbr:/root
     networks: [ rustdesk ]
@@ -97,8 +101,20 @@ services:
       - RUSTDESK_ID_SERVER=id.your-domain.com:21116
       - RUSTDESK_RELAY_SERVER=relay.your-domain.com:21117
       - RUSTDESK_API_SERVER=https://api.your-domain.com
-      # Public key — from ./data/hbbs/id_ed25519.pub after hbbs first starts:
-      - RUSTDESK_KEY=CHANGE_ME_public_key
+      # The PUBLIC key, from ./data/hbbs/id_ed25519.pub once hbbs has started. Never the
+      # 64-byte id_ed25519 beside it: that is the private key, this server hands whatever
+      # is set here to every client, and anyone holding it can impersonate your ID server.
+      - RUSTDESK_PUBLIC_KEY=CHANGE_ME_public_key
+      # Browser remote desktop. These two make this container serve /ws/id and /ws/relay on
+      # the console's own hostname and certificate and forward them to hbbs and hbbr, so
+      # there is no second certificate, no extra public port and no reverse-proxy change.
+      # Everything here is already on one network, so the service names resolve.
+      #
+      # The trade-off: relayed session video passes through this container. To keep it out
+      # of the media path instead, clear these, terminate TLS in front of 21118/21119
+      # yourself, and set RUSTDESK_WS_ID_URL / RUSTDESK_WS_RELAY_URL to those endpoints.
+      - RUSTDESK_WS_ID_UPSTREAM=hbbs:21118
+      - RUSTDESK_WS_RELAY_UPSTREAM=hbbr:21119
       # Unknown devices must enroll with a deployment token unless both legacy switches are changed.
       - RUSTDESK_REQUIRE_DEPLOYMENT=true
       - RUSTDESK_AUTO_REGISTER=false
