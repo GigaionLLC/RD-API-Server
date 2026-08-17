@@ -1478,6 +1478,55 @@ textarea.form-control {
   font-size: 12px;
 }
 
+/* Multi-value combobox: current selections as removable chips above the search box. The
+   chips are the control's value — the ids are mirrored into a hidden field — so they read
+   as a list rather than as decoration. */
+.rd-combo__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.rd-combo__chips:empty {
+  display: none;
+}
+
+.rd-combo__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 9px;
+  border: 1px solid var(--rd-border);
+  border-radius: 999px;
+  background: var(--rd-surface-raised);
+  color: var(--rd-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.rd-combo__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--rd-text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.rd-combo__chip-remove:hover,
+.rd-combo__chip-remove:focus-visible {
+  background: var(--rd-surface-hover);
+  color: var(--rd-text-bright);
+}
+
 /* Toasts */
 .rd-toasts {
   position: fixed;

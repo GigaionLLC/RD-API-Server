@@ -2,9 +2,6 @@
 @section('title', 'Edit Group')
 @php
     $canEdit = auth()->user()->hasPermission('groups.edit');
-    $selectedAccessGroups = $allGroups->filter(
-        static fn ($candidate): bool => in_array((int) $candidate->id, $accessGroupIds, true)
-    );
 @endphp
 
 @section('content')
@@ -46,11 +43,24 @@
                 <div class="rd-field">
                     @if ($canEdit)
                     <label class="rd-label" for="can_access_groups">Can access these user groups</label>
-                    <select class="rd-select" id="can_access_groups" multiple size="6" data-access-multiselect data-target="#can_access_group_ids" aria-describedby="access-groups-help">
-                        @foreach ($allGroups as $g)
-                            <option value="{{ $g->id }}" @selected(in_array((int) $g->id, $accessGroupIds, true))>{{ $g->name }}</option>
-                        @endforeach
-                    </select>
+                    {{-- Searched, not listed. See the combobox rule in CLAUDE.md; the hidden
+                         field keeps the comma-joined shape the controller already accepts. --}}
+                    <div class="rd-combo rd-combo--multi" data-url="{{ route('admin.groups.search') }}"
+                         data-target="#can_access_group_ids">
+                        <div class="rd-combo__chips">
+                            @foreach ($selectedAccessGroups as $selectedGroup)
+                                <span class="rd-combo__chip" data-id="{{ $selectedGroup->id }}">
+                                    <span class="rd-combo__chip-text">{{ $selectedGroup->name }}</span>
+                                    <button type="button" class="rd-combo__chip-remove" tabindex="-1"
+                                            aria-label="Remove {{ $selectedGroup->name }}">&times;</button>
+                                </span>
+                            @endforeach
+                        </div>
+                        <input type="text" class="rd-input rd-combo__input" id="can_access_groups"
+                               placeholder="Search user groups…" autocomplete="off"
+                               aria-describedby="access-groups-help">
+                        <div class="rd-combo__menu"></div>
+                    </div>
                     <input type="hidden" id="can_access_group_ids" name="can_access_group_ids" value="{{ implode(',', $accessGroupIds) }}">
                     @else
                     <span class="rd-label">Can access these user groups</span>

@@ -4,6 +4,34 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.5.0] - 2026-08-17
+
+### Changed
+
+- **Every picker whose list grows with the deployment now searches instead of listing.** A fleet is
+  thousands of devices and, on a directory-synced deployment, thousands of groups. Rendering those
+  into a `<select>` built every row into the DOM on page load — so the page was slowest for exactly
+  the deployments with the most to manage, and an operator could only scroll it, never search.
+
+  Device and user pickers already worked this way. This brings the rest into line: the remote
+  control peer picker, the three user-group pickers, and the three multi-value group pickers. The
+  searchable combobox gained multi-value support to make the last of those possible — selections
+  become removable chips, and the component emits whichever shape the form already posted, so no
+  controller or validation rule changed.
+
+  `CLAUDE.md` records the rule: never render a database-backed list into a `<select>`, but keep
+  plain selects for fixed lists, because a combobox for four options is worse.
+
+### Fixed
+
+- **The admin-role scope picker listed every group in the deployment, unscoped.** A delegate
+  confined to one group could read the names of all of them from the role form. It now goes through
+  `AdminScopeService` like every other group query.
+
+- Every device-index page load fetched every in-scope user, sorted them, and rendered none of them.
+  The owner picker had been converted to a combobox and the query was left behind; on a large
+  deployment it was the biggest unbounded fetch on the page.
+
 ## [1.4.6] - 2026-08-17
 
 ### Changed
@@ -413,7 +441,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.6...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.5.0...HEAD
+[1.5.0]: docs/releases/v1.5.0.md
 [1.4.6]: docs/releases/v1.4.6.md
 [1.4.5]: docs/releases/v1.4.5.md
 [1.4.4]: docs/releases/v1.4.4.md

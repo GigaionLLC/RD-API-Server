@@ -28,13 +28,28 @@
 
 <div class="rd-field" data-role-scope @unless(old('type', $role->type) === \App\Models\AdminRole::TYPE_GROUP) hidden @endunless>
     <label class="rd-label" for="scope">Scoped user groups</label>
-    <select class="rd-select" id="scope" name="scope[]" multiple size="6" aria-describedby="scope-help"
-            @disabled(! $canEdit)
-            @error('scope') aria-invalid="true" aria-errormessage="scope-error" @enderror>
-        @foreach ($groups as $g)
-            <option value="{{ $g->id }}" @selected(in_array((int) $g->id, $selectedScope, true))>{{ $g->name }}</option>
+    {{-- Searched, not listed. See the combobox rule in CLAUDE.md. Each chip emits its own
+         hidden scope[] input, so the request shape and validation are unchanged. --}}
+    <div class="rd-combo rd-combo--multi" data-url="{{ route('admin.groups.search') }}"
+         data-name="scope[]">
+        <div class="rd-combo__chips">
+            @foreach ($scopeGroups as $scopeGroup)
+                <span class="rd-combo__chip" data-id="{{ $scopeGroup->id }}">
+                    <span class="rd-combo__chip-text">{{ $scopeGroup->name }}</span>
+                    <button type="button" class="rd-combo__chip-remove" tabindex="-1"
+                            aria-label="Remove {{ $scopeGroup->name }}">&times;</button>
+                </span>
+            @endforeach
+        </div>
+        @foreach ($scopeGroups as $scopeGroup)
+            <input type="hidden" name="scope[]" value="{{ $scopeGroup->id }}" data-rd-value>
         @endforeach
-    </select>
+        <input type="text" class="rd-input rd-combo__input" id="scope"
+               placeholder="Search user groups…" autocomplete="off" aria-describedby="scope-help"
+               @disabled(! $canEdit)
+               @error('scope') aria-invalid="true" aria-errormessage="scope-error" @enderror>
+        <div class="rd-combo__menu"></div>
+    </div>
     <span class="rd-help" id="scope-help">For group-scoped roles, choose the user groups whose users and devices this role may manage.</span>
     @error('scope')<span class="rd-help rd-help--error" id="scope-error">{{ $message }}</span>@enderror
 </div>

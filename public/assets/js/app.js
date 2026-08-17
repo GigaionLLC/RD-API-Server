@@ -847,6 +847,58 @@
       var $input = $combo.find('.rd-combo__input').first();
       var $menu = $combo.find('.rd-combo__menu').first();
       var url = $combo.data('url');
+
+      // Multi-value mode. Selections become chips and the ids are written to a separate
+      // hidden field as a comma-joined list, which is the shape the server already
+      // accepts from the multi-selects this replaces — so nothing changes behind it.
+      var multiple = $combo.hasClass('rd-combo--multi');
+      var $chips = $combo.find('.rd-combo__chips').first();
+      var $target = multiple ? $($combo.data('target')) : $();
+      // Two ways to submit a multi-value selection, because the forms this replaces used
+      // both: a single comma-joined field (data-target), or one input per value under an
+      // array name (data-name). Emitting whichever the form already expects keeps every
+      // controller and validation rule untouched.
+      var fieldName = $combo.data('name');
+
+      function chosenIds() {
+        return $chips.find('.rd-combo__chip').map(function () {
+          return String($(this).attr('data-id'));
+        }).get();
+      }
+
+      function syncTarget() {
+        var ids = chosenIds();
+
+        if ($target.length) {
+          $target.val(ids.join(',')).trigger('change');
+        }
+
+        if (fieldName) {
+          $combo.find('input[type="hidden"][data-rd-value]').remove();
+          $.each(ids, function (index, id) {
+            $('<input type="hidden" data-rd-value>')
+              .attr({ name: fieldName, value: id })
+              .appendTo($combo);
+          });
+        }
+      }
+
+      function addChip(id, text) {
+        id = String(id);
+        if ($.inArray(id, chosenIds()) >= 0) {
+          return;
+        }
+        var $chip = $('<span class="rd-combo__chip"></span>').attr('data-id', id);
+        $('<span class="rd-combo__chip-text"></span>').text(text).appendTo($chip);
+        $('<button type="button" class="rd-combo__chip-remove" tabindex="-1"></button>')
+          // The label names what is being removed, so a screen reader hears
+          // "Remove Support team" rather than a row of identical "Remove" buttons.
+          .attr('aria-label', 'Remove ' + text)
+          .html('&times;')
+          .appendTo($chip);
+        $chips.append($chip);
+        syncTarget();
+      }
       var listId = $menu.attr('id') || 'rd-combo-list-' + comboSequence;
       var timer = null;
       var activeIndex = -1;
@@ -912,6 +964,16 @@
           return;
         }
 
+        if (multiple) {
+          addChip($item.attr('data-id'), $item.text());
+          // Cleared rather than filled: the box is now for the next selection, and
+          // leaving the last choice in it makes the field read like a single value.
+          $input.val('');
+          close(false);
+          $input.trigger('focus');
+          return;
+        }
+
         $hidden.val($item.attr('data-id'));
         $input.val($item.text());
         close(false);
@@ -974,7 +1036,9 @@
       }
 
       $input.on('input.rdCombo', function () {
-        $hidden.val('');
+        if (!multiple) {
+          $hidden.val('');
+        }
         dismissed = false;
         window.clearTimeout(timer);
         timer = window.setTimeout(search, 200);
@@ -1021,6 +1085,27 @@
         event.preventDefault();
         choose($(this));
       });
+
+      $chips.on('click.rdCombo', '.rd-combo__chip-remove', function () {
+        $(this).closest('.rd-combo__chip').remove();
+        syncTarget();
+        $input.trigger('focus');
+      });
+
+      if (multiple) {
+        $input.on('keydown.rdComboChips', function (event) {
+          // Backspace in an empty box removes the last chip, which is what every other
+          // chip input does and what a user will try before reaching for the mouse.
+          if (event.key === 'Backspace' && !$input.val()) {
+            var $last = $chips.find('.rd-combo__chip').last();
+            if ($last.length) {
+              event.preventDefault();
+              $last.remove();
+              syncTarget();
+            }
+          }
+        });
+      }
 
       $(document).on('click.rdCombo' + comboSequence, function (event) {
         if (!$.contains($combo[0], event.target) && event.target !== $combo[0]) {

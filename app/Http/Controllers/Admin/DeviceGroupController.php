@@ -70,9 +70,6 @@ class DeviceGroupController extends Controller
         $scopePermission = $request->user()->hasPermission('device_groups.edit')
             ? 'device_groups.edit'
             : 'device_groups.view';
-        $userGroups = $this->scope->scopeUserGroups(Group::query(), $request->user(), $scopePermission)
-            ->orderBy('name')->get();
-
         // Currently granted user-group ids.
         $accessGroupIds = DeviceGroupAccess::query()
             ->where('device_group_id', $deviceGroup->id)
@@ -80,7 +77,18 @@ class DeviceGroupController extends Controller
             ->map(static fn ($id): int => (int) $id)
             ->all();
 
-        return view('admin.device_groups.edit', compact('deviceGroup', 'userGroups', 'accessGroupIds'));
+        // Only the granted groups are loaded. The picker searches the rest through
+        // admin.groups.search, so a directory with thousands of groups no longer puts all
+        // of them in the page. Still scoped: a name outside the boundary is not shown even
+        // when the grant exists.
+        $selectedAccessGroups = $accessGroupIds === []
+            ? collect()
+            : $this->scope->scopeUserGroups(Group::query(), $request->user(), $scopePermission)
+                ->whereIn('id', $accessGroupIds)
+                ->orderBy('name')
+                ->get(['id', 'name']);
+
+        return view('admin.device_groups.edit', compact('deviceGroup', 'selectedAccessGroups', 'accessGroupIds'));
     }
 
     public function update(Request $request, DeviceGroup $deviceGroup): JsonResponse

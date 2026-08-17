@@ -88,11 +88,6 @@ class GroupController extends Controller
         $scopePermission = $request->user()->hasPermission('groups.edit')
             ? 'groups.edit'
             : 'groups.view';
-        $allGroups = $this->scope->scopeUserGroups(Group::query(), $request->user(), $scopePermission)
-            ->where('id', '!=', $group->id)
-            ->orderBy('name')
-            ->get();
-
         // Currently granted target group ids.
         $accessGroupIds = UserGroupAccess::query()
             ->where('group_id', $group->id)
@@ -100,7 +95,17 @@ class GroupController extends Controller
             ->map(static fn ($id): int => (int) $id)
             ->all();
 
-        return view('admin.groups.edit', compact('group', 'allGroups', 'accessGroupIds'));
+        // Only the granted groups are loaded; the picker searches the rest through
+        // admin.groups.search. Still scoped, and still excluding this group itself.
+        $selectedAccessGroups = $accessGroupIds === []
+            ? collect()
+            : $this->scope->scopeUserGroups(Group::query(), $request->user(), $scopePermission)
+                ->where('id', '!=', $group->id)
+                ->whereIn('id', $accessGroupIds)
+                ->orderBy('name')
+                ->get(['id', 'name']);
+
+        return view('admin.groups.edit', compact('group', 'selectedAccessGroups', 'accessGroupIds'));
     }
 
     public function update(Request $request, Group $group): JsonResponse

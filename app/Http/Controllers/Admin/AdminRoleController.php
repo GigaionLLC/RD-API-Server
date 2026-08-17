@@ -37,14 +37,21 @@ class AdminRoleController extends Controller
         $this->authorizeRoleMutation($request);
 
         $role = new AdminRole(['type' => AdminRole::TYPE_GLOBAL, 'perms' => [], 'scope' => []]);
-        // Scoped like every other group list. Unscoped, this named every group in the
-        // deployment to anyone who could open the role form — including a delegate who is
-        // confined to one of them.
-        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'roles.view')
-            ->orderBy('name')->get(['id', 'name']);
+        // Whatever a failed submission put back, otherwise nothing.
+        $selectedScope = array_map('intval', (array) old('scope', []));
+        // Only the groups already in scope are loaded, by id; the picker searches the rest
+        // through admin.groups.search. Scoped, too — unscoped this named every group in the
+        // deployment to anyone who could open the role form, including a delegate confined
+        // to one of them.
+        $scopeGroups = $selectedScope === []
+            ? collect()
+            : $this->scope->scopeUserGroups(Group::query(), $request->user(), 'roles.view')
+                ->whereIn('id', $selectedScope)
+                ->orderBy('name')
+                ->get(['id', 'name']);
         $canEdit = true;
 
-        return view('admin.admin_roles.create', compact('role', 'groups', 'canEdit'));
+        return view('admin.admin_roles.create', compact('role', 'scopeGroups', 'canEdit'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -62,14 +69,20 @@ class AdminRoleController extends Controller
 
     public function edit(Request $request, AdminRole $role): View
     {
-        // Scoped like every other group list. Unscoped, this named every group in the
-        // deployment to anyone who could open the role form — including a delegate who is
-        // confined to one of them.
-        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'roles.view')
-            ->orderBy('name')->get(['id', 'name']);
+        $selectedScope = array_map('intval', (array) old('scope', (array) $role->scope));
+        // Only the groups already in scope are loaded, by id; the picker searches the rest
+        // through admin.groups.search. Scoped, too — unscoped this named every group in the
+        // deployment to anyone who could open the role form, including a delegate confined
+        // to one of them.
+        $scopeGroups = $selectedScope === []
+            ? collect()
+            : $this->scope->scopeUserGroups(Group::query(), $request->user(), 'roles.view')
+                ->whereIn('id', $selectedScope)
+                ->orderBy('name')
+                ->get(['id', 'name']);
         $canEdit = (bool) $request->user()->is_admin;
 
-        return view('admin.admin_roles.edit', compact('role', 'groups', 'canEdit'));
+        return view('admin.admin_roles.edit', compact('role', 'scopeGroups', 'canEdit'));
     }
 
     public function update(Request $request, AdminRole $role): RedirectResponse
