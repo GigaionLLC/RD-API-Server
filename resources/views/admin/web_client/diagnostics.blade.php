@@ -85,6 +85,11 @@
                 that configuration without a restart, and the two would disagree in the meantime —
                 the console claiming one thing while the server did another.
             </p>
+            <p class="text-muted small mb-2">
+                The server key is <code>RUSTDESK_PUBLIC_KEY</code> — the contents of
+                <code>id_ed25519.pub</code>, never <code>id_ed25519</code>. <code>RUSTDESK_KEY</code>
+                still works and means the same thing.
+            </p>
             <p class="mb-2"><strong>Either</strong> let this container carry the WebSocket
                 (one hostname, one certificate, no reverse-proxy changes):</p>
             <pre class="mb-3"><code>RUSTDESK_WS_ID_UPSTREAM=hbbs:21118

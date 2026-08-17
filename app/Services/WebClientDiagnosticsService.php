@@ -19,6 +19,8 @@ use Illuminate\Http\Request;
  */
 class WebClientDiagnosticsService
 {
+    public function __construct(private readonly ServerKeyService $keys) {}
+
     public const OK = 'ok';
 
     public const WARN = 'warn';
@@ -123,40 +125,32 @@ class WebClientDiagnosticsService
     /** @return array<string, mixed> */
     private function serverKeyCheck(): array
     {
-        $key = $this->serverKey();
-
         // Without a key the viewer cannot verify the peer it is talking to, and a session
         // that cannot be verified is one whose password proof and keystrokes could be read
         // by whatever is in the middle. It still works; it is simply no longer private.
-        if ($key === '') {
+        if (! $this->keys->isConfigured()) {
             return $this->check('Server key', self::WARN,
                 'Not configured. Sessions cannot be verified end to end, and the viewer will not refuse an unverifiable peer.');
         }
 
-        // An Ed25519 signing key is 64 bytes of seed followed by the 32-byte public key,
-        // and RustDesk writes both to disk with confusingly similar names. Configuring the
-        // private half here is a serious mistake rather than a typo: this value is handed
-        // to every client and to the viewer, so the key that exists to prove the server's
-        // identity would be published to anyone who asks. It also does not work — hbbs
-        // compares it against its own and refuses the connection.
-        $raw = base64_decode($key, true);
-        if ($raw !== false && strlen($raw) === 64) {
+        if ($this->keys->isMalformed()) {
             return $this->check('Server key', self::FAIL,
-                'This is the server PRIVATE key (64 bytes), not the public key. It is handed to every client, '
-                .'so anyone who receives it can impersonate your ID server — and hbbs refuses connections that '
-                .'present it. Use the 32-byte public key from id_ed25519.pub: '
-                .base64_encode(substr($raw, 32)).' — and rotate the key pair, because the private half has been '
-                .'distributed.');
+                'Not a RustDesk server key. RUSTDESK_PUBLIC_KEY expects the base64 contents of id_ed25519.pub — 32 bytes.');
         }
 
-        if ($raw === false || strlen($raw) !== 32) {
+        // Still reported loudly even though nothing distributes it any more: the private
+        // key is sitting in this deployment's configuration, which means it is in whatever
+        // holds that configuration, and it should be rotated rather than merely corrected.
+        if ($this->keys->isPrivate()) {
             return $this->check('Server key', self::FAIL,
-                'Not a valid RustDesk server key. Expected 32 bytes of base64 from id_ed25519.pub; got '
-                .($raw === false ? 'something that is not base64' : strlen($raw).' bytes').'.');
+                'This is the server PRIVATE key (64 bytes), not the public one. Nothing here distributes it — the '
+                .'public half is derived and sent instead, so clients and the viewer work — but hbbs refuses a client '
+                .'that presents it, and a private key in configuration should be treated as exposed. Set '
+                .'RUSTDESK_PUBLIC_KEY to the public half ('.$this->keys->publicKey().') and rotate the pair.');
         }
 
         return $this->check('Server key', self::OK,
-            'Configured, and the right half of the pair. The viewer refuses a peer it cannot verify.');
+            'Configured, and the public half of the pair. The viewer refuses a peer it cannot verify.');
     }
 
     /** @return array<string, mixed> */
@@ -283,18 +277,6 @@ class WebClientDiagnosticsService
         $port = (int) array_pop($parts);
 
         return [implode(':', $parts), $port];
-    }
-
-    private function serverKey(): string
-    {
-        $inline = trim((string) config('rustdesk.key'));
-        if ($inline !== '') {
-            return $inline;
-        }
-
-        $path = trim((string) config('rustdesk.key_file'));
-
-        return $path !== '' && is_file($path) ? trim((string) file_get_contents($path)) : '';
     }
 
     /** @return array<string, mixed> */

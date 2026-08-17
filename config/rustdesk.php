@@ -14,9 +14,19 @@ return [
     'relay_server' => env('RUSTDESK_RELAY_SERVER', '127.0.0.1:21117'),
     'api_server' => env('RUSTDESK_API_SERVER', 'http://127.0.0.1:8080'),
 
-    // The RustDesk public key (contents of id_ed25519.pub). Either inline or a file path.
-    'key' => env('RUSTDESK_KEY', ''),
-    'key_file' => env('RUSTDESK_KEY_FILE', ''),
+    // The RustDesk PUBLIC key — the contents of `id_ed25519.pub`, not `id_ed25519`.
+    //
+    // `RUSTDESK_PUBLIC_KEY` says which half belongs here, because the two files sit beside
+    // each other with near-identical names and the wrong one is easy to grab. It is not a
+    // rename: `RUSTDESK_KEY` is the conventional spelling across the RustDesk ecosystem and
+    // keeps working indefinitely. Breaking it would fail silently — an unset key disables
+    // peer verification rather than raising anything — which is the worst way for an
+    // upgrade to go wrong.
+    //
+    // Either half is accepted and only the public one is ever used or distributed; see
+    // App\Services\ServerKeyService.
+    'key' => env('RUSTDESK_PUBLIC_KEY', env('RUSTDESK_KEY', '')),
+    'key_file' => env('RUSTDESK_PUBLIC_KEY_FILE', env('RUSTDESK_KEY_FILE', '')),
 
     /*
      * WebSocket endpoints for the browser remote-desktop viewer.

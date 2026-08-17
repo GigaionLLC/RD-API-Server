@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Strategy;
 use App\Services\AdminScopeService;
 use App\Services\ClientConfigService;
+use App\Services\ServerKeyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -153,11 +154,9 @@ class ClientConfigController extends Controller
         // The config string uses the bare host; the client supplies the standard hbbs ports.
         $strip = static fn (string $h): string => (string) preg_replace('/:(21116|21117)$/', '', trim($h));
 
-        $key = trim((string) config('rustdesk.key', ''));
-        $keyFile = trim((string) config('rustdesk.key_file', ''));
-        if ($key === '' && $keyFile !== '' && is_file($keyFile)) {
-            $key = trim((string) @file_get_contents($keyFile));
-        }
+        // Always the public half. This is the path that hands the key to every client, so
+        // it is the one place a private key must never reach — see ServerKeyService.
+        $key = app(ServerKeyService::class)->publicKey();
 
         $host = $strip((string) config('rustdesk.id_server', ''));
         $relay = $strip((string) config('rustdesk.relay_server', ''));

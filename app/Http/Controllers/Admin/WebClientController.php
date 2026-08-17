@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\AdminScopeService;
+use App\Services\ServerKeyService;
 use App\Services\WebClientDiagnosticsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,7 @@ class WebClientController extends Controller
     public function __construct(
         private readonly AdminScopeService $scope,
         private readonly WebClientDiagnosticsService $diagnostics,
+        private readonly ServerKeyService $serverKeys,
     ) {}
 
     /**
@@ -321,20 +323,13 @@ class WebClientController extends Controller
     }
 
     /**
-     * The RustDesk public key, inline or from a file. This is a public value — clients
-     * are configured with it — but it is read server-side so the viewer cannot be pointed
-     * at a different server by editing a form.
+     * The RustDesk public key. Read server-side so the viewer cannot be pointed at a
+     * different server by editing a form, and always the public half — see ServerKeyService
+     * for why a deployment configured with the private one still works and is still told.
      */
     private function serverKey(): string
     {
-        $inline = trim((string) config('rustdesk.key'));
-        if ($inline !== '') {
-            return $inline;
-        }
-
-        $path = trim((string) config('rustdesk.key_file'));
-
-        return $path !== '' && File::isFile($path) ? trim((string) File::get($path)) : '';
+        return $this->serverKeys->publicKey();
     }
 
     /**

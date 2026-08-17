@@ -4,6 +4,34 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.4.5] - 2026-08-16
+
+### Security
+
+- **This server can no longer hand out a private key, however it is configured.** It never signs
+  anything — the key exists here only to be given to clients and to the viewer, which use it to
+  *verify* — so the private half has no use and no code path wants it. It was nonetheless possible
+  to configure: an Ed25519 signing key is 64 bytes (a seed followed by the 32-byte public key) and
+  RustDesk writes the halves side by side as `id_ed25519` and `id_ed25519.pub`. Pointing
+  `RUSTDESK_KEY` or `RUSTDESK_KEY_FILE` at the first published, to every client that requested a
+  configuration, the key whose whole purpose is to prove the server's identity.
+
+  Both distribution paths — the client-config generator and the browser viewer — now go through a
+  single service that yields only the public half, deriving it when a private key is supplied. A
+  deployment that made this mistake keeps working and is told about it, rather than breaking with a
+  puzzle; `hbbs` refuses a client presenting a private key anyway, so passing it through helped
+  nobody. A value that is neither half is dropped rather than distributed, because a malformed key
+  breaks every client with an error none of them can diagnose.
+
+  **If your configuration holds the private key, rotate the pair.** It has been distributed.
+
+### Added
+
+- `RUSTDESK_PUBLIC_KEY` and `RUSTDESK_PUBLIC_KEY_FILE`, which say which half belongs there.
+  `RUSTDESK_KEY` and `RUSTDESK_KEY_FILE` are the conventional spelling across the RustDesk
+  ecosystem and keep working indefinitely — breaking them would fail silently, since an unset key
+  disables peer verification rather than raising anything.
+
 ## [1.4.4] - 2026-08-16
 
 ### Fixed
@@ -363,7 +391,8 @@ First stable release of the independent RD-API-Server application.
 See the [complete v1.0.0 release notes](docs/releases/v1.0.0.md) for installation, upgrade,
 security, and verification details.
 
-[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.4...HEAD
+[Unreleased]: https://github.com/GigaionLLC/RD-API-Server/compare/v1.4.5...HEAD
+[1.4.5]: docs/releases/v1.4.5.md
 [1.4.4]: docs/releases/v1.4.4.md
 [1.4.3]: docs/releases/v1.4.3.md
 [1.4.2]: docs/releases/v1.4.2.md

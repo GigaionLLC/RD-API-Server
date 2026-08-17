@@ -246,7 +246,8 @@ defence in depth.
 | "Viewer assets are not installed" | Run `install-assets.mjs`. |
 | Mixed-content error in the console | Console is HTTPS but `RUSTDESK_WS_*_URL` is empty, so the viewer tried `ws://`. |
 | "WebCodecs unavailable" | Not a secure context. Use HTTPS or `localhost`. |
-| Connects, then "ID does not exist" | Peer is offline, or `RUSTDESK_KEY` does not match the server's `id_ed25519.pub`. |
+| Connects, then "ID does not exist" | Peer is offline, or the server key does not match the server's `id_ed25519.pub`. |
+| "The server key configured here does not match the ID server" | `RUSTDESK_PUBLIC_KEY` is wrong — most often it holds `id_ed25519` (64 bytes, the private key) instead of `id_ed25519.pub` (32 bytes). The diagnostics page names this and prints the correct value. |
 | "Wrong Password" | The peer's own connection password, which this server does not hold. |
 | Two operators disconnect each other | Client-IP headers are being forwarded to 21118. See §6. |
 | Black screen, no error | Almost always the relay endpoint: `/ws/relay` must reach **21119**, not 21117. |
