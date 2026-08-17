@@ -3,6 +3,53 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-17 02:40] - Released v1.5.0: searchable pickers and a multi-value combobox
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `public/assets/js/app.js` (multi-value combobox), `public/assets/css/theme-dark.css` (chips, existing tokens)
+- `resources/views/admin/{admin_roles/_form,groups/edit,device_groups/edit,users/create,users/edit,users/index,web_client/remote}.blade.php`
+- `app/Http/Controllers/Admin/{WebClient,Group,AdminRole,DeviceGroup,User,Device}Controller.php`, `routes/web.php`
+- `tests/Feature/{ComboboxPickerTest,WebClientTest,ServerKeyTest}.php`
+- `CLAUDE.md` (the rule), `config/app.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.5.0.md`
+**Database/API Changes:** None. `/api/version` reports `1.5.0`. Two new admin search routes,
+`admin.remote.search` and `admin.groups.search`.
+**Summary:** Published v1.5.0 at manifest digest
+`sha256:5b853a9e93e82a7e6ef24af656384319335b1c7434f234dedc92dab64eb53d99`. An audit of all 43 selects
+under `resources/views/admin` found the device and user pickers already searchable — the exposure was
+concentrated in the group pickers, which a directory-synced deployment fills with thousands of rows.
+The combobox gained multi-value support so the three remaining multi-selects could convert, and it
+emits whichever submission shape the form already used, so no controller or validation rule changed
+and the conversion cannot silently save something different. Two defects surfaced from the audit:
+`AdminRoleController` ran `Group::orderBy('name')->get()` completely unscoped, naming every group in
+the deployment to a delegate confined to one; and every device-index load fetched every in-scope
+user and rendered none, left behind when that picker became a combobox. **Process failure worth
+recording:** the first half of this work was pushed, CI failed, and v1.5.0 was tagged on top without
+checking the run — caught only while monitoring the release. The cause was my own test, which set
+`putenv()`/`$_ENV` to exercise the RUSTDESK_KEY fallback; whether `env()` observes those depends on
+how the Env repository was built, so it passed locally and silently did not in CI. Rewritten against
+`Env::getRepository()`. Nothing had been published under the failed tag (the quality gate precedes
+the publish job; no image, no release, `latest` unmoved), so the tag was repointed rather than a
+version number burned. Verified in a browser against the published image: search, select, duplicate
+refused, chip removed, form submitted, saved row read back from the database.
+
+## [2026-08-17 01:20] - Released v1.4.6: the shipped examples name the right key
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `docker-compose.yml`, `docker-compose.dev.yml`, `examples/full-stack.docker-compose.yml`, `.env.example`, `QUICKSTART.md`
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.4.6.md`
+**Database/API Changes:** None. `/api/version` reports `1.4.6`.
+**Summary:** Documentation and examples only. 1.4.5 made it impossible for the server to hand out a
+private key; this addressed why one was configured. The shipped Compose files and `.env.example` are
+what an operator copies, and they were the last place naming `RUSTDESK_KEY` with no indication of
+which half of the pair it wants — while `.env.example` omitted the ID server, relay, API server and
+key entirely, so there was nothing to check a guess against and the two candidate files sit side by
+side with near-identical names. They now name `RUSTDESK_PUBLIC_KEY` and state the consequence of the
+wrong one. No deployment needs to change: the Compose files read the new name and fall back to
+`RUSTDESK_KEY`, verified with `docker compose config` in all four combinations. The Compose files
+also passed none of the four WebSocket settings through, so the browser remote desktop could not be
+configured from them at all; the full-stack example now wires the container-carried transport and
+comments out the 21118/21119 publications that become unnecessary.
+
 ## [2026-08-17 00:45] - Released v1.4.5: the server cannot hand out a private key
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
