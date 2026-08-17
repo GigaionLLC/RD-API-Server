@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\ServerKeyService;
+use Illuminate\Support\Env;
 use Tests\TestCase;
 
 /**
@@ -75,33 +76,39 @@ class ServerKeyTest extends TestCase
     }
 
     /**
-     * Evaluates config/rustdesk.php against a given environment, which is the only way to
-     * exercise the env fallback: config() reads values resolved at boot.
+     * Resolves `config/rustdesk.php` against a given environment.
+     *
+     * Through the Env repository rather than `putenv()`. An earlier version set `putenv()`
+     * and `$_ENV` directly, which worked locally and failed in CI: whether `env()` sees
+     * those depends on which adapters the repository was built with, and that differs
+     * between environments. This is the supported way in, and behaves the same everywhere.
      *
      * @param  array<string, string>  $env
      */
     private function keyFromEnv(array $env): string
     {
+        $repository = Env::getRepository();
+        $names = ['RUSTDESK_PUBLIC_KEY', 'RUSTDESK_KEY'];
         $previous = [];
+
+        foreach ($names as $name) {
+            $previous[$name] = $repository->get($name);
+            $repository->clear($name);
+        }
         foreach ($env as $name => $value) {
-            $previous[$name] = $_ENV[$name] ?? null;
-            $_ENV[$name] = $value;
-            putenv("{$name}={$value}");
+            $repository->set($name, $value);
         }
 
-        $resolved = (string) (require config_path('rustdesk.php'))['key'];
-
-        foreach ($previous as $name => $value) {
-            if ($value === null) {
-                unset($_ENV[$name]);
-                putenv($name);
-            } else {
-                $_ENV[$name] = $value;
-                putenv("{$name}={$value}");
+        try {
+            return (string) (require config_path('rustdesk.php'))['key'];
+        } finally {
+            foreach ($names as $name) {
+                $repository->clear($name);
+                if ($previous[$name] !== null) {
+                    $repository->set($name, $previous[$name]);
+                }
             }
         }
-
-        return $resolved;
     }
 
     public function test_the_conventional_env_name_keeps_working(): void
