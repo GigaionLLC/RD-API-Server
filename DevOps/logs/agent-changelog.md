@@ -3,6 +3,32 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-08-17 03:20] - Released v1.6.0: version on screen, redacted support report
+**Agent:** rustdesk-api (Claude Opus 5)
+**Files Modified:**
+- `app/Services/{LogRedactor,SupportReportService}.php` (new), `app/Http/Controllers/Admin/SupportController.php` (new)
+- `resources/views/admin/support/index.blade.php` (new), `resources/views/admin/partials/sidebar.blade.php`, `public/assets/css/theme-dark.css`, `routes/web.php`
+- `tests/Unit/LogRedactorTest.php` (new), `tests/Feature/SupportReportTest.php` (new)
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docs/releases/v1.6.0.md`
+**Database/API Changes:** None. `/api/version` reports `1.6.0`. Two new admin routes, `admin.support`
+and `admin.support.download`, both behind `permission:settings.view`.
+**Summary:** Published v1.6.0 at manifest digest
+`sha256:9f521a2fad39ed25176d0151751de8ec95f28a6595889313842a8ea65514d970`. The version now sits in
+the sidebar footer on every page, and a support report assembles everything a maintainer usually has
+to ask for into one paste, redacted before it can leave the machine. Design points worth keeping:
+placeholders are consistent per value (`<host-1>` twice means one host twice), because a report
+nobody can reason from is one nobody will ask for; secret-by-name values are never read in order to
+be hidden, only their presence reported; and the finished text is shown before it can be downloaded,
+because redaction is a reduction in what escapes rather than a guarantee. **Method note:** the unit
+tests were green and the output was still wrong. Generating a real report against a running container
+and reading it found two defects — a harmless `production.DEBUG:` pair whose value consumed a
+following `DB_PASSWORD=hunter2` whole, so the password shipped; and a kernel release
+(`6.6.87.2-microsoft-standard`) replaced as a valid IPv4 address, deleting the platform information
+the line carried. Both pinned. For a redactor specifically, treat a green suite as insufficient
+evidence: the failure is silent and the consequence is publishing an operator's infrastructure.
+Verified again from the published image with passwords, a key, a peer id, an email, a customer
+hostname and two addresses seeded into the log — none survived, all diagnostic content did.
+
 ## [2026-08-17 02:40] - Released v1.5.0: searchable pickers and a multi-value combobox
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**
