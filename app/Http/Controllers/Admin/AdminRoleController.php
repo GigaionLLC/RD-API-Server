@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminRole;
 use App\Models\Group;
+use App\Services\AdminScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,6 +18,8 @@ use Illuminate\View\View;
  */
 class AdminRoleController extends Controller
 {
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     public function index(Request $request): View
     {
         $roles = AdminRole::query()
@@ -34,7 +37,11 @@ class AdminRoleController extends Controller
         $this->authorizeRoleMutation($request);
 
         $role = new AdminRole(['type' => AdminRole::TYPE_GLOBAL, 'perms' => [], 'scope' => []]);
-        $groups = Group::orderBy('name')->get(['id', 'name']);
+        // Scoped like every other group list. Unscoped, this named every group in the
+        // deployment to anyone who could open the role form — including a delegate who is
+        // confined to one of them.
+        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'roles.view')
+            ->orderBy('name')->get(['id', 'name']);
         $canEdit = true;
 
         return view('admin.admin_roles.create', compact('role', 'groups', 'canEdit'));
@@ -55,7 +62,11 @@ class AdminRoleController extends Controller
 
     public function edit(Request $request, AdminRole $role): View
     {
-        $groups = Group::orderBy('name')->get(['id', 'name']);
+        // Scoped like every other group list. Unscoped, this named every group in the
+        // deployment to anyone who could open the role form — including a delegate who is
+        // confined to one of them.
+        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'roles.view')
+            ->orderBy('name')->get(['id', 'name']);
         $canEdit = (bool) $request->user()->is_admin;
 
         return view('admin.admin_roles.edit', compact('role', 'groups', 'canEdit'));

@@ -50,11 +50,15 @@
                     <option value="group">Set group</option>
                     <option value="delete">Delete</option>
                 </select>
-                <label class="visually-hidden" for="bulkGroup">User group</label>
-                <select class="rd-select rd-toolbar__control rd-hidden" name="value" id="bulkGroup" disabled>
-                    <option value="">— No group —</option>
-                    @foreach ($groups as $g)<option value="{{ $g->id }}">{{ $g->name }}</option>@endforeach
-                </select>
+                <label class="visually-hidden" for="bulkGroupSearch">User group</label>
+                {{-- Searched, not listed. See the combobox rule in CLAUDE.md. --}}
+                <div class="rd-combo rd-toolbar__control rd-hidden" id="bulkGroupCombo"
+                     data-url="{{ route('admin.groups.search') }}">
+                    <input type="hidden" name="value" id="bulkGroup" disabled>
+                    <input type="text" class="rd-input rd-combo__input" id="bulkGroupSearch"
+                           placeholder="Search group… (blank = none)" autocomplete="off">
+                    <div class="rd-combo__menu"></div>
+                </div>
                 <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-check-line" aria-hidden="true"></i> Apply</button>
                 <button type="button" class="rd-btn rd-btn--ghost" id="bulkClear">Clear</button>
             </div>
@@ -161,10 +165,13 @@
             refreshBulk();
         });
 
-        // The group select only applies to the "Set group" action.
+        // The group picker only applies to the "Set group" action. The visible control is
+        // now the combobox wrapper; the hidden input carries the value and stays disabled
+        // otherwise, so it is not submitted for the other actions.
         function syncAction() {
             var isGroup = $('#bulkAction').val() === 'group';
-            $('#bulkGroup').toggleClass('rd-hidden', !isGroup).prop('disabled', !isGroup);
+            $('#bulkGroupCombo').toggleClass('rd-hidden', !isGroup);
+            $('#bulkGroup').prop('disabled', !isGroup);
         }
         $('#bulkAction').on('change', syncAction);
         syncAction();

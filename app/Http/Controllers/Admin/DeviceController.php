@@ -37,15 +37,15 @@ class DeviceController extends Controller
             ->paginate(20)
             ->appends($request->query());
 
-        // Targets for the bulk-assign bar.
-        $users = $this->scope->scopeUsers(User::query(), $actor, 'devices.edit')
-            ->orderBy('username')->get(['id', 'username']);
+        // Targets for the bulk-assign bar. The owner picker is a searchable combobox rather
+        // than a select, so no user list is fetched here — it used to be, for every page
+        // load, and nothing rendered it.
         $deviceGroups = $this->scope->scopeDeviceGroups(DeviceGroup::query(), $actor, 'devices.edit')
             ->orderBy('name')->get(['id', 'name']);
         $strategies = $this->scope->scopeStrategies(Strategy::query(), $actor, 'devices.edit')
             ->orderBy('name')->get(['id', 'name']);
 
-        return view('admin.devices.index', compact('devices', 'q', 'status', 'users', 'deviceGroups', 'strategies'));
+        return view('admin.devices.index', compact('devices', 'q', 'status', 'deviceGroups', 'strategies'));
     }
 
     /**

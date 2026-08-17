@@ -61,20 +61,19 @@
                     <div class="col-12 col-sm-auto">
                         <button type="submit" class="btn btn-primary">Load</button>
                     </div>
-                    @if ($known->isNotEmpty())
-                        <div class="col-12 col-sm">
-                            <label for="rd-known" class="form-label mb-1">…or pick a known device</label>
-                            <select class="form-select" id="rd-known">
-                                <option value="">Select a device…</option>
-                                @foreach ($known as $item)
-                                    <option value="{{ $item->rustdesk_id }}" @selected($item->rustdesk_id === $peer)>
-                                        {{ $item->alias ?: $item->hostname ?: $item->rustdesk_id }}
-                                        · {{ $item->rustdesk_id }}{{ $item->is_online ? '' : ' · offline' }}
-                                    </option>
-                                @endforeach
-                            </select>
+                    <div class="col-12 col-sm">
+                        <label for="rd-known" class="form-label mb-1">…or search a known device</label>
+                        {{-- Searched, never listed. A fleet is thousands of devices; rendering
+                             them into a <select> builds every one into the DOM on page load and
+                             leaves the operator scrolling for a hostname they already know.
+                             See the combobox rule in CLAUDE.md. --}}
+                        <div class="rd-combo" data-url="{{ route('admin.remote.search') }}">
+                            <input type="hidden" id="rd-known-id">
+                            <input type="text" class="rd-input rd-combo__input" id="rd-known"
+                                   placeholder="Search hostname, alias or ID…" autocomplete="off">
+                            <div class="rd-combo__menu"></div>
                         </div>
-                    @endif
+                    </div>
                 </form>
 
                 @if ($peer !== '')
@@ -124,11 +123,14 @@
 (function () {
     // Picking a known device fills the ID field rather than navigating, so the operator
     // still presses Load — and then Connect — before anything reaches the other machine.
-    var picker = document.getElementById('rd-known');
+    var chosen = document.getElementById('rd-known-id');
     var field = document.getElementById('rd-peer');
-    if (!picker || !field) return;
-    picker.addEventListener('change', function () {
-        if (picker.value) { field.value = picker.value; field.focus(); }
+    if (!chosen || !field) return;
+    // The combobox writes the peer id into its hidden input. Copy it across rather than
+    // navigating: the operator still presses Load, and then Connect, before anything
+    // reaches the other machine.
+    $(chosen).on('change', function () {
+        if (chosen.value) { field.value = chosen.value; field.focus(); }
     });
 })();
 </script>

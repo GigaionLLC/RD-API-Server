@@ -8,10 +8,10 @@ use App\Models\User;
 use App\Services\AdminScopeService;
 use App\Services\ServerKeyService;
 use App\Services\WebClientDiagnosticsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\View\View;
 use RuntimeException;
@@ -81,7 +81,6 @@ class WebClientController extends Controller
             'peer' => $peer,
             'device' => $peer === '' ? null : $this->deviceFor($peer),
             'unrestricted' => $this->scope->isUnrestricted($actor, 'devices.view'),
-            'known' => $this->knownPeers($actor),
             'config' => $peer === '' ? null : $this->clientConfig(null, $actor, $peer),
             'assetsPresent' => $this->assetsPresent(),
             'needsWsUrls' => $this->needsWsUrls($this->clientConfig(null, $actor, $peer ?: 'preview')),
@@ -311,15 +310,41 @@ class WebClientController extends Controller
     /**
      * Peers this operator may reach, for the picker beside the id field.
      *
-     * @return Collection<int, Device>
+     * Searched rather than listed. A fleet is thousands of devices, and rendering them into
+     * a `<select>` builds every one into the DOM on page load — slowest for exactly the
+     * deployments with the most machines, and unsearchable for the operator, who is left
+     * scrolling for a hostname they already know.
+     *
+     * The result is capped and the query is scoped, so this is not a way to enumerate
+     * devices outside the operator's boundary either.
      */
-    private function knownPeers(User $actor): Collection
+    public function searchPeers(Request $request): JsonResponse
     {
-        return $this->scope
+        /** @var User $actor */
+        $actor = $request->user();
+        $q = trim((string) $request->query('q', ''));
+
+        $devices = $this->scope
             ->scopeDevices(Device::query(), $actor, 'devices.view')
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('rustdesk_id', 'like', "%{$q}%")
+                ->orWhere('hostname', 'like', "%{$q}%")
+                ->orWhere('alias', 'like', "%{$q}%")))
+            // Online and recently seen first: with no search term this is the "who was I
+            // just working on" list, which is what an operator opening the page wants.
+            ->orderByDesc('is_online')
             ->orderByDesc('last_online_at')
-            ->limit(200)
-            ->get(['id', 'rustdesk_id', 'alias', 'hostname', 'is_online', 'os']);
+            ->limit(20)
+            ->get(['rustdesk_id', 'alias', 'hostname', 'is_online']);
+
+        return response()->json($devices->map(fn (Device $d) => [
+            // The peer id, not the primary key: this picker chooses something to connect
+            // to, and an id typed by hand has to produce the same value.
+            'id' => $d->rustdesk_id,
+            'text' => ($d->hostname ?: $d->alias ?: $d->rustdesk_id)
+                .' ('.$d->rustdesk_id.')'
+                .($d->is_online ? '' : ' · offline'),
+        ])->all());
     }
 
     /**

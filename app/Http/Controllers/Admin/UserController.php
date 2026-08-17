@@ -70,13 +70,10 @@ class UserController extends Controller
             ->paginate(20)
             ->appends($request->query());
 
-        $groups = $this->scope->scopeUserGroups(Group::query(), $actor, 'users.edit')
-            ->orderBy('name')->get(['id', 'name']);
-
         $canEdit = $request->user()->hasPermission('users.edit');
         $canManageAdminAccess = (bool) $request->user()->is_admin;
 
-        return view('admin.users.index', compact('users', 'q', 'groups', 'canEdit', 'canManageAdminAccess'));
+        return view('admin.users.index', compact('users', 'q', 'canEdit', 'canManageAdminAccess'));
     }
 
     /**
@@ -147,11 +144,9 @@ class UserController extends Controller
     public function create(Request $request): View
     {
         $user = new User(['status' => User::STATUS_NORMAL, 'login_verify' => User::LOGIN_VERIFY_OFF]);
-        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'users.edit')
-            ->orderBy('name')->get(['id', 'name']);
         $canManageAdminAccess = (bool) $request->user()->is_admin;
 
-        return view('admin.users.create', compact('user', 'groups', 'canManageAdminAccess'));
+        return view('admin.users.create', compact('user', 'canManageAdminAccess'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -205,8 +200,6 @@ class UserController extends Controller
         $this->scope->authorizeUser($request->user(), $user, 'users.view');
         $this->authorizePrivilegedAccountManagement($request, $user);
 
-        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'users.edit')
-            ->orderBy('name')->get(['id', 'name']);
         $canEdit = $request->user()->hasPermission('users.edit');
         $canManageAdminAccess = (bool) $request->user()->is_admin;
         $adminRoles = $canManageAdminAccess
@@ -233,7 +226,6 @@ class UserController extends Controller
 
         return view('admin.users.edit', compact(
             'user',
-            'groups',
             'adminRoles',
             'assignedRoleIds',
             'federatedRoles',

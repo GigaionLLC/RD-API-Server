@@ -74,6 +74,7 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     // Before the {device} routes: 'diagnostics' would otherwise be bound as a device id.
     Route::get('/admin/web-client/diagnostics', [WebClientController::class, 'diagnostics'])->middleware('permission:settings.view')->name('admin.web-client.diagnostics');
     Route::get('/admin/remote', [WebClientController::class, 'remote'])->middleware('permission:devices.view')->name('admin.remote');
+    Route::get('/admin/remote/search', [WebClientController::class, 'searchPeers'])->middleware('permission:devices.view')->name('admin.remote.search');
     Route::get('/admin/remote/frame', [WebClientController::class, 'remoteFrame'])->middleware('permission:devices.view')->name('admin.remote.frame');
     Route::get('/admin/devices/{device}/connect', [WebClientController::class, 'show'])->middleware('permission:devices.view')->name('admin.devices.connect');
     Route::get('/admin/devices/{device}/connect/frame', [WebClientController::class, 'frame'])->middleware('permission:devices.view')->name('admin.devices.connect.frame');
@@ -93,6 +94,7 @@ Route::middleware(['auth', 'admin', 'console.audit'])->group(function () {
     Route::delete('/admin/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.edit')->name('admin.users.destroy');
 
     // Groups (user groups)
+    Route::get('/admin/groups/search', [GroupController::class, 'search'])->middleware('permission:groups.view')->name('admin.groups.search');
     Route::get('/admin/groups', [GroupController::class, 'index'])->middleware('permission:groups.view')->name('admin.groups.index');
     Route::get('/admin/groups/create', [GroupController::class, 'create'])->middleware('permission:groups.edit')->name('admin.groups.create');
     Route::post('/admin/groups', [GroupController::class, 'store'])->middleware('permission:groups.edit')->name('admin.groups.store');

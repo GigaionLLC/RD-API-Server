@@ -37,12 +37,14 @@
                     </div>
                     <div class="rd-field">
                         <label class="rd-label" for="group_id">Group</label>
-                        <select class="rd-select" id="group_id" name="group_id" @disabled(! $canEdit)>
-                            <option value="">— None —</option>
-                            @foreach ($groups as $g)
-                                <option value="{{ $g->id }}" @selected($user->group_id == $g->id)>{{ $g->name }}</option>
-                            @endforeach
-                        </select>
+                        {{-- Searched, not listed. See the combobox rule in CLAUDE.md. --}}
+                        <div class="rd-combo" data-url="{{ route('admin.groups.search') }}">
+                            <input type="hidden" name="group_id" value="{{ $user->group_id }}">
+                            <input type="text" class="rd-input rd-combo__input" id="group_id"
+                                   value="{{ $user->group?->name }}" placeholder="Search group… (blank = none)"
+                                   autocomplete="off" @disabled(! $canEdit)>
+                            <div class="rd-combo__menu"></div>
+                        </div>
                     </div>
                     @if ($canManageAdminAccess)
                     <div class="rd-field">

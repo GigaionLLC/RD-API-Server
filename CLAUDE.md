@@ -56,5 +56,16 @@ docker compose -f docker/compose.toolchain.yml --profile e2e run --rm e2e bash d
   (see the contract doc). English renames apply to PHP identifiers, not the wire protocol.
 - **MariaDB/InnoDB only:** use the dedicated Compose profiles for tests and screenshots. Existing
   SQLite installations must migrate before upgrading; see [docs/sqlite-to-mariadb.md](docs/sqlite-to-mariadb.md).
+- **Never render a database-backed list into a `<select>`.** A fleet is thousands of devices, users
+  and groups; `@foreach ($devices as ...)` builds every one of them into the DOM on page load, so
+  the page gets slower for the deployments that need it most, and an operator has to scroll a list
+  they cannot search. Use the searchable combobox instead: `.rd-combo` markup, a `search` action
+  returning `[{id, text}]` capped at 20 rows and scoped through `AdminScopeService`, and
+  `RD.bindCombobox()` binds it. It debounces, aborts superseded requests and carries the ARIA
+  roles. Pattern to copy: `DeviceController::search()` and `devices/edit.blade.php`.
+
+  **Plain `<select>` is still right for a fixed list** — statuses, enum choices, quality presets,
+  anything hard-coded in the Blade. A combobox for four options is worse. The rule is about lists
+  whose length is a function of deployment size.
 - Follow the **wrap-up protocol** in [AGENT.md](AGENT.md): log every change to
   [DevOps/logs/agent-changelog.md](DevOps/logs/agent-changelog.md).

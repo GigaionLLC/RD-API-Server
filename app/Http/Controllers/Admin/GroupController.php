@@ -35,6 +35,30 @@ class GroupController extends Controller
         return view('admin.groups.index', compact('groups', 'memberCounts'));
     }
 
+    /**
+     * Groups matching a search term, for the combobox pickers.
+     *
+     * A directory-synced deployment has as many groups as the directory does, which can be
+     * thousands — so they are searched rather than listed. Scoped and capped like every
+     * other search action: a picker must not become a way to enumerate what the operator
+     * cannot otherwise see.
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        $groups = $this->scope->scopeUserGroups(Group::query(), $request->user(), 'groups.view')
+            ->when($q !== '', fn ($query) => $query->where('name', 'like', "%{$q}%"))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name']);
+
+        return response()->json($groups->map(fn (Group $g) => [
+            'id' => $g->id,
+            'text' => $g->name,
+        ])->all());
+    }
+
     public function create(Request $request): View
     {
         $this->scope->authorizeUnrestricted($request->user(), 'groups.edit');

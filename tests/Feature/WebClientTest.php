@@ -393,6 +393,70 @@ class WebClientTest extends TestCase
     }
 
     /* ---------------------------------------------------------------- */
+    /* Peer search */
+    /* ---------------------------------------------------------------- */
+
+    public function test_peer_search_returns_ids_not_primary_keys(): void
+    {
+        // The picker chooses something to connect to, so it must produce the same value an
+        // operator would type. Returning the row id would fill the field with a number that
+        // means nothing to hbbs.
+        $admin = $this->admin();
+        $device = $this->device('345890346', $admin, 'Workstation');
+
+        $body = $this->actingAs($admin)
+            ->getJson(route('admin.remote.search', ['q' => 'Workstation']))
+            ->assertOk()
+            ->json();
+
+        $this->assertCount(1, $body);
+        $this->assertSame('345890346', $body[0]['id']);
+        $this->assertNotSame((string) $device->id, $body[0]['id']);
+        $this->assertStringContainsString('Workstation', $body[0]['text']);
+    }
+
+    public function test_peer_search_is_bounded(): void
+    {
+        // The reason this endpoint exists: a fleet is thousands of devices, and none of
+        // them belong in a page's DOM.
+        $admin = $this->admin();
+        for ($i = 0; $i < 25; $i++) {
+            $this->device('90000'.$i, $admin, "Host {$i}");
+        }
+
+        $this->assertCount(20, $this->actingAs($admin)
+            ->getJson(route('admin.remote.search'))->assertOk()->json());
+    }
+
+    public function test_peer_search_cannot_enumerate_outside_the_scope(): void
+    {
+        // A picker must not become a way to see what the device list would not show.
+        [$delegate, $inside, $outside] = $this->scopedFixture();
+
+        $ids = collect($this->actingAs($delegate)
+            ->getJson(route('admin.remote.search'))->assertOk()->json())
+            ->pluck('id')->all();
+
+        $this->assertContains($inside->rustdesk_id, $ids);
+        $this->assertNotContains($outside->rustdesk_id, $ids);
+    }
+
+    public function test_peer_search_matches_hostname_alias_and_id(): void
+    {
+        $admin = $this->admin();
+        $this->device('345890346', $admin, 'Reception PC');
+
+        foreach (['Reception', '3458903', 'reception pc'] as $term) {
+            $this->assertCount(1, $this->actingAs($admin)
+                ->getJson(route('admin.remote.search', ['q' => $term]))->assertOk()->json(),
+                "should match on: {$term}");
+        }
+
+        $this->assertCount(0, $this->actingAs($admin)
+            ->getJson(route('admin.remote.search', ['q' => 'nothing-like-this']))->assertOk()->json());
+    }
+
+    /* ---------------------------------------------------------------- */
     /* Fixtures */
     /* ---------------------------------------------------------------- */
 

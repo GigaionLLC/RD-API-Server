@@ -52,12 +52,15 @@
                 </div>
                 <div class="rd-field">
                     <label class="rd-label" for="group_id">Group</label>
-                    <select class="rd-select" id="group_id" name="group_id">
-                        <option value="">— None —</option>
-                        @foreach ($groups as $g)
-                            <option value="{{ $g->id }}" @selected(old('group_id') == $g->id)>{{ $g->name }}</option>
-                        @endforeach
-                    </select>
+                    {{-- Searched, not listed: a directory-synced deployment has as many groups
+                         as the directory. See the combobox rule in CLAUDE.md. --}}
+                    <div class="rd-combo" data-url="{{ route('admin.groups.search') }}">
+                        <input type="hidden" name="group_id" value="{{ old('group_id') }}">
+                        <input type="text" class="rd-input rd-combo__input" id="group_id"
+                               value="{{ old('group_name') }}" placeholder="Search group… (blank = none)"
+                               autocomplete="off">
+                        <div class="rd-combo__menu"></div>
+                    </div>
                 </div>
                 @if ($canManageAdminAccess)
                 <div class="rd-field">
