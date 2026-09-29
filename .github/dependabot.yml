@@ -2,6 +2,9 @@
 # published (repository setting); these weekly runs keep versions and pinned
 # image digests from drifting. Minor/patch bumps are grouped per ecosystem to
 # keep the PR count low; every PR still has to pass the full CI gate set.
+# Major versions (jQuery 4, MariaDB 13, PHPUnit 13, Node 26, ...) are
+# migrations, not maintenance: they are ignored here and planned by hand.
+# Advisories against an ignored major still raise Dependabot alerts.
 version: 2
 updates:
   - package-ecosystem: composer
@@ -11,6 +14,9 @@ updates:
     groups:
       composer-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /
@@ -19,6 +25,9 @@ updates:
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
@@ -33,8 +42,14 @@ updates:
     directories: [/docker]
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker-compose
     directories: [/, /docker, /examples]
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
