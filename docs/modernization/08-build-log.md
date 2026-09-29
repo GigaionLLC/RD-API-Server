@@ -2,6 +2,31 @@
 
 Chronological record of what was built and its verification state. Newest at top.
 
+## 2026-09-28 - v1.7.0 security hardening from the adversarial review (verified)
+
+- **Presets (F1):** `/api/sysinfo` presets apply on the first accepted upload only
+  (`devices.presets_applied_at`), fill blanks, never overwrite admin assignments, and match
+  existing strategies/device groups only (no group creation). Legitimate first-contact filing kept.
+- **Scope (F3):** strategy scope includes direct `devices.strategy_id` references; delegated deploy
+  tokens are scope-bounded on `/api/devices/cli` and `/api/devices/deploy`; redirect/proxy option
+  keys are full-admin-only (`ClientConfigService::FULL_ADMIN_ONLY_OPTION_KEYS`).
+- **OIDC (F2):** callback renders an approval page; `POST /api/oidc/confirm` (nonce + SameSite=Strict
+  cookie) issues the token. Client polling unchanged. `/api/oidc/auth` throttled; Nginx access log
+  redacts the poll/callback query strings.
+- **At rest (F5):** `auth_tokens`/`deploy_tokens` → `token_hash` (existing rows hashed in place,
+  still valid); `oauth_sessions` keyed by digest with encrypted `auth_body`; peer `password`/`hash`
+  encrypted; new deploy tokens default to a 365-day expiry.
+- **Viewer (F4):** runtime Nginx 404s the standalone `viewer.html`; standalone mode requires
+  encryption and takes no host/key from the URL; RD_CONFIG hex-escaped.
+- **Login (F6–F9):** per-account failure ceiling (before LDAP), IPv6 /64 limiter buckets,
+  post-password state messages with timing parity, console email verification, single-use TOTP.
+- **Headers (F10):** `SecurityHeaders` middleware on the web group (nosniff, referrer policy,
+  frame-ancestors 'self', HSTS on HTTPS only).
+- Verified in the toolchain (`docker compose -f docker/compose.toolchain.yml`): Pint, PHPStan,
+  full PHPUnit (`--profile test`), web-client `node --test` + `vendor.mjs --check`, Playwright E2E
+  (`--profile e2e`, `docker/e2e.sh`), and `nginx -t` plus a functional 404/log-redaction check of
+  the rendered runtime template.
+
 ## 2026-07-24 - Opt-in trusted private networks for OIDC egress (verified)
 
 - Added `App\Support\TrustedPrivateNetworks`, the parser and matcher behind

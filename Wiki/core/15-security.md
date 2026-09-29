@@ -220,9 +220,14 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Mixed-content errors, HTTP redirects from a public HTTPS origin, or cookies missing `Secure`
   indicate a broken proxy trust boundary. Confirm the proxy and configured trust mode instead of
   masking the issue with hard-coded secure asset helpers or a globally forced URL scheme.
-- Client IPs feed login and 2FA throttles, API-key IP allowlists, audit records, and last-seen
-  metadata. Any new IP-based security control must use the framework request IP and retain this
-  trusted-proxy boundary.
+- Client IPs feed login and 2FA throttles, API-key IP allowlists, the recording-upload source
+  allowlist, audit records, and last-seen metadata. Any new IP-based security control must use the
+  framework request IP and retain this trusted-proxy boundary.
+- In `*` mode, a caller that can reach the application port without passing the sanitizing proxy
+  can choose its own `X-Forwarded-For`. That turns every IP-keyed throttle into a suggestion and,
+  more importantly, satisfies the API-key and recording-upload IP allowlists, which are
+  authorization controls rather than throttles. Keep the port private or pin `TRUSTED_PROXIES` to
+  the proxy's address before relying on those allowlists.
 
 ## Login Challenge Boundary
 
@@ -235,6 +240,71 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
 - Each row has its own five-guess budget, so rotating source IPs cannot reset it. A live TOTP
   code without the password-proven challenge is insufficient; the supported one-request path
   still requires the local/LDAP password and TOTP together.
+
+## Delegated Administration Boundary
+
+- A delegated (group or individual) role only reaches devices, users and device groups inside its
+  scope (`AdminScopeService`). A strategy is in a delegate's scope only when every assignment row
+  **and every device that references it directly** (`devices.strategy_id`) is in scope.
+- A delegated admin's deploy token is bounded by the same scope on `/api/devices/cli` and
+  `/api/devices/deploy`: in-scope strategies only, existing in-scope device groups only (no group
+  creation), and no adoption of a device owned outside the scope. Full administrators' tokens keep
+  the historical behaviour.
+- Strategy options that redirect a client (`custom-rendezvous-server`, `relay-server`,
+  `api-server`, `key`) or route it through a credentialed proxy (`proxy-url`, `proxy-username`,
+  `proxy-password`) can be added, changed or removed only by unrestricted administrators, in the
+  console and the v1 API (`ClientConfigService::FULL_ADMIN_ONLY_OPTION_KEYS`).
+
+## OIDC Device Sign-in Approval
+
+- The RustDesk OIDC device flow lets anyone start a sign-in and send the provider link to someone
+  else. The callback therefore never binds an identity to a device on its own: it renders an
+  approval page (reported device name/OS, RustDesk id, requesting IP, time) and issues the bearer
+  token only after `POST /api/oidc/confirm` with the page's one-time nonce and the matching
+  HttpOnly SameSite=Strict `rd_oidc_approval` cookie. A second callback for the same session is
+  refused, so the holder of the polling code cannot mint their own approval page.
+- Pending sessions are keyed by `sha256(polling code)`; an undelivered AuthBody is encrypted with the
+  application key. `POST /api/oidc/auth` is throttled per source. The runtime access log omits the
+  query strings of `/api/oidc/auth-query` and the callback; Nginx error-log lines for failed
+  upstream connections can still contain the request line.
+
+## Credential Storage Boundary
+
+- Client bearer tokens (`auth_tokens.token_hash`), deploy tokens (`deploy_tokens.token_hash`) and
+  API keys are stored only as SHA-256 digests. The plaintext is shown once (login response, deploy
+  token creation) and can never be read back.
+- Address-book peer `password` and `hash` (password-equivalent for connecting) are encrypted with
+  the application key via the model's `encrypted` cast; the client API returns the same plaintext.
+  See the Authenticator Secret and Application-Key Boundary below — the key and the database are
+  one backup unit.
+- New deploy tokens without an explicit expiry expire after `RUSTDESK_DEPLOY_TOKEN_TTL_DAYS`
+  (default 365).
+
+## Login Throttling and Disclosure Boundary
+
+- Client and console logins are limited per account+source and per source (IPv6 bucketed per /64),
+  and by a per-account failure ceiling across all sources (`App\Support\LoginThrottle`, default 20
+  failures per 15 minutes). The ceiling is checked before any LDAP bind, so the server cannot be
+  used to exceed it against directory accounts; a successful sign-in resets it.
+- Account state (disabled, unverified, SSO-only) is disclosed only after a correct password, and an
+  unknown account name costs the same password-hash work as a known one.
+- The admin console enforces the account's login verification: TOTP accounts use the authenticator
+  challenge, and email-verification accounts receive an emailed code (bound to the browser session,
+  five-guess budget, fails closed when mail cannot be sent).
+- Accepted TOTP time steps are recorded per account (`users.two_factor_last_counter`); a code for
+  that step or an earlier one is refused, on the client and in the console.
+
+## Browser Hardening
+
+- Web (console) responses carry `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN` and
+  `Content-Security-Policy: frame-ancestors 'self'`; HSTS (`max-age=31536000`) is added only on HTTPS
+  requests (`App\Http\Middleware\SecurityHeaders`). There is no script CSP yet because console
+  views and the viewer's injected configuration use inline scripts.
+- The standalone web viewer (`/assets/webclient/src/ui/viewer.html`) is a development page and the
+  runtime Nginx returns 404 for it; operators use the authenticated Connect flow. The standalone
+  page requires an encrypted, key-verified session and never takes the server host or key from
+  the URL.
 
 ## Device Enrollment Boundary
 
@@ -249,6 +319,13 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   30 per source, 100 globally, and 5,000 total devices.
 - The framework request IP is authoritative for enrollment limits, so reverse proxies must obey
   the configured trusted-proxy boundary above.
+- Device-supplied `OPTION_PRESET_*` values on `/api/sysinfo` are an enrollment-time action only.
+  They apply on the first accepted upload (`devices.presets_applied_at`), fill blanks without ever
+  replacing an existing direct strategy, non-default device group, name or note, and match
+  strategies and device groups against existing rows only (a device can never create a group).
+  Knowing a device's `id` + `uuid` therefore does not let a local user move it into another
+  strategy (and read that strategy's options) after enrollment. Re-filing an enrolled device is
+  an administrator action (console, v1 API, or deploy-token `/api/devices/cli`).
 
 ## Audit Ingestion Boundary
 
@@ -395,6 +472,8 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   database-backed session; setup and recovery responses are private/no-store and suppress
   referrer disclosure. A database or session disclosure without the application key therefore
   does not reveal a usable seed.
+- The same key also encrypts address-book peer passwords/hashes and undelivered OIDC sign-in
+  results (since v1.7.0), so losing it also loses saved peer passwords.
 - The runtime uses an explicit `APP_KEY` when configured; otherwise it generates and persists one
   at `storage/app/.appkey`. The database and that key are one backup unit. Restoring the database
   without the matching key makes existing authenticator secrets unreadable and keyed recovery

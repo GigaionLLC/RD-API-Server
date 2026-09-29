@@ -101,7 +101,14 @@ matches; `/api/sysinfo_ver` lets it confirm the server still has the same versio
 **`/api/sysinfo_ver`** returns an opaque version string used to short‑circuit uploads.
 
 The server stores core fields and applies recognized preset keys only after the request's
-`id`/`uuid` pair matches an approved device. A mismatched, unknown, or unapproved device receives
+`id`/`uuid` pair matches an approved device. **Since v1.7.0 presets are an enrollment-time
+action:** they are honoured only on the device's first accepted sysinfo upload
+(`devices.presets_applied_at` closes the window), they only fill blanks (an existing direct
+strategy, a non-default device group, or an admin-set name/note is never overwritten), and
+`strategy_name` / `device_group_name` are matched against **existing** rows only — unknown names
+are ignored and no device group is ever created from device input. The response is unchanged
+(`SYSINFO_UPDATED`). To re-file an enrolled device, use the console or `rustdesk --assign`
+(`/api/devices/cli`, deploy-token authenticated). A mismatched, unknown, or unapproved device receives
 `ID_NOT_FOUND` and cannot change inventory, assignments, groups, or address books. Legacy
 first-seen registration requires the explicit combination
 `RUSTDESK_REQUIRE_DEPLOYMENT=false` + `RUSTDESK_AUTO_REGISTER=true`; it retains first-caller trust
@@ -133,6 +140,19 @@ match the exact device `id` and `uuid` stored when the flow began. The AuthBody 
 twice within a 15-second retry window for a dropped response; it is then erased from the pending
 session and further polls return the normal pending error, limiting token replay without changing
 the client response shape.
+
+**Approval step (server-side, since v1.7.0; invisible to the client).** The provider redirects the
+browser to `/api/oauth/callback` (alias `/api/oidc/callback`). The server resolves the account but
+issues **no token yet**: it renders an approval page showing the requesting device's reported
+name/OS, RustDesk id, the source IP of the `POST /api/oidc/auth` call and its time. Only
+`POST /api/oidc/confirm` (form fields `state`, `nonce`, `decision=approve|deny`, plus the
+`rd_oidc_approval` HttpOnly SameSite=Strict cookie set with the page) issues the token and makes the
+AuthBody available to the poll. Until then the poll keeps returning the pending error, so the stock
+client needs no change. This closes device-login consent phishing (an attacker's own `code`/`url`
+sent to a victim). The pending row is keyed by `sha256(code)` and the stored AuthBody is encrypted
+with the application key. `POST /api/oidc/auth` is throttled per source (20/min, IPv6 per /64), and
+the runtime Nginx access log records `/api/oidc/auth-query` and the callback without their query
+strings.
 
 ### 3b. AuthBody / UserPayload — the shape every login must return
 ```json
