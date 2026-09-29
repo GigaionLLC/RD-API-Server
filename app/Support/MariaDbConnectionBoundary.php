@@ -130,7 +130,7 @@ final class MariaDbConnectionBoundary
             self::rejectLiveConnection($connection);
         }
 
-        $server = is_array($server ?? null) ? $server : [];
+        $server = is_array($server) ? $server : [];
         $hasCompleteResult = array_key_exists('database_name', $server)
             && array_key_exists('server_version', $server)
             && array_key_exists('default_storage_engine', $server)
