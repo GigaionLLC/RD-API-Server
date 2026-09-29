@@ -314,7 +314,9 @@ class OidcDestinationSecurityTest extends TestCase
 
         $this->assertNotSame('', $code);
         $this->assertStringStartsWith('https://login.example.net/oauth/authorize?audience=desktop&', $url);
-        $this->assertTrue(app(OauthService::class)->handleCallback($code, 'provider-code')['ok']);
+        $result = app(OauthService::class)->handleCallback($code, 'provider-code');
+        $this->assertTrue($result['ok']);
+        $this->approveOidcSignIn($result);
         $this->assertStringContainsString(
             'access_token',
             app(OauthService::class)->pollResult($code, 'device', 'uuid')

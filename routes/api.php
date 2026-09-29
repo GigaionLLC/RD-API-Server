@@ -39,8 +39,11 @@ Route::post('/sysinfo_ver', [SystemController::class, 'sysinfoVer']);
 Route::get('/login-options', [LoginController::class, 'loginOptions']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:api-login');
 
-// OIDC / OAuth device-login flow (contract §3a). All unauthenticated.
-Route::post('/oidc/auth', [OauthController::class, 'auth']);
+// OIDC / OAuth device-login flow (contract §3a). All unauthenticated. Starting a flow performs
+// outbound provider discovery, so it is throttled per source (see AppServiceProvider).
+Route::post('/oidc/auth', [OauthController::class, 'auth'])->middleware('throttle:oidc-auth');
+// Approval step shown on the callback page before a device token is issued (not a client call).
+Route::post('/oidc/confirm', [OauthController::class, 'confirm'])->middleware('throttle:oidc-confirm');
 Route::get('/oidc/auth-query', [OauthController::class, 'authQuery']);
 Route::get('/oauth/callback', [OauthController::class, 'callback']);
 Route::get('/oidc/callback', [OauthController::class, 'callback']);

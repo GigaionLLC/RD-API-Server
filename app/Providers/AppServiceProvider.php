@@ -53,5 +53,18 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(30)->by('rd-login-ip:'.$request->ip())->response($tooMany),
             ];
         });
+
+        // Starting an OIDC device login inserts a pending row and performs outbound provider
+        // discovery. A stock client starts one flow per sign-in click.
+        RateLimiter::for('oidc-auth', fn (Request $request): Limit => Limit::perMinute(20)
+            ->by('rd-oidc-auth:'.$request->ip())
+            ->response(fn (): JsonResponse => response()->json(
+                ['error' => 'Too many sign-in attempts. Please wait a minute and try again.'],
+                429,
+            )));
+
+        // The browser approval step for an OIDC device login.
+        RateLimiter::for('oidc-confirm', fn (Request $request): Limit => Limit::perMinute(30)
+            ->by('rd-oidc-confirm:'.$request->ip()));
     }
 }

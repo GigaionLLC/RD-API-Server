@@ -9,20 +9,25 @@ use Illuminate\Support\Carbon;
 
 /**
  * A pending OIDC/OAuth device-login session (DB-backed so it is shared across API instances).
- * Keyed by the polling `code` the client echoes back; carries the issued AuthBody once resolved.
+ * Keyed by the polling `code` the client echoes back; carries the issued AuthBody once approved.
  *
  * `auth_body` is stored as a raw JSON string (NOT an array cast) so the exact bytes — including
  * an empty `{}` object — are returned verbatim to the client; the Rust client deserializes it
  * with serde, which is stricter than the array-cast round-trip would preserve.
  *
  * @property string|null $auth_body
+ * @property string|null $request_ip
+ * @property int|null $user_id
+ * @property string|null $confirm_hash
+ * @property string|null $browser_hash
+ * @property Carbon|null $resolved_at
  * @property int $delivery_count
  * @property Carbon|null $delivered_at
  * @property Carbon $expires_at
  */
 #[Fillable([
     'code', 'op', 'rustdesk_id', 'uuid', 'nonce', 'code_verifier',
-    'device_os', 'device_type', 'device_name', 'auth_body', 'delivery_count',
+    'device_os', 'device_type', 'device_name', 'request_ip', 'auth_body', 'delivery_count',
     'delivered_at', 'expires_at',
 ])]
 class OauthSession extends Model
@@ -44,6 +49,8 @@ class OauthSession extends Model
         return [
             'expires_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'resolved_at' => 'datetime',
+            'user_id' => 'integer',
             'delivery_count' => 'integer',
         ];
     }
