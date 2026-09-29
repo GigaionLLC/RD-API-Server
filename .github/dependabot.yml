@@ -1,0 +1,40 @@
+# Dependency update PRs. Security updates arrive as soon as an advisory is
+# published (repository setting); these weekly runs keep versions and pinned
+# image digests from drifting. Minor/patch bumps are grouped per ecosystem to
+# keep the PR count low; every PR still has to pass the full CI gate set.
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      composer-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Dockerfile and Compose base images are pinned by version + digest
+  - package-ecosystem: docker
+    directories: [/docker]
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker-compose
+    directories: [/, /docker, /examples]
+    schedule:
+      interval: weekly

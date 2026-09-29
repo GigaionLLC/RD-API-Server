@@ -4,6 +4,26 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.6.3] - 2026-09-28
+
+### Security
+
+- **Dependencies patched.** `league/commonmark` 2.8.2 → 2.10.3 (published advisories including
+  an `AttributesExtension` unsafe-link / event-handler filter bypass and several parser
+  denial-of-service issues), `guzzlehttp/guzzle` 7.12.1 → 7.15.5 and `guzzlehttp/psr7`
+  2.12.1 → 2.13.1 (host-check bypass via non-canonical hosts, among others), and
+  `laravel/framework` 13.16.1 → 13.33.0. `composer audit` and `npm audit` report no advisories.
+- **Base images patched.** PHP 8.5.8 → 8.5.11 (runtime and toolchain), MariaDB 11.8.8 → 11.8.9
+  (bundled Compose, examples, CI), Node.js 24.18.0 → 24.21.0 (toolchain, CI). All still pinned by
+  multi-architecture digest.
+
+### Changed
+
+- **Dependabot** now proposes weekly Composer, npm, GitHub Actions, Dockerfile and Compose updates;
+  every proposal still has to pass the full CI gate set.
+
+No API, database or UI changes.
+
 ## [1.6.2] - 2026-08-17
 
 ### Fixed

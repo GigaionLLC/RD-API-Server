@@ -5,7 +5,7 @@ Nginx/PHP-FPM candidate. It is deliberately separate from the normal development
 application stack:
 
 - each runtime/profile/trial pair starts with fresh app processes and a fresh MariaDB
-  11.8.8/InnoDB database on `tmpfs`;
+  11.8.9/InnoDB database on `tmpfs`;
 - no service publishes a host port;
 - the dataset creator refuses any schema except `rustdesk_api_performance` unless the Compose-only
   disposable-database guard is present;
