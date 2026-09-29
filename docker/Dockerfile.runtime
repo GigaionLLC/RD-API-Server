@@ -5,7 +5,7 @@
 
 # External build inputs are exact release tags plus multi-architecture digests. Update them
 # using the verification procedure in docker/README.md.
-FROM composer:2.10.2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760 AS composer
+FROM composer:2.10.3@sha256:9715c7f69044da2a212a5fbde29ee7da24e364d426560ae6367b060236f847d7 AS composer
 FROM mlocati/php-extension-installer:2.11.12@sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138 AS php_extension_installer
 
 # ---- Stage 1: shared PHP-FPM runtime ----
