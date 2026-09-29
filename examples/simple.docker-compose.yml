@@ -56,7 +56,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: mariadb:11
+    image: mariadb:13
     container_name: rustdesk-api-db
     environment:
       MARIADB_DATABASE: rustdesk_api
