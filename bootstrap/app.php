@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureCredentialVersion;
 use App\Http\Middleware\LogConsoleOperation;
 use App\Http\Middleware\RustAuth;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->authenticateSessions();
         $middleware->appendToGroup('web', EnsureCredentialVersion::class);
+        $middleware->appendToGroup('web', SecurityHeaders::class);
         // The application is hosted at the root origin. Trust only the proxy headers needed for
         // the client chain and TLS scheme; Host supplies the public host and the HTTPS scheme
         // supplies its default port. Ignoring forwarded host/port/prefix prevents URL poisoning
