@@ -110,7 +110,7 @@
             <div id="rd-viewer">
                 <iframe
                     src="{{ route('admin.remote.frame', ['peer' => $peer]) }}"
-                    allow="fullscreen; autoplay; clipboard-read; clipboard-write"
+                    allow="fullscreen; autoplay; clipboard-write"
                     allowfullscreen
                     title="Remote desktop"></iframe>
             </div>

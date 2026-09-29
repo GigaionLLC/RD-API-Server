@@ -63,6 +63,13 @@ __NGINX_WS_MAP__
             return 404;
         }
 
+        # The browser viewer is served only through the authenticated console (Connect), which
+        # reads this file from disk and injects the server-owned connection settings. The bare
+        # standalone page is a development harness and must not be reachable on this origin.
+        location = /assets/webclient/src/ui/viewer.html {
+            return 404;
+        }
+
 __NGINX_WS_LOCATIONS__
 
         location / {
