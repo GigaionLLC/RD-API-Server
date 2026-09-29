@@ -107,7 +107,7 @@ class OauthService
         OauthSession::where('expires_at', '<', now())->delete();
 
         OauthSession::create([
-            'code' => $code,
+            'code' => OauthSession::keyFor($code),
             'op' => $provider->op,
             'rustdesk_id' => $id,
             'uuid' => $uuid,
@@ -214,7 +214,7 @@ class OauthService
             return ['ok' => false, 'error' => 'Missing state'];
         }
 
-        $session = OauthSession::find($state);
+        $session = OauthSession::find(OauthSession::keyFor($state));
         if (! $session || $session->isExpired()) {
             return ['ok' => false, 'error' => 'Session expired'];
         }
@@ -318,7 +318,7 @@ class OauthService
         }
 
         return DB::transaction(function () use ($state, $nonce, $browserSecret, $approve, $failure): array {
-            $session = OauthSession::whereKey($state)->lockForUpdate()->first();
+            $session = OauthSession::whereKey(OauthSession::keyFor($state))->lockForUpdate()->first();
             if (! $session || $session->isExpired() || $session->user_id === null
                 || ! empty($session->auth_body) || (int) $session->delivery_count > 0
                 || ! is_string($session->confirm_hash) || ! is_string($session->browser_hash)
@@ -811,7 +811,7 @@ class OauthService
         }
 
         return DB::transaction(function () use ($code, $rustdeskId, $uuid): string {
-            $session = OauthSession::whereKey($code)->lockForUpdate()->first();
+            $session = OauthSession::whereKey(OauthSession::keyFor($code))->lockForUpdate()->first();
             if (! $session || $session->isExpired()) {
                 $session?->delete();
 

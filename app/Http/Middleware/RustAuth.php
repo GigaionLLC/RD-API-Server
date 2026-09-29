@@ -26,7 +26,7 @@ class RustAuth
         }
 
         /** @var AuthToken|null $authToken */
-        $authToken = AuthToken::where('token', $token)
+        $authToken = AuthToken::where('token_hash', AuthToken::hashToken($token))
             ->where('status', AuthToken::STATUS_ACTIVE)
             ->first();
 

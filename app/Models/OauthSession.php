@@ -9,11 +9,12 @@ use Illuminate\Support\Carbon;
 
 /**
  * A pending OIDC/OAuth device-login session (DB-backed so it is shared across API instances).
- * Keyed by the polling `code` the client echoes back; carries the issued AuthBody once approved.
+ * Keyed by the SHA-256 digest of the polling `code` the client echoes back (keyFor()); carries the
+ * issued AuthBody, encrypted with the application key, once approved.
  *
- * `auth_body` is stored as a raw JSON string (NOT an array cast) so the exact bytes — including
- * an empty `{}` object — are returned verbatim to the client; the Rust client deserializes it
- * with serde, which is stricter than the array-cast round-trip would preserve.
+ * `auth_body` is a raw JSON string (NOT an array cast) so the exact bytes — including an empty
+ * `{}` object — are returned verbatim to the client; the Rust client deserializes it with serde,
+ * which is stricter than the array-cast round-trip would preserve. It is encrypted at rest.
  *
  * @property string|null $auth_body
  * @property string|null $request_ip
@@ -49,10 +50,22 @@ class OauthSession extends Model
         return [
             'expires_at' => 'datetime',
             'delivered_at' => 'datetime',
+            // Exact AuthBody JSON string, encrypted at rest (the `encrypted` cast round-trips the
+            // string byte-for-byte).
+            'auth_body' => 'encrypted',
             'resolved_at' => 'datetime',
             'user_id' => 'integer',
             'delivery_count' => 'integer',
         ];
+    }
+
+    /**
+     * Primary-key value for a plaintext polling code. The code doubles as the provider `state` and
+     * is a bearer-like secret, so only its digest is stored.
+     */
+    public static function keyFor(string $code): string
+    {
+        return hash('sha256', $code);
     }
 
     public function isExpired(): bool

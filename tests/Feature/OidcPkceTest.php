@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\OauthProvider;
+use App\Models\OauthSession;
 use App\Models\User;
 use App\Models\UserThird;
 use App\Services\OauthService;
@@ -107,7 +108,8 @@ class OidcPkceTest extends TestCase
         [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
 
         // Persisted in the DB (shared across instances), not just an in-memory cache.
-        $this->assertDatabaseHas('oauth_sessions', ['code' => $code, 'op' => 'keycloak']);
+        $this->assertDatabaseHas('oauth_sessions', ['code' => OauthSession::keyFor($code), 'op' => 'keycloak']);
+        $this->assertDatabaseMissing('oauth_sessions', ['code' => $code]);
     }
 
     public function test_poll_resolves_across_separate_service_instances(): void
@@ -139,7 +141,7 @@ class OidcPkceTest extends TestCase
             app()->make(OauthService::class)->pollResult($code, 'dev', 'uuid')
         );
         $this->assertDatabaseHas('oauth_sessions', [
-            'code' => $code,
+            'code' => OauthSession::keyFor($code),
             'delivery_count' => 2,
             'auth_body' => null,
         ]);
@@ -194,7 +196,7 @@ class OidcPkceTest extends TestCase
             ->assertJsonPath('error', 'No authed oidc is found');
 
         $this->assertDatabaseHas('oauth_sessions', [
-            'code' => $code,
+            'code' => OauthSession::keyFor($code),
             'delivery_count' => 0,
         ]);
 

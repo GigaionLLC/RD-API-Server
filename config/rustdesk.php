@@ -81,6 +81,9 @@ return [
         // When true, new/ungrouped devices auto-join a default device group (promoting the
         // oldest group, or creating a "Default" one) so they never sit in "None".
         'auto_default_group' => (bool) env('RUSTDESK_AUTO_DEFAULT_GROUP', true),
+        // Lifetime of a newly created deploy token when the creator leaves "Expires at" empty
+        // (0 = never expires). Existing tokens keep the expiry they were created with.
+        'deploy_token_ttl_days' => max(0, (int) env('RUSTDESK_DEPLOY_TOKEN_TTL_DAYS', 365)),
     ],
 
     // Whether the personal (non-shared) address book API is enabled.

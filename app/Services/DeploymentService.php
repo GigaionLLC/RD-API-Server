@@ -40,7 +40,9 @@ class DeploymentService
             return null;
         }
 
-        $deployToken = DeployToken::with('user')->where('token', trim($token))->first();
+        $deployToken = DeployToken::with('user')
+            ->where('token_hash', DeployToken::hashToken(trim($token)))
+            ->first();
 
         if (! $deployToken) {
             return null;

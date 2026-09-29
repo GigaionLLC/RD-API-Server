@@ -106,7 +106,7 @@ class PasswordCredentialRevocationTest extends TestCase
         ])->assertOk();
         $this->assertSame(
             2,
-            AuthToken::where('token', $newLogin->json('access_token'))->firstOrFail()->credential_version,
+            AuthToken::where('token_hash', AuthToken::hashToken((string) $newLogin->json('access_token')))->firstOrFail()->credential_version,
         );
     }
 
