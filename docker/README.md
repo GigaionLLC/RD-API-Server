@@ -8,12 +8,12 @@ digest prevents a registry tag from silently resolving to different bytes later.
 
 | Input | Version | Multi-architecture digest |
 |---|---:|---|
-| PHP CLI | 8.5.8 Bookworm | `sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a5b0bf0105725f8987b54bee` |
-| PHP FPM | 8.5.8 Bookworm | `sha256:83c155135b9c4aa664fc6ce47020a10fe53576a0ed3468119cf2efec22fd16b9` |
-| Node.js | 24.18.0 Bookworm slim | `sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d` |
+| PHP CLI | 8.5.11 Bookworm | `sha256:d551e79d694fd91c4fdf34c4adcc52dd2042a064b881e25c319b2533ead0682c` |
+| PHP FPM | 8.5.11 Bookworm | `sha256:53eab56a8f43f51a92119f6c29b3448af98eec288ff17f92829354a4b4c9ca05` |
+| Node.js | 24.21.0 Bookworm slim | `sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6` |
 | Composer | 2.10.2 | `sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760` |
 | PHP extension installer | 2.11.12 | `sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138` |
-| MariaDB | 11.8.8 | `sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4` |
+| MariaDB | 11.8.9 | `sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68` |
 | Mailpit | 1.30.4 | `sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6` |
 | RustDesk server (full-stack example) | 1.1.15 | `sha256:10818ec05b179039c6660f4d8e74b303f0db2858bbad2b18e24992ea22d54cd6` |
 
@@ -342,7 +342,7 @@ instance completed every migration before restoring traffic or starting another 
 2. Resolve the tag's manifest-list digest (not a platform-specific child manifest):
 
    ```bash
-   docker buildx imagetools inspect node:24.18.0-bookworm-slim
+   docker buildx imagetools inspect node:24.21.0-bookworm-slim
    ```
 
    Confirm that the output includes both `linux/amd64` and `linux/arm64`, then copy the top-level
@@ -361,7 +361,7 @@ instance completed every migration before restoring traffic or starting another 
 
    ```bash
    docker run --rm -v "$PWD":/app -w /app \
-     node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d \
+     node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 \
      node -p "require('./package-lock.json').packages['node_modules/playwright'].version"
    ```
 5. Rebuild and verify from clean inputs:

@@ -3,6 +3,20 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-09-28 20:30] - v1.6.3 security maintenance: patched dependencies and base images
+**Agent:** rustdesk-api (Claude Opus 5.5)
+**Files Modified:**
+- `composer.lock`, `package-lock.json`
+- `docker/Dockerfile.runtime`, `docker/Dockerfile.toolchain`, `docker-compose.yml`, `docker-compose.dev.yml`, `docker/compose.toolchain.yml`, `docker/compose.performance.yml`, `examples/full-stack.docker-compose.yml`, `scripts/ci-runtime-smoke.sh`, `.github/workflows/ci.yml`
+- `.github/dependabot.yml` (new)
+- `config/app.php`, `tests/Feature/SmokeTest.php`, `CHANGELOG.md`, `README.md`, `docker/README.md`, `tests/Performance/README.md`, `docs/releases/v1.6.3.md`
+**Database/API Changes:** None. `/api/version` reports `1.6.3`.
+**Summary:** Quarterly audit found published advisories against shipped `league/commonmark` 2.8.2
+and `guzzlehttp/guzzle` 7.12.1 / `psr7` 2.12.1; updated those plus `laravel/framework` to 13.33.0
+(`composer update -W` on the four packages only), ran `npm audit fix` (dev-only), and moved the
+digest-pinned bases to PHP 8.5.11, MariaDB 11.8.9 and Node 24.21.0. Added Dependabot. PHPUnit (699),
+Pint and PHPStan green in the toolchain; `TRUSTED_PROXIES=*` compose default left as-is (intentional).
+
 ## [2026-08-17 21:05] - Released v1.6.2: click and cursor agree by construction
 **Agent:** rustdesk-api (Claude Opus 5)
 **Files Modified:**

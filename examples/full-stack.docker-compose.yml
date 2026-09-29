@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
     container_name: rustdesk-db
     environment:
       MARIADB_RANDOM_ROOT_PASSWORD: "yes"

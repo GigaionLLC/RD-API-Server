@@ -12,13 +12,13 @@ command, backed by MariaDB.
 > compatibility with its open‑source client. This is a **separate implementation** of the
 > client's public API, maintained independently.
 
-> ✅ **Stable release: [v1.6.2](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.6.2).**
+> ✅ **Stable release: [v1.6.3](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.6.3).**
 > **Connect** on any device opens a remote desktop in the browser — screen, sound, mouse, keyboard,
 > clipboard and chat — with no plugin, no download and no client install. Two environment values
 > stand it up on the console's own hostname and certificate, with no reverse-proxy change and no
 > extra public ports, and **System → Remote desktop** says plainly what is missing if it does not
 > connect. **Remote control** takes a RustDesk ID directly, and nothing ever connects on its own.
-> Review the **[release notes](docs/releases/v1.6.2.md)**, and **[v1.4.0](docs/releases/v1.4.0.md)**
+> Review the **[release notes](docs/releases/v1.6.3.md)**, and **[v1.4.0](docs/releases/v1.4.0.md)**
 > for what the viewer does and does not do yet.
 
 > Implements the RustDesk client API contract and adds the features the client supports that
@@ -89,7 +89,7 @@ local `.env` file with your DB password and RustDesk endpoints. `ADMIN_PASS` is 
 and a strong password is generated at first boot and shown once in the container log.
 
 For a deployment that must remain on the current stable release, set
-`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.6.2`; `latest` moves only with a
+`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.6.3`; `latest` moves only with a
 verified, annotated stable release tag.
 
 ```env
@@ -172,7 +172,7 @@ services:
     depends_on:
       db: { condition: service_healthy }
   db:
-    image: mariadb:11.8.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
+    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: rustdesk_api
@@ -274,6 +274,8 @@ architecture and conventions are in **[AGENT.md](AGENT.md)**.
 ## 📚 Documentation
 
 - **[CHANGELOG.md](CHANGELOG.md)** — public release history
+- **[v1.6.3 release notes](docs/releases/v1.6.3.md)** — security maintenance: patched
+  dependencies and base images, no behaviour change
 - **[v1.6.2 release notes](docs/releases/v1.6.2.md)** — a visible pointer, a cancellable
   connection, and the two WebSocket variable pairs explained
 - **[v1.6.0 release notes](docs/releases/v1.6.0.md)** — the version in the console, and a redacted
