@@ -96,6 +96,15 @@ return [
     // Bearer token lifetime for the client API (account login tokens).
     'token_ttl_days' => (int) env('RUSTDESK_TOKEN_TTL_DAYS', 90),
 
+    // Brute-force ceiling per account name, across all source addresses, shared by the client
+    // login and the admin console login (App\Support\LoginThrottle). Failed first-factor attempts
+    // beyond the limit within the window are refused before any password or LDAP check.
+    // 0 disables the per-account ceiling (the per-address limits still apply).
+    'login' => [
+        'account_max_failures' => (int) env('RUSTDESK_LOGIN_ACCOUNT_MAX_FAILURES', 20),
+        'account_decay_minutes' => (int) env('RUSTDESK_LOGIN_ACCOUNT_DECAY_MINUTES', 15),
+    ],
+
     // Prometheus /metrics endpoint. Empty = disabled (404). When set, scrapers must send
     // `Authorization: Bearer <token>`.
     'metrics_token' => env('RUSTDESK_METRICS_TOKEN', ''),

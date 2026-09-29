@@ -11,6 +11,7 @@ use App\Services\OauthService;
 use App\Services\SsoRoleSyncService;
 use App\Services\TwoFactorService;
 use App\Support\AccountPasswordPolicy;
+use App\Support\LoginThrottle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -23,6 +24,9 @@ use Illuminate\Support\Str;
  */
 class LoginController extends Controller
 {
+    /** Argon2id/bcrypt hash of a random value, checked when no account matches (timing parity). */
+    private static ?string $dummyHash = null;
+
     public function __construct(
         private readonly TwoFactorService $twoFactor,
         private readonly OauthService $oauth,
@@ -82,6 +86,15 @@ class LoginController extends Controller
             return response()->json(['error' => 'Invalid username or password']);
         }
 
+        // Per-account ceiling across all source addresses, checked before any LDAP bind so this
+        // endpoint cannot be used to lock directory accounts faster than the ceiling allows.
+        if ($type !== 'email_code' && LoginThrottle::accountLocked($username)) {
+            return response()->json(
+                ['error' => 'Too many login attempts. Please wait a few minutes and try again.'],
+                429,
+            );
+        }
+
         // LDAP first-factor: on a credentials submission (not the email_code second step),
         // resolve the authenticated provider/subject link before any local lookup. The exact
         // linked user is authoritative; the submitted username must never select a local account.
@@ -104,33 +117,16 @@ class LoginController extends Controller
                 ->first();
         }
 
-        if (! $user) {
-            return response()->json(['error' => 'Invalid username or password']);
-        }
-
-        // Reject non-active accounts with a status-specific message before any token issuance.
-        if ($user->status === User::STATUS_DISABLED) {
-            return response()->json(['error' => 'Account disabled']);
-        }
-        if ($user->status === User::STATUS_UNVERIFIED) {
-            return response()->json(['error' => 'Account not verified']);
-        }
-        if (! $user->isActive()) {
-            return response()->json(['error' => 'This account is disabled']);
-        }
-
-        // SSO-only accounts may not authenticate with a local password. The LDAP path (which
-        // sets $ldapAuthenticated) and the OIDC flow are unaffected — only block the local
-        // password submission (a credentials first-factor that did not pass LDAP).
-        if ($user->force_sso && ! $ldapAuthenticated && $type !== 'email_code') {
-            return response()->json(['error' => 'This account must sign in via SSO']);
-        }
-
         $rustdeskId = (string) $request->input('id', '');
         $uuid = (string) $request->input('uuid', '');
 
         // --- Second-factor submission ---------------------------------------------------
         if ($type === 'email_code') {
+            // No account state is revealed here: this request carries no password.
+            if (! $user || ! $user->isActive()) {
+                return response()->json(['error' => 'Wrong or expired verification code']);
+            }
+
             $verificationCode = (string) ($request->input('verificationCode') ?? $request->input('code') ?? '');
             $secret = (string) $request->input('secret', '');
 
@@ -167,15 +163,44 @@ class LoginController extends Controller
         }
 
         // First-factor: verify the password. LDAP-verified logins skip the local hash check
-        // (LDAP users authenticate against the directory, not the local password).
+        // (LDAP users authenticate against the directory, not the local password). A missing
+        // account still pays for one hash check, so response time does not reveal whether the
+        // name exists, and account state is only disclosed after a correct password.
         if (! $ldapAuthenticated) {
-            if ($password === '' || ! Hash::check($password, $user->password)) {
-                return response()->json(['error' => 'Invalid username or password']);
-            }
+            $storedHash = $user !== null ? (string) $user->password : self::dummyHash();
+            $passwordValid = $password !== '' && Hash::check($password, $storedHash);
 
-            if (! $this->passwordHashes->upgradeIfNeeded($user, $password)) {
+            if ($user === null || ! $passwordValid || ! $this->passwordHashes->upgradeIfNeeded($user, $password)) {
+                LoginThrottle::recordAccountFailure($username);
+
                 return response()->json(['error' => 'Invalid username or password']);
             }
+        }
+
+        if (! $user) {
+            LoginThrottle::recordAccountFailure($username);
+
+            return response()->json(['error' => 'Invalid username or password']);
+        }
+
+        LoginThrottle::clearAccount($username);
+
+        // Reject non-active accounts with a status-specific message before any token issuance.
+        if ($user->status === User::STATUS_DISABLED) {
+            return response()->json(['error' => 'Account disabled']);
+        }
+        if ($user->status === User::STATUS_UNVERIFIED) {
+            return response()->json(['error' => 'Account not verified']);
+        }
+        if (! $user->isActive()) {
+            return response()->json(['error' => 'This account is disabled']);
+        }
+
+        // SSO-only accounts may not authenticate with a local password. The LDAP path (which
+        // sets $ldapAuthenticated) and the OIDC flow are unaffected — only block the local
+        // password submission (a credentials first-factor that did not pass LDAP).
+        if ($user->force_sso && ! $ldapAuthenticated) {
+            return response()->json(['error' => 'This account must sign in via SSO']);
         }
 
         // TOTP submitted alongside credentials (client may send tfaCode immediately).
@@ -187,6 +212,10 @@ class LoginController extends Controller
             // together. The stock Flutter client instead uses the bound second step below.
             if ($tfaCode !== '') {
                 if (! $this->twoFactor->verifyTotp($user, $tfaCode)) {
+                    // Counts toward the per-account ceiling, so a leaked password does not allow
+                    // unlimited distributed guessing of the second factor on this path.
+                    LoginThrottle::recordAccountFailure($username);
+
                     return response()->json(['error' => 'Wrong 2FA code']);
                 }
 
@@ -240,6 +269,11 @@ class LoginController extends Controller
 
         // No second factor required.
         return response()->json($this->authBody($user, $request));
+    }
+
+    private static function dummyHash(): string
+    {
+        return self::$dummyHash ??= Hash::make(Str::random(40));
     }
 
     /**

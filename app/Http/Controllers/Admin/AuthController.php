@@ -11,10 +11,12 @@ use App\Services\OauthService;
 use App\Services\SsoRoleSyncService;
 use App\Support\AccountPasswordPolicy;
 use App\Support\InitialAdminPassword;
+use App\Support\LoginThrottle;
 use App\Support\ProtectedAdministrator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -26,6 +28,9 @@ use Illuminate\View\View;
  */
 class AuthController extends Controller
 {
+    /** Hash of a random value, checked for unknown names so login timing does not reveal them. */
+    private static ?string $dummyHash = null;
+
     public function __construct(
         private readonly LdapService $ldap,
         private readonly OauthService $oauth,
@@ -159,10 +164,19 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'max:'.AccountPasswordPolicy::MAX_LENGTH],
         ]);
 
-        // Brute-force protection: 5 failed attempts per account+IP per minute, then locked out.
-        $throttleKey = 'admin-login:'.Str::lower($credentials['username']).'|'.$request->ip();
+        // Brute-force protection: 5 failed attempts per account+source per minute (IPv6 callers
+        // bucketed per /64), plus a per-account ceiling across all sources that is checked before
+        // any LDAP bind (App\Support\LoginThrottle).
+        $throttleKey = 'admin-login:'.Str::lower($credentials['username']).'|'.LoginThrottle::ipBucket($request->ip());
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+
+            return back()
+                ->withInput($request->only('username'))
+                ->withErrors(['username' => "Too many login attempts. Try again in {$seconds} seconds."]);
+        }
+        if (LoginThrottle::accountLocked($credentials['username'])) {
+            $seconds = LoginThrottle::accountAvailableIn($credentials['username']);
 
             return back()
                 ->withInput($request->only('username'))
@@ -187,24 +201,14 @@ class AuthController extends Controller
             }
         }
 
-        // SSO-only accounts may not authenticate with the local password (LDAP, which sets
-        // $authenticated above, is still allowed). Block the local-credentials attempt only.
-        if (! $authenticated) {
-            /** @var User|null $candidate */
-            $candidate = User::where('username', $credentials['username'])
-                ->orWhere('email', $credentials['username'])
-                ->first();
-
-            if ($candidate && $candidate->force_sso) {
-                return back()
-                    ->withInput($request->only('username'))
-                    ->withErrors(['username' => 'This account must sign in via SSO.']);
-            }
-        }
-
         if (! $authenticated) {
             if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+                // Unknown names pay for one hash check too, so timing does not reveal them.
+                if (! User::where('username', $credentials['username'])->exists()) {
+                    Hash::check($credentials['password'], self::dummyHash());
+                }
                 RateLimiter::hit($throttleKey);
+                LoginThrottle::recordAccountFailure($credentials['username']);
 
                 return back()
                     ->withInput($request->only('username'))
@@ -216,15 +220,30 @@ class AuthController extends Controller
             if (! $this->passwordHashes->upgradeIfNeeded($localUser, $credentials['password'])) {
                 Auth::logout();
                 RateLimiter::hit($throttleKey);
+                LoginThrottle::recordAccountFailure($credentials['username']);
 
                 return back()
                     ->withInput($request->only('username'))
                     ->withErrors(['username' => 'Invalid username or password.']);
             }
+
+            // SSO-only accounts may not authenticate with the local password (LDAP, which sets
+            // $authenticated above, is still allowed). Checked only after a correct password so
+            // the message cannot be used to discover which accounts exist or are SSO-only.
+            if ($localUser->force_sso) {
+                Auth::logout();
+                RateLimiter::clear($throttleKey);
+                LoginThrottle::clearAccount($credentials['username']);
+
+                return back()
+                    ->withInput($request->only('username'))
+                    ->withErrors(['username' => 'This account must sign in via SSO.']);
+            }
         }
 
-        // Credentials accepted — clear the failure counter for this account+IP.
+        // Credentials accepted — clear the failure counters for this account.
         RateLimiter::clear($throttleKey);
+        LoginThrottle::clearAccount($credentials['username']);
 
         /** @var User $user */
         $user = Auth::user();
@@ -270,6 +289,11 @@ class AuthController extends Controller
         $this->retireInitialPasswordFile($user);
 
         return redirect()->intended(route('admin.dashboard'));
+    }
+
+    private static function dummyHash(): string
+    {
+        return self::$dummyHash ??= Hash::make(Str::random(40));
     }
 
     public function logout(Request $request): RedirectResponse
