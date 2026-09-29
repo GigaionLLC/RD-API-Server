@@ -129,32 +129,34 @@ class SystemController extends Controller
         }
 
         $device->fill([
-            'cpu' => (string) $request->input('cpu', $device->cpu),
-            'hostname' => (string) $request->input('hostname', $device->hostname),
-            'memory' => (string) $request->input('memory', $device->memory),
-            'os' => (string) $request->input('os', $device->os),
-            'username' => (string) $request->input('username', $device->username),
-            'version' => (string) $request->input('version', $device->version),
+            'cpu' => $this->inventoryString($request, 'cpu', $device->cpu),
+            'hostname' => $this->inventoryString($request, 'hostname', $device->hostname),
+            'memory' => $this->inventoryString($request, 'memory', $device->memory),
+            'os' => $this->inventoryString($request, 'os', $device->os),
+            'username' => $this->inventoryString($request, 'username', $device->username),
+            'version' => $this->inventoryString($request, 'version', $device->version),
         ]);
 
-        // Preset overrides for displayed identity.
-        if ($v = $request->input('device_username')) {
-            $device->device_username = $v;
-        }
-        if ($v = $request->input('device_name')) {
-            $device->device_name = $v;
-        }
-        if ($v = $request->input('note')) {
-            $device->note = $v;
+        // Device-supplied presets are honoured only inside the enrollment window: the first
+        // accepted sysinfo upload after the device was registered/approved. Later uploads (or a
+        // hand-crafted request from anyone who can read this machine's id + uuid) can no longer
+        // move the device between strategies, groups or address books.
+        $enrollmentWindow = $device->presets_applied_at === null;
+
+        if ($enrollmentWindow) {
+            $this->applyPresets($device, $request);
+            $device->presets_applied_at = now();
         }
 
-        // Default group for new / ungrouped devices (a device_group_name preset, applied in
-        // applyPresets() below, still takes precedence over this).
+        // Default group for new / ungrouped devices (a device_group_name preset, applied above,
+        // takes precedence over this).
         $device->device_group_id ??= DeviceGroup::defaultId();
 
         $device->save();
 
-        $this->applyPresets($device, $request);
+        if ($enrollmentWindow) {
+            $this->applyAddressBookPreset($device, $request);
+        }
 
         return response('SYSINFO_UPDATED')->header('Content-Type', 'text/plain');
     }
@@ -170,49 +172,93 @@ class SystemController extends Controller
     /**
      * Auto-registration from OPTION_PRESET_* keys (custom client / --assign).
      * docs/modernization/02-client-api-contract.md §2.
+     *
+     * Presets only fill blanks: an assignment an administrator (or an authenticated
+     * `/api/devices/cli` deployment) already made is never overwritten. Strategies and device
+     * groups are matched by exact name against existing rows; unknown names are ignored, so a
+     * device can never create groups.
      */
     private function applyPresets(Device $device, Request $request): void
     {
-        $dirty = false;
-
-        // Assign to a named strategy.
-        if ($name = $request->input('strategy_name')) {
-            $strategy = Strategy::where('name', $name)->first();
-            if ($strategy) {
-                $device->strategy_id = $strategy->id;
-                $dirty = true;
+        // Displayed identity overrides.
+        foreach (['device_username', 'device_name', 'note'] as $field) {
+            $value = $this->presetString($request, $field);
+            if ($value !== null && (string) $device->{$field} === '') {
+                $device->{$field} = $value;
             }
         }
 
-        // Assign to a (possibly new) device group.
-        if ($name = $request->input('device_group_name')) {
-            $group = DeviceGroup::firstOrCreate(['name' => $name]);
-            $device->device_group_id = $group->id;
-            $dirty = true;
+        // Assign to a named strategy (only when none is assigned directly yet).
+        $strategyName = $this->presetString($request, 'strategy_name');
+        if ($strategyName !== null && $device->strategy_id === null) {
+            $strategyId = Strategy::where('name', $strategyName)->value('id');
+            if ($strategyId !== null) {
+                $device->strategy_id = (int) $strategyId;
+            }
         }
 
-        if ($dirty) {
-            $device->save();
+        // Join an existing device group, unless an explicit (non-default) group is already set.
+        $groupName = $this->presetString($request, 'device_group_name');
+        if ($groupName !== null
+            && ($device->device_group_id === null || (int) $device->device_group_id === DeviceGroup::defaultId())) {
+            $groupId = DeviceGroup::where('name', $groupName)->value('id');
+            if ($groupId !== null) {
+                $device->device_group_id = (int) $groupId;
+            }
+        }
+    }
+
+    /**
+     * Auto-file the device into its owner's address book (enrollment window only).
+     */
+    private function applyAddressBookPreset(Device $device, Request $request): void
+    {
+        $abName = $this->presetString($request, 'address_book_name');
+        if ($abName === null) {
+            return;
         }
 
-        // Auto-file the device into a (shared) address book.
-        if ($abName = $request->input('address_book_name')) {
-            $book = AddressBook::firstOrCreate(['name' => $abName, 'user_id' => $device->user_id]);
+        $book = AddressBook::firstOrCreate(['name' => $abName, 'user_id' => $device->user_id]);
 
-            $tag = $request->input('address_book_tag');
-            AddressBookPeer::updateOrCreate(
-                ['address_book_id' => $book->id, 'rustdesk_id' => $device->rustdesk_id],
-                array_filter([
-                    'user_id' => $device->user_id,
-                    'hostname' => $device->hostname,
-                    'platform' => $device->os,
-                    'alias' => $request->input('address_book_alias'),
-                    'password' => $request->input('address_book_password'),
-                    'note' => $request->input('address_book_note'),
-                    'tags' => $tag ? [$tag] : null,
-                ], static fn ($v) => $v !== null)
-            );
+        $tag = $this->presetString($request, 'address_book_tag');
+        AddressBookPeer::updateOrCreate(
+            ['address_book_id' => $book->id, 'rustdesk_id' => $device->rustdesk_id],
+            array_filter([
+                'user_id' => $device->user_id,
+                'hostname' => $device->hostname,
+                'platform' => $device->os,
+                'alias' => $this->presetString($request, 'address_book_alias'),
+                'password' => $this->presetString($request, 'address_book_password'),
+                'note' => $this->presetString($request, 'address_book_note'),
+                'tags' => $tag !== null ? [$tag] : null,
+            ], static fn ($v) => $v !== null)
+        );
+    }
+
+    /**
+     * A preset value as a bounded, non-empty string; anything else (arrays, objects, blanks,
+     * oversized values) is treated as absent.
+     */
+    private function presetString(Request $request, string $key): ?string
+    {
+        $value = $request->input($key);
+        if (! is_scalar($value)) {
+            return null;
         }
+
+        $value = trim((string) $value);
+
+        return $value === '' || mb_strlen($value) > 255 ? null : $value;
+    }
+
+    /**
+     * A client-reported inventory value; a non-scalar value keeps the stored one.
+     */
+    private function inventoryString(Request $request, string $key, mixed $current): string
+    {
+        $value = $request->input($key, $current);
+
+        return is_scalar($value) ? (string) $value : (string) $current;
     }
 
     private function identityMatches(Device $device, string $uuid): bool
