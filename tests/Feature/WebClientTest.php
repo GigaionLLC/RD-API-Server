@@ -71,6 +71,25 @@ class WebClientTest extends TestCase
 
     private bool $stubbedAssets = false;
 
+    public function test_a_device_reported_hostname_cannot_break_out_of_the_injected_config(): void
+    {
+        $admin = $this->admin();
+        $hostname = '<!--<script></script>"&\'';
+        $device = $this->device('345890347', $admin, $hostname);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.devices.connect.frame', $device))
+            ->assertOk()
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        preg_match('/window\.RD_CONFIG=(\{.*?\});<\/script>/s', (string) $response->getContent(), $matches);
+        $this->assertArrayHasKey(1, $matches);
+        $this->assertStringNotContainsString('<', $matches[1]);
+        $this->assertStringNotContainsString('>', $matches[1]);
+        $injected = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($hostname, $injected['peerLabel']);
+    }
+
     /* ---------------------------------------------------------------- */
     /* Authorization */
     /* ---------------------------------------------------------------- */

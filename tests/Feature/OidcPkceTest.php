@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\OauthProvider;
+use App\Models\OauthSession;
 use App\Models\User;
 use App\Models\UserThird;
 use App\Services\OauthService;
@@ -84,6 +85,7 @@ class OidcPkceTest extends TestCase
         // Provider redirects back: server exchanges the code (state == polling code).
         $result = $oauth->handleCallback($code, 'auth-code-xyz');
         $this->assertTrue($result['ok'], $result['error']);
+        $this->approveOidcSignIn($result);
 
         // The token request must include the PKCE verifier.
         Http::assertSent(function ($req) {
@@ -106,7 +108,8 @@ class OidcPkceTest extends TestCase
         [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
 
         // Persisted in the DB (shared across instances), not just an in-memory cache.
-        $this->assertDatabaseHas('oauth_sessions', ['code' => $code, 'op' => 'keycloak']);
+        $this->assertDatabaseHas('oauth_sessions', ['code' => OauthSession::keyFor($code), 'op' => 'keycloak']);
+        $this->assertDatabaseMissing('oauth_sessions', ['code' => $code]);
     }
 
     public function test_poll_resolves_across_separate_service_instances(): void
@@ -120,7 +123,9 @@ class OidcPkceTest extends TestCase
         [$code] = app(OauthService::class)->beginAuth('keycloak', 'dev', 'uuid', []);
 
         // Callback handled by one instance...
-        $this->assertTrue(app()->make(OauthService::class)->handleCallback($code, 'auth-code')['ok']);
+        $result = app()->make(OauthService::class)->handleCallback($code, 'auth-code');
+        $this->assertTrue($result['ok']);
+        $this->approveOidcSignIn($result);
 
         // ...client poll handled by a freshly-resolved instance.
         $body = app()->make(OauthService::class)->pollResult($code, 'dev', 'uuid');
@@ -136,7 +141,7 @@ class OidcPkceTest extends TestCase
             app()->make(OauthService::class)->pollResult($code, 'dev', 'uuid')
         );
         $this->assertDatabaseHas('oauth_sessions', [
-            'code' => $code,
+            'code' => OauthSession::keyFor($code),
             'delivery_count' => 2,
             'auth_body' => null,
         ]);
@@ -149,7 +154,7 @@ class OidcPkceTest extends TestCase
         $oauth = app(OauthService::class);
 
         [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
-        $oauth->handleCallback($code, 'auth-code');
+        $this->approveOidcSignIn($oauth->handleCallback($code, 'auth-code'));
 
         $res = $this->getJson("/api/oidc/auth-query?code={$code}&id=dev&uuid=uuid")->assertOk();
 
@@ -182,14 +187,16 @@ class OidcPkceTest extends TestCase
         $oauth = app(OauthService::class);
 
         [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
-        $this->assertTrue($oauth->handleCallback($code, 'auth-code')['ok']);
+        $result = $oauth->handleCallback($code, 'auth-code');
+        $this->assertTrue($result['ok']);
+        $this->approveOidcSignIn($result);
 
         $this->getJson("/api/oidc/auth-query?code={$code}&id=attacker&uuid=wrong")
             ->assertOk()
             ->assertJsonPath('error', 'No authed oidc is found');
 
         $this->assertDatabaseHas('oauth_sessions', [
-            'code' => $code,
+            'code' => OauthSession::keyFor($code),
             'delivery_count' => 0,
         ]);
 
@@ -222,7 +229,9 @@ class OidcPkceTest extends TestCase
         $oauth = app(OauthService::class);
 
         [$code] = $oauth->beginAuth('keycloak', 'dev', 'uuid', []);
-        $this->assertTrue($oauth->handleCallback($code, 'code')['ok']);
+        $result = $oauth->handleCallback($code, 'code');
+        $this->assertTrue($result['ok']);
+        $this->approveOidcSignIn($result);
         $this->assertStringContainsString('access_token', $oauth->pollResult($code, 'dev', 'uuid'));
 
         $this->assertDatabaseHas('user_thirds', ['op' => 'keycloak', 'open_id' => 'kc-1']);

@@ -38,7 +38,7 @@ class AdminRecoveryCommandTest extends TestCase
         $this->assertGreaterThan((int) $user->credential_version, (int) $fresh?->credential_version);
         $this->assertSame(
             AuthToken::STATUS_REVOKED,
-            AuthToken::where('token', 'stale-token')->value('status')
+            AuthToken::where('token_hash', AuthToken::hashToken('stale-token'))->value('status')
         );
     }
 

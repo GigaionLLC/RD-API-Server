@@ -26,6 +26,11 @@ class DeploymentService
 
     public const RESULT_ID_TAKEN = 'ID_TAKEN';
 
+    /** Permission a deploy token's owner must hold; its admin scope bounds what the token may do. */
+    private const PERMISSION = 'deploy.edit';
+
+    public function __construct(private readonly AdminScopeService $scope) {}
+
     /**
      * Resolve a deploy token string to a non-expired DeployToken, or null.
      */
@@ -35,7 +40,9 @@ class DeploymentService
             return null;
         }
 
-        $deployToken = DeployToken::with('user')->where('token', trim($token))->first();
+        $deployToken = DeployToken::with('user')
+            ->where('token_hash', DeployToken::hashToken(trim($token)))
+            ->first();
 
         if (! $deployToken) {
             return null;
@@ -47,7 +54,7 @@ class DeploymentService
 
         // A long-lived token must not outlive the account or permission that authorized it.
         $owner = $deployToken->user;
-        if (! $owner || ! $owner->isActive() || ! $owner->hasPermission('deploy.edit')) {
+        if (! $owner || ! $owner->isActive() || ! $owner->hasPermission(self::PERMISSION)) {
             return null;
         }
 
@@ -80,6 +87,11 @@ class DeploymentService
         // Existing identifiers can only be touched by the device that originally established
         // them. A blank legacy UUID has no identity proof and therefore fails closed.
         if ($existing && ((string) $existing->uuid === '' || ! hash_equals((string) $existing->uuid, $uuid))) {
+            return self::RESULT_ID_TAKEN;
+        }
+
+        // A delegated owner's token cannot adopt a device owned outside their admin scope.
+        if ($existing && ! $this->mayAdopt($token, $existing)) {
             return self::RESULT_ID_TAKEN;
         }
 
@@ -129,15 +141,20 @@ class DeploymentService
             return 'This id is already taken by another device.';
         }
 
+        $tokenOwner = $token->user;
+        if ($existing && ! $this->mayAdopt($token, $existing)) {
+            return "This device is outside the deployment token owner's administrative scope.";
+        }
+
         // Owner: an explicit --user_name wins, otherwise the token's owner.
         $ownerId = $token->user_id;
-        if (! empty($input['user_name'])) {
-            $user = User::where('username', $input['user_name'])->first();
+        $userName = $this->inputString($input, 'user_name');
+        if ($userName !== null) {
+            $user = User::where('username', $userName)->first();
             if (! $user || ! $user->isActive()) {
-                return 'Unknown user: '.$input['user_name'];
+                return 'Unknown user: '.$userName;
             }
 
-            $tokenOwner = $token->user;
             if ($user->id !== $token->user_id && ! $tokenOwner->is_admin) {
                 return 'Only a full administrator can assign a device to another user.';
             }
@@ -152,46 +169,67 @@ class DeploymentService
             'approved' => true,
         ]);
 
-        if (! empty($input['strategy_name'])) {
-            $strategy = Strategy::where('name', $input['strategy_name'])->first();
+        $strategyName = $this->inputString($input, 'strategy_name');
+        if ($strategyName !== null) {
+            $strategy = Strategy::where('name', $strategyName)->first();
             if (! $strategy) {
-                return 'Unknown strategy: '.$input['strategy_name'];
+                return 'Unknown strategy: '.$strategyName;
             }
+
+            $allowed = $this->scope->strategyIds($tokenOwner, self::PERMISSION);
+            if ($allowed !== null && ! in_array((int) $strategy->id, $allowed, true)) {
+                return 'Strategy '.$strategyName." is outside the deployment token owner's administrative scope.";
+            }
+
             $device->strategy_id = $strategy->id;
         }
 
-        if (! empty($input['device_group_name'])) {
-            $device->device_group_id = DeviceGroup::firstOrCreate(['name' => (string) $input['device_group_name']])->id;
+        $groupName = $this->inputString($input, 'device_group_name');
+        if ($groupName !== null) {
+            $allowedGroups = $this->scope->deviceGroupIds($tokenOwner, self::PERMISSION);
+            if ($allowedGroups === null) {
+                // Unrestricted owners may still create a group on first use, as before.
+                $device->device_group_id = DeviceGroup::firstOrCreate(['name' => $groupName])->id;
+            } else {
+                $groupId = DeviceGroup::where('name', $groupName)->value('id');
+                if ($groupId === null || ! in_array((int) $groupId, $allowedGroups, true)) {
+                    return 'Device group '.$groupName." is unknown or outside the deployment token owner's administrative scope.";
+                }
+                $device->device_group_id = (int) $groupId;
+            }
         }
 
         // Fall back to the default group when no explicit group was named.
         $device->device_group_id ??= DeviceGroup::defaultId();
 
         foreach (['device_username', 'device_name', 'note'] as $field) {
-            if (! empty($input[$field])) {
-                $device->{$field} = (string) $input[$field];
+            $value = $this->inputString($input, $field);
+            if ($value !== null) {
+                $device->{$field} = $value;
             }
         }
 
         $device->save();
 
         // File the device into a (possibly new) address book owned by the resolved user.
-        if (! empty($input['address_book_name'])) {
+        $bookName = $this->inputString($input, 'address_book_name');
+        if ($bookName !== null) {
             $book = AddressBook::firstOrCreate([
-                'name' => (string) $input['address_book_name'],
+                'name' => $bookName,
                 'user_id' => $ownerId,
             ]);
 
+            $tag = $this->inputString($input, 'address_book_tag');
             AddressBookPeer::updateOrCreate(
                 ['address_book_id' => $book->id, 'rustdesk_id' => $id],
                 array_filter([
                     'user_id' => $ownerId,
                     'hostname' => $device->hostname,
                     'platform' => $device->os,
-                    'alias' => $input['address_book_alias'] ?? null,
-                    'password' => $input['address_book_password'] ?? null,
-                    'note' => $input['address_book_note'] ?? null,
-                    'tags' => ! empty($input['address_book_tag']) ? [$input['address_book_tag']] : null,
+                    'alias' => $this->inputString($input, 'address_book_alias'),
+                    'password' => $this->inputString($input, 'address_book_password'),
+                    'note' => $this->inputString($input, 'address_book_note'),
+                    'tags' => $tag !== null ? [$tag] : null,
                 ], static fn ($v) => $v !== null)
             );
         }
@@ -199,5 +237,40 @@ class DeploymentService
         $token->forceFill(['last_used_at' => now()])->save();
 
         return '';
+    }
+
+    /**
+     * Whether the token may (re)enroll an existing device: always for an unrestricted owner;
+     * otherwise only a device that is unowned or already inside the owner's admin scope.
+     */
+    private function mayAdopt(DeployToken $token, Device $device): bool
+    {
+        $owner = $token->user;
+        if ($owner === null) {
+            return false;
+        }
+
+        $allowed = $this->scope->deviceIds($owner, self::PERMISSION);
+
+        return $allowed === null
+            || $device->user_id === null
+            || in_array((int) $device->id, $allowed, true);
+    }
+
+    /**
+     * A CLI preset as a bounded, non-empty string, or null when absent / not a string.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function inputString(array $input, string $key): ?string
+    {
+        $value = $input[$key] ?? null;
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' || mb_strlen($value) > 255 ? null : $value;
     }
 }

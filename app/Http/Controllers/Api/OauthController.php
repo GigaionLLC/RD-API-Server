@@ -7,6 +7,7 @@ use App\Services\OauthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * OAuth / OIDC device-login flow for the RustDesk client
@@ -14,13 +15,19 @@ use Illuminate\Http\Response;
  *
  * Flow:
  *   1. POST /api/oidc/auth         → {code, url}
- *   2. client opens url; provider redirects to GET /api/oauth/callback?code=&state=
- *   3. client polls GET /api/oidc/auth-query?code=&id=&uuid= → {"body": "<AuthBody json>"}
+ *   2. client opens url; provider redirects to GET /api/oauth/callback?code=&state=, which shows
+ *      an approval page (device name / id / requesting IP / time)
+ *   3. the account holder approves: POST /api/oidc/confirm (one-time nonce + browser cookie)
+ *   4. client polls GET /api/oidc/auth-query?code=&id=&uuid= → {"body": "<AuthBody json>"}
+ *      (unchanged: it keeps receiving the pending error until step 3 completes)
  *
  * Never throws to the client: every error path returns {"error": ...} (or HTML on callback).
  */
 class OauthController extends Controller
 {
+    /** Cookie binding the approval POST to the browser that completed the provider sign-in. */
+    public const APPROVAL_COOKIE = 'rd_oidc_approval';
+
     public function __construct(private readonly OauthService $oauth) {}
 
     /**
@@ -43,6 +50,7 @@ class OauthController extends Controller
             (string) $request->input('id', ''),
             (string) $request->input('uuid', ''),
             $deviceInfo,
+            $request->ip(),
         );
 
         if ($code === '' || $url === '') {
@@ -57,14 +65,14 @@ class OauthController extends Controller
 
     /**
      * GET /api/oauth/callback (alias /api/oidc/callback)
-     * Provider redirect target. Exchanges the code, resolves the user, stores the AuthBody
-     * against the pending session, then renders a "return to the app" page.
+     * Provider redirect target. Exchanges the code and resolves the user, then renders an
+     * approval page; no token is issued until the account holder approves (confirm()).
      */
     public function callback(Request $request): Response
     {
-        $state = (string) $request->query('state', '');
-        $code = (string) $request->query('code', '');
-        $error = (string) $request->query('error', '');
+        $state = $this->queryString($request, 'state');
+        $code = $this->queryString($request, 'code');
+        $error = $this->queryString($request, 'error');
 
         if ($error !== '') {
             return $this->page('Sign-in failed', 'The provider reported: '.e($error), false);
@@ -76,11 +84,72 @@ class OauthController extends Controller
             return $this->page('Sign-in failed', e($result['error']), false);
         }
 
-        return $this->page(
-            'Sign-in complete',
-            'You have signed in successfully. You can now return to the RustDesk app.',
+        $confirmation = $result['confirmation'] ?? null;
+        if (! is_array($confirmation)) {
+            return $this->page(
+                'Sign-in complete',
+                'You have signed in successfully. You can now return to the RustDesk app.',
+                true,
+            );
+        }
+
+        $response = response()
+            ->view('oidc.confirm', [
+                'confirmation' => $confirmation,
+                'action' => url('/api/oidc/confirm'),
+                'viewerIp' => (string) $request->ip(),
+            ])
+            ->withHeaders($this->sensitiveHeaders());
+
+        $response->headers->setCookie(new Cookie(
+            self::APPROVAL_COOKIE,
+            (string) $confirmation['browser_secret'],
+            now()->addSeconds(OauthService::CACHE_TTL),
+            '/api/',
+            null,
+            $request->isSecure(),
             true,
+            false,
+            Cookie::SAMESITE_STRICT,
+        ));
+
+        return $response;
+    }
+
+    /**
+     * POST /api/oidc/confirm
+     * The approval form on the callback page. Requires the page's one-time nonce and the
+     * browser-binding cookie set with it; "deny" discards the pending sign-in.
+     */
+    public function confirm(Request $request): Response
+    {
+        $approve = $request->input('decision') === 'approve';
+        $result = $this->oauth->approveSignIn(
+            $this->inputString($request, 'state'),
+            $this->inputString($request, 'nonce'),
+            (string) $request->cookie(self::APPROVAL_COOKIE, ''),
+            $approve,
         );
+
+        if (! $result['ok']) {
+            $response = $this->page('Sign-in failed', e($result['error']), false);
+        } elseif ($result['approved']) {
+            $response = $this->page(
+                'Sign-in complete',
+                'The device is now signed in. You can return to the RustDesk app.',
+                true,
+            );
+        } else {
+            $response = $this->page(
+                'Sign-in denied',
+                'The sign-in request was discarded and no access was granted. You can close this page.',
+                false,
+            );
+        }
+
+        $response->headers->clearCookie(self::APPROVAL_COOKIE, '/api/', null, $request->isSecure(), true, Cookie::SAMESITE_STRICT);
+
+        return $response;
     }
 
     /**
@@ -170,6 +239,36 @@ class OauthController extends Controller
 </html>
 HTML;
 
-        return response($html, 200)->header('Content-Type', 'text/html; charset=utf-8');
+        return response($html, 200)
+            ->header('Content-Type', 'text/html; charset=utf-8')
+            ->withHeaders($this->sensitiveHeaders());
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function sensitiveHeaders(): array
+    {
+        return [
+            'Cache-Control' => 'no-store, private',
+            'Pragma' => 'no-cache',
+            'Referrer-Policy' => 'no-referrer',
+            'X-Frame-Options' => 'DENY',
+            'Content-Security-Policy' => "frame-ancestors 'none'",
+        ];
+    }
+
+    private function queryString(Request $request, string $key): string
+    {
+        $value = $request->query($key, '');
+
+        return is_string($value) ? $value : '';
+    }
+
+    private function inputString(Request $request, string $key): string
+    {
+        $value = $request->input($key, '');
+
+        return is_string($value) ? $value : '';
     }
 }

@@ -193,6 +193,8 @@ class StrategyController extends Controller
             $options[$key] = (string) ($values[$i] ?? '');
         }
 
+        $this->guardFullAdminOnlyOptions($request, (array) ($strategy->options ?? []), $options);
+
         $strategy->fill([
             'name' => $request->input('name'),
             'note' => $request->input('note'),
@@ -272,5 +274,26 @@ class StrategyController extends Controller
         return redirect()
             ->route('admin.strategies.index')
             ->with('status', 'Strategy deleted.');
+    }
+
+    /**
+     * Server-redirect and proxy-credential options are full-administrator territory: a delegated
+     * editor may keep them exactly as stored but not add, change or remove them.
+     *
+     * @param  array<array-key, mixed>  $before
+     * @param  array<array-key, mixed>  $after
+     */
+    private function guardFullAdminOnlyOptions(Request $request, array $before, array $after): void
+    {
+        if ($this->scope->isUnrestricted($request->user(), 'strategies.edit')) {
+            return;
+        }
+
+        $changed = ClientConfigService::changedFullAdminOnlyKeys($before, $after);
+        if ($changed !== []) {
+            throw ValidationException::withMessages([
+                'opt' => 'Only a full administrator can set or change: '.implode(', ', $changed).'.',
+            ]);
+        }
     }
 }

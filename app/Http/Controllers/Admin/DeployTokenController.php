@@ -8,6 +8,7 @@ use App\Models\Device;
 use App\Services\AdminScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -49,7 +50,7 @@ class DeployTokenController extends Controller
             'credential_version' => max(1, (int) $request->user()->credential_version),
             'token' => $token,
             'name' => $data['name'] ?? null,
-            'expires_at' => $data['expires_at'] ?? null,
+            'expires_at' => $data['expires_at'] ?? self::defaultExpiry(),
         ]);
 
         return redirect()
@@ -103,5 +104,16 @@ class DeployTokenController extends Controller
         return redirect()
             ->route('admin.devices.pending')
             ->with('status', 'Device rejected.');
+    }
+
+    /**
+     * Expiry for a token created without an explicit date (rustdesk.devices.deploy_token_ttl_days;
+     * 0 keeps the historical never-expiring behaviour).
+     */
+    public static function defaultExpiry(): ?Carbon
+    {
+        $days = (int) config('rustdesk.devices.deploy_token_ttl_days', 365);
+
+        return $days > 0 ? now()->addDays($days)->endOfDay() : null;
     }
 }

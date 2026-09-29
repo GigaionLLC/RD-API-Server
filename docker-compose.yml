@@ -101,6 +101,8 @@ services:
       RUSTDESK_AUTO_REGISTER_PER_IP_PER_MINUTE: "${RUSTDESK_AUTO_REGISTER_PER_IP_PER_MINUTE:-30}"
       RUSTDESK_AUTO_REGISTER_GLOBAL_PER_MINUTE: "${RUSTDESK_AUTO_REGISTER_GLOBAL_PER_MINUTE:-100}"
       RUSTDESK_AUTO_REGISTER_MAX_DEVICES: "${RUSTDESK_AUTO_REGISTER_MAX_DEVICES:-5000}"
+      # Lifetime (days) of a new deploy token created without an expiry date; 0 = never expires.
+      RUSTDESK_DEPLOY_TOKEN_TTL_DAYS: "${RUSTDESK_DEPLOY_TOKEN_TTL_DAYS:-365}"
 
       # Recording uploads stay off until enabled plus a source CIDR or proxy/header token.
       RUSTDESK_RECORDING_UPLOAD_ENABLED: "${RUSTDESK_RECORDING_UPLOAD_ENABLED:-false}"

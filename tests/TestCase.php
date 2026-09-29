@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Services\OauthService;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
@@ -29,6 +30,26 @@ abstract class TestCase extends BaseTestCase
         $this->assertSafeTestDatabase($app);
 
         return $app;
+    }
+
+    /**
+     * Complete the OIDC approval step for a successful OauthService::handleCallback() result, as
+     * the account holder's browser would by pressing "Approve sign-in on this device".
+     *
+     * @param  array<string, mixed>  $callbackResult
+     */
+    protected function approveOidcSignIn(array $callbackResult): void
+    {
+        $confirmation = $callbackResult['confirmation'] ?? null;
+        $this->assertIsArray($confirmation, 'The callback did not ask for approval.');
+
+        $result = app(OauthService::class)->approveSignIn(
+            (string) $confirmation['state'],
+            (string) $confirmation['nonce'],
+            (string) $confirmation['browser_secret'],
+            true,
+        );
+        $this->assertTrue($result['ok'], $result['error']);
     }
 
     private function assertSafeTestDatabase(Application $app): void

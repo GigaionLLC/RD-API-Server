@@ -31,6 +31,9 @@ class AddressBookPeer extends Model
         return [
             'tags' => 'array',
             'force_always_relay' => 'boolean',
+            // Connection secrets are encrypted at rest with APP_KEY; reads return the plaintext.
+            'password' => 'encrypted',
+            'hash' => 'encrypted',
         ];
     }
 

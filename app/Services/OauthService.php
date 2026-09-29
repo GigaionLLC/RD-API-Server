@@ -76,7 +76,7 @@ class OauthService
      * @param  array<string, mixed>  $deviceInfo
      * @return array{0: string, 1: string}
      */
-    public function beginAuth(string $op, string $id, string $uuid, array $deviceInfo): array
+    public function beginAuth(string $op, string $id, string $uuid, array $deviceInfo, ?string $requestIp = null): array
     {
         $id = trim($id);
         $uuid = trim($uuid);
@@ -107,15 +107,16 @@ class OauthService
         OauthSession::where('expires_at', '<', now())->delete();
 
         OauthSession::create([
-            'code' => $code,
+            'code' => OauthSession::keyFor($code),
             'op' => $provider->op,
             'rustdesk_id' => $id,
             'uuid' => $uuid,
             'nonce' => $nonce,
             'code_verifier' => $verifier,
-            'device_os' => (string) ($deviceInfo['os'] ?? ''),
-            'device_type' => (string) ($deviceInfo['type'] ?? ''),
-            'device_name' => (string) ($deviceInfo['name'] ?? ''),
+            'device_os' => $this->deviceInfoString($deviceInfo, 'os'),
+            'device_type' => $this->deviceInfoString($deviceInfo, 'type'),
+            'device_name' => $this->deviceInfoString($deviceInfo, 'name'),
+            'request_ip' => $requestIp !== null && strlen($requestIp) <= 45 ? $requestIp : null,
             'auth_body' => null,
             'expires_at' => now()->addSeconds(self::CACHE_TTL),
         ]);
@@ -195,10 +196,17 @@ class OauthService
     }
 
     /**
-     * Handle the provider callback: exchange `code`, resolve/create the local user and store
-     * the issued AuthBody against the pending session.
+     * Handle the provider callback: exchange `code` and resolve/create the local user, then park
+     * the pending session awaiting the account holder's explicit approval.
      *
-     * @return array{ok: bool, error: string}
+     * No access token exists yet. The browser that completed the provider sign-in receives a
+     * one-time confirmation nonce (rendered into the page) plus a browser-binding secret (set as
+     * a cookie); both must come back on the approval POST (approveSignIn) before a bearer token
+     * is issued for the device that started the flow. This stops a phishing link built from an
+     * attacker's own `/api/oidc/auth` session from silently handing the victim's token to the
+     * attacker's poll.
+     *
+     * @return array{ok: bool, error: string, confirmation?: array<string, mixed>}
      */
     public function handleCallback(string $state, string $code): array
     {
@@ -206,14 +214,21 @@ class OauthService
             return ['ok' => false, 'error' => 'Missing state'];
         }
 
-        $session = OauthSession::find($state);
+        $session = OauthSession::find(OauthSession::keyFor($state));
         if (! $session || $session->isExpired()) {
             return ['ok' => false, 'error' => 'Session expired'];
         }
 
-        // Already resolved — nothing more to do (idempotent).
-        if (! empty($session->auth_body)) {
+        // Already approved — nothing more to do (idempotent).
+        if (! empty($session->auth_body) || (int) $session->delivery_count > 0) {
             return ['ok' => true, 'error' => ''];
+        }
+
+        // The provider sign-in already happened for this session. A second callback must not
+        // mint a fresh approval page: anyone holding the polling code could otherwise approve
+        // the already-resolved identity themselves.
+        if ($session->user_id !== null) {
+            return ['ok' => false, 'error' => 'This sign-in link has already been used. Start again from the RustDesk app.'];
         }
 
         $provider = $this->enabledProvider((string) $session->op);
@@ -235,8 +250,8 @@ class OauthService
             return ['ok' => false, 'error' => 'This account is disabled'];
         }
 
-        // Reconcile before the AuthBody is issued: the bearer token below carries an is_admin
-        // snapshot, and a sync revokes outstanding tokens.
+        // Reconcile before the AuthBody is issued: the bearer token carries an is_admin snapshot,
+        // and a sync revokes outstanding tokens. Provider groups are only available here.
         $this->ssoRoleSync->sync(
             $user,
             SsoRoleMapping::KIND_OIDC,
@@ -245,24 +260,117 @@ class OauthService
             'client_oidc',
         );
 
-        // Store the AuthBody as a raw JSON string so its exact bytes (incl. empty {} objects)
-        // reach the client's strict serde parser unchanged.
-        $session->auth_body = (string) json_encode($this->authBody($user, $provider->op, [
-            'id' => $session->rustdesk_id,
-            'uuid' => $session->uuid,
-            'device_os' => $session->device_os,
-            'device_type' => $session->device_type,
-            'device_name' => $session->device_name,
-        ]), JSON_UNESCAPED_SLASHES);
-        $session->save();
+        $nonce = Str::random(48);
+        $browserSecret = Str::random(48);
 
-        Log::channel('stderr')->info('OIDC callback resolved user', [
+        $claimed = OauthSession::whereKey($session->getKey())
+            ->whereNull('user_id')
+            ->whereNull('auth_body')
+            ->update([
+                'user_id' => $user->id,
+                'confirm_hash' => hash('sha256', $nonce),
+                'browser_hash' => hash('sha256', $browserSecret),
+                'resolved_at' => now(),
+            ]);
+        if ($claimed !== 1) {
+            return ['ok' => false, 'error' => 'This sign-in link has already been used. Start again from the RustDesk app.'];
+        }
+
+        Log::channel('stderr')->info('OIDC callback resolved user; awaiting approval', [
             'op' => $provider->op,
             'user_id' => $user->id,
             'status' => (int) $user->status,
         ]);
 
-        return ['ok' => true, 'error' => ''];
+        return [
+            'ok' => true,
+            'error' => '',
+            'confirmation' => [
+                'state' => $state,
+                'nonce' => $nonce,
+                'browser_secret' => $browserSecret,
+                'account' => (string) $user->username,
+                'provider' => (string) $provider->op,
+                'device_name' => (string) ($session->device_name ?? ''),
+                'device_os' => (string) ($session->device_os ?? ''),
+                'device_type' => (string) ($session->device_type ?? ''),
+                'rustdesk_id' => (string) ($session->rustdesk_id ?? ''),
+                'request_ip' => (string) ($session->request_ip ?? ''),
+                'requested_at' => $session->created_at,
+                'expires_at' => $session->expires_at,
+            ],
+        ];
+    }
+
+    /**
+     * Complete (or decline) a callback-resolved sign-in. Requires the one-time nonce rendered on
+     * the confirmation page and the browser-binding secret from its cookie. On approval the
+     * bearer token is issued and the AuthBody becomes available to the device's poll.
+     *
+     * @return array{ok: bool, error: string, approved: bool}
+     */
+    public function approveSignIn(string $state, string $nonce, string $browserSecret, bool $approve): array
+    {
+        $failure = ['ok' => false, 'error' => 'This sign-in request is invalid or has expired. Start again from the RustDesk app.', 'approved' => false];
+        if ($state === '' || $nonce === '' || $browserSecret === ''
+            || strlen($state) > 128 || strlen($nonce) > 128 || strlen($browserSecret) > 128) {
+            return $failure;
+        }
+
+        return DB::transaction(function () use ($state, $nonce, $browserSecret, $approve, $failure): array {
+            $session = OauthSession::whereKey(OauthSession::keyFor($state))->lockForUpdate()->first();
+            if (! $session || $session->isExpired() || $session->user_id === null
+                || ! empty($session->auth_body) || (int) $session->delivery_count > 0
+                || ! is_string($session->confirm_hash) || ! is_string($session->browser_hash)
+                || ! hash_equals($session->confirm_hash, hash('sha256', $nonce))
+                || ! hash_equals($session->browser_hash, hash('sha256', $browserSecret))) {
+                return $failure;
+            }
+
+            if (! $approve) {
+                $session->delete();
+
+                return ['ok' => true, 'error' => '', 'approved' => false];
+            }
+
+            $user = User::find($session->user_id);
+            if (! $user || ! $user->isActive()) {
+                $session->delete();
+
+                return ['ok' => false, 'error' => 'This account is disabled', 'approved' => false];
+            }
+
+            // Store the AuthBody as a raw JSON string so its exact bytes (incl. empty {} objects)
+            // reach the client's strict serde parser unchanged.
+            $session->forceFill([
+                'auth_body' => (string) json_encode($this->authBody($user, (string) $session->op, [
+                    'id' => $session->rustdesk_id,
+                    'uuid' => $session->uuid,
+                    'device_os' => $session->device_os,
+                    'device_type' => $session->device_type,
+                    'device_name' => $session->device_name,
+                ]), JSON_UNESCAPED_SLASHES),
+                'confirm_hash' => null,
+                'browser_hash' => null,
+            ])->save();
+
+            Log::channel('stderr')->info('OIDC device sign-in approved', [
+                'op' => (string) $session->op,
+                'user_id' => $user->id,
+            ]);
+
+            return ['ok' => true, 'error' => '', 'approved' => true];
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $deviceInfo
+     */
+    private function deviceInfoString(array $deviceInfo, string $key): string
+    {
+        $value = $deviceInfo[$key] ?? '';
+
+        return is_scalar($value) ? mb_substr(trim((string) $value), 0, 255) : '';
     }
 
     /**
@@ -703,7 +811,7 @@ class OauthService
         }
 
         return DB::transaction(function () use ($code, $rustdeskId, $uuid): string {
-            $session = OauthSession::whereKey($code)->lockForUpdate()->first();
+            $session = OauthSession::whereKey(OauthSession::keyFor($code))->lockForUpdate()->first();
             if (! $session || $session->isExpired()) {
                 $session?->delete();
 

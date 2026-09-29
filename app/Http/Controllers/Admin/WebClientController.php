@@ -175,12 +175,15 @@ class WebClientController extends Controller
             throw new NotFoundHttpException('viewer assets are not installed');
         }
 
-        $json = json_encode($config, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-
-        // Injected before the module script so RD_CONFIG exists when viewer.js evaluates.
-        // JSON_HEX_TAG is not needed because the payload is server-owned config, but the
-        // closing-tag guard is cheap insurance against a value ever becoming user data.
-        $inject = '<script>window.RD_CONFIG='.str_replace('</', '<\/', $json).';</script>';
+        // Injected before the module script so RD_CONFIG exists when viewer.js evaluates. The
+        // peer label can be a device-reported hostname, so every character that is significant
+        // to the HTML script-data tokenizer (`<`, `>`, `&`, quotes) is hex-escaped; `<!--` or
+        // `</script` in a hostname can then neither end nor re-open the element.
+        $json = json_encode(
+            $config,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+        );
+        $inject = '<script>window.RD_CONFIG='.$json.';</script>';
         $needle = '<script type="module"';
         $document = (string) File::get($path);
 

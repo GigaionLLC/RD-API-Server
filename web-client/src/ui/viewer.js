@@ -170,6 +170,10 @@ function sessionOptions() {
         myId: 'web-client',
         myName: 'Web Client',
         secure: location.protocol === 'https:',
+        // Fail closed here too. Without a verified server key the password proof, input and
+        // clipboard would cross the relay in plaintext, so an unverifiable handshake stops the
+        // session instead of silently downgrading.
+        requireEncryption: true,
     };
 }
 
@@ -788,11 +792,12 @@ if (config) {
     $('hint').textContent = `Ready to connect to ${config.peerLabel ?? config.peerId}. `
         + 'Press Connect when you are.';
 } else {
-    // Server details may be prefilled from the query string for development, but never
-    // the password: a peer secret in a URL lands in browser history, the Referer header
-    // and every access log between here and the server.
+    // Only the peer id and transport mode may be prefilled from the query string. Never the
+    // password (a peer secret in a URL lands in browser history, the Referer header and every
+    // access log), and never the server host or key: a link that chooses which server and key
+    // to trust lets whoever wrote it relay the operator's password proof to the real peer.
     const params = new URLSearchParams(location.search);
-    for (const k of ['host', 'peer', 'key', 'mode']) {
+    for (const k of ['peer', 'mode']) {
         if (params.has(k)) $(k).value = params.get(k);
     }
 }

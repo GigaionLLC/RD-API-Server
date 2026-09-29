@@ -50,7 +50,8 @@
                 <div class="rd-field">
                     <label class="rd-label" for="expires_at">Expires at</label>
                     <input class="rd-input" id="expires_at" name="expires_at" type="date" value="{{ old('expires_at') }}">
-                    <span class="rd-help">Leave empty for a token that never expires.</span>
+                    @php($defaultTtlDays = (int) config('rustdesk.devices.deploy_token_ttl_days', 365))
+                    <span class="rd-help">{{ $defaultTtlDays > 0 ? "Leave empty for the default lifetime of {$defaultTtlDays} days." : 'Leave empty for a token that never expires.' }}</span>
                 </div>
                 <div class="rd-actions rd-form-grid__full">
                     <button type="submit" class="rd-btn rd-btn--primary"><i class="ri-add-line" aria-hidden="true"></i> Create token</button>

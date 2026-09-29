@@ -3,6 +3,23 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-09-28 22:30] - v1.7.0 security hardening (adversarial review fixes F1–F10)
+**Agent:** rustdesk-api (Claude Opus 5.5)
+**Files Modified:**
+- F1 presets: `app/Http/Controllers/Api/SystemController.php`, `app/Models/Device.php`, `database/migrations/2026_09_28_100001_add_presets_applied_at_to_devices_table.php`
+- F3 scope: `app/Services/{AdminScopeService,DeploymentService,ClientConfigService}.php`, `app/Http/Controllers/Admin/StrategyController.php`, `app/Http/Controllers/Api/V1/StrategyController.php`
+- F2 OIDC approval: `app/Services/OauthService.php`, `app/Http/Controllers/Api/OauthController.php`, `app/Models/OauthSession.php`, `resources/views/oidc/confirm.blade.php`, `routes/api.php`, `app/Providers/AppServiceProvider.php`, `docker/nginx.conf.template`, `database/migrations/2026_09_28_100002_add_approval_to_oauth_sessions_table.php`
+- F5 at rest: `app/Models/{AuthToken,DeployToken,AddressBookPeer}.php`, `app/Http/Middleware/RustAuth.php`, `app/Http/Controllers/Admin/DeployTokenController.php`, `resources/views/admin/deploy_tokens/index.blade.php`, `config/rustdesk.php`, `.env.example`, `docker-compose{,.dev}.yml`, migrations `2026_09_28_100003_hash_client_and_deploy_tokens.php`, `2026_09_28_100004_encrypt_address_book_peer_secrets.php`
+- F4 viewer: `web-client/src/ui/viewer.js`, `app/Http/Controllers/Admin/WebClientController.php`, `resources/views/admin/web_client/remote.blade.php`, `docker/nginx.conf.template`
+- F6/F8 login: `app/Support/LoginThrottle.php`, `app/Http/Controllers/Api/LoginController.php`, `app/Http/Controllers/Admin/AuthController.php`
+- F7 console email: `app/Http/Controllers/Admin/TwoFactorController.php`, `resources/views/admin/two_factor/challenge.blade.php`
+- F9 TOTP replay: `app/Services/TwoFactorService.php`, `app/Models/User.php`, `database/migrations/2026_09_28_100005_add_two_factor_last_counter_to_users_table.php`
+- F10 headers: `app/Http/Middleware/SecurityHeaders.php`, `bootstrap/app.php`, `web-client/README.md`
+- Tests: `tests/Feature/{SysinfoPresetSecurity,DevicePresetWindowMigration,DelegatedAdminScopeSecurity,OidcDeviceApproval,CredentialAtRest,CredentialAtRestMigration,LoginHardening,ConsoleEmailVerification,TotpReplay,SecurityHeaders}Test.php` (new); adjusted `OidcPkceTest`, `OidcDestinationSecurityTest`, `WebClientTest`, `AdminRecoveryCommandTest`, `PasswordCredentialRevocationTest`, `SsoRoleMappingTest`, `SmokeTest`, `tests/TestCase.php`
+- Docs: `docs/releases/v1.7.0.md`, `CHANGELOG.md`, `README.md`, `Wiki/core/15-security.md`, `docs/modernization/{02-client-api-contract,08-build-log,09-port-status}.md`, `config/app.php`
+**Database/API Changes:** Five migrations (devices.presets_applied_at; oauth_sessions approval columns; auth/deploy tokens → `token_hash` digests with in-place hashing of existing rows, oauth_sessions keyed by digest + encrypted `auth_body`; address_book_peers password/hash encrypted; users.two_factor_last_counter). New non-client route `POST /api/oidc/confirm`. No client `/api/*` path or JSON key changed. `/api/version` reports `1.7.0`.
+**Summary:** Implemented the security-review fixes without changing the client wire protocol: enrollment-only sysinfo presets, delegated-admin scope on strategies and deploy tokens, OIDC device sign-in approval page, hashed tokens and encrypted peer secrets (existing tokens keep working), standalone viewer 404 + fail-closed encryption, per-account login ceiling with IPv6 /64 buckets, no pre-password state disclosure, console email verification, single-use TOTP and console security headers; `TRUSTED_PROXIES=*` default left intact (docs expanded).
+
 ## [2026-09-28 20:30] - v1.6.3 security maintenance: patched dependencies and base images
 **Agent:** rustdesk-api (Claude Opus 5.5)
 **Files Modified:**

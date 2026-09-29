@@ -4,6 +4,46 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.7.0] - 2026-09-28
+
+Security hardening from an adversarial review. The RustDesk client wire protocol is unchanged;
+deployed clients keep working and nobody is signed out. **Read the
+[upgrade notes](docs/releases/v1.7.0.md)**: back up the database together with the application key.
+
+### Security
+
+- **Device presets are enrollment-only.** `/api/sysinfo` `OPTION_PRESET_*` values apply on a
+  device's first accepted upload, only fill blanks (never override an admin's strategy, group,
+  name or note), and match existing strategies/groups only — a device can no longer move itself
+  into another strategy (and read its options) or create device groups.
+- **Delegated-admin scope.** Strategies directly assigned to out-of-scope devices are out of scope;
+  deploy tokens of delegated admins are bounded by their scope on `/api/devices/cli` and
+  `/api/devices/deploy`; server-redirect and proxy-credential strategy options
+  (`custom-rendezvous-server`, `relay-server`, `api-server`, `key`, `proxy-*`) are full-admin-only.
+- **OIDC device sign-in approval.** The callback page shows the requesting device (name, OS,
+  RustDesk ID, source IP, time) and issues no token until the account holder approves;
+  `/api/oidc/auth` is rate-limited; the runtime access log redacts OIDC poll/callback query strings.
+- **Credentials at rest.** Client bearer tokens and deploy tokens are stored as SHA-256 digests
+  (existing tokens migrated in place and still valid); pending OIDC results and address-book peer
+  `password`/`hash` are encrypted with the application key (API output unchanged).
+- **Standalone web viewer** is no longer served by the runtime image (404); the standalone page
+  requires encryption and takes no server host/key from the URL. Stricter escaping of the injected
+  viewer configuration.
+- **Login hardening.** Per-account failure ceiling across all sources (checked before LDAP binds),
+  IPv6 /64 rate-limit buckets, no account-state disclosure or timing difference before a correct
+  password, console email login verification, single-use TOTP codes.
+- **Browser headers** on the console: `nosniff`, `Referrer-Policy`, `frame-ancestors 'self'` /
+  `X-Frame-Options: SAMEORIGIN`, and HSTS on HTTPS requests.
+
+### Changed
+
+- New deploy tokens created without an expiry date expire after `RUSTDESK_DEPLOY_TOKEN_TTL_DAYS`
+  (default 365; `0` = never). Existing tokens are unchanged.
+- New settings `RUSTDESK_LOGIN_ACCOUNT_MAX_FAILURES` (default 20) and
+  `RUSTDESK_LOGIN_ACCOUNT_DECAY_MINUTES` (default 15).
+- Five database migrations run automatically at start-up; the token-hashing migration cannot be
+  reversed (a downgrade signs every client out).
+
 ## [1.6.3] - 2026-09-28
 
 ### Security

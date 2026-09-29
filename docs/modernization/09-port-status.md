@@ -133,7 +133,7 @@ contract. Status: ⬜ not started · 🟦 in progress · ✅ done+verified.
 | `POST /api/oidc/auth` · `GET /api/oidc/auth-query` | ✅ | ⬜ | |
 | `POST /api/logout` · `currentUser` · `user/info` | ✅ | ⬜ | |
 | `POST /api/heartbeat` | ⚠️ stub | ✅ | strategy-push + change-detection verified |
-| `POST /api/sysinfo` · `sysinfo_ver` | ⚠️ | ✅ | presets + ID_NOT_FOUND gating verified |
+| `POST /api/sysinfo` · `sysinfo_ver` | ⚠️ | ✅ | presets (enrollment-only since v1.7.0) + ID_NOT_FOUND gating verified |
 | `GET/POST /api/ab*` (personal+shared) | ✅ | ⬜ | |
 | `POST /api/audit/conn` · `audit/file` | ✅ | ⬜ | |
 | `POST /api/record` | ❌ | ⬜ | new (recording upload) |
@@ -164,7 +164,7 @@ contract. Status: ⬜ not started · 🟦 in progress · ✅ done+verified.
 | Session management | ⬜ | auth-token rotation |
 | Version-capability gating | ⬜ | ref: lantongxue |
 | Strategy settings-push | ✅ | heartbeat config_options push, priority device>user>group, verified |
-| Preset auto-registration | ✅ | sysinfo OPTION_PRESET_* → strategy/device-group/address-book, verified |
+| Preset auto-registration | ✅ | sysinfo OPTION_PRESET_* → strategy/device-group/address-book on first upload only, fill-blanks, existing groups only (v1.7.0), verified |
 | Access control / roles | ⬜ | teams/MSP |
 
 ## Cross-cutting

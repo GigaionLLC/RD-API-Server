@@ -163,7 +163,7 @@ class SsoRoleMappingTest extends TestCase
         $this->sync($user, 'oidc', 'authentik', ['admins']);
 
         $this->assertGreaterThan($before, (int) $user->fresh()?->credential_version);
-        $this->assertDatabaseMissing('auth_tokens', ['token' => 'stale-token']);
+        $this->assertDatabaseMissing('auth_tokens', ['token_hash' => AuthToken::hashToken('stale-token')]);
     }
 
     public function test_an_unchanged_effective_set_does_not_churn_the_credential_version(): void
