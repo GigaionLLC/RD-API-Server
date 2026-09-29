@@ -25,6 +25,7 @@
     <link href="{{ asset('assets/vendor/remixicon/remixicon.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/css/theme-dark.css') }}" rel="stylesheet">
 </head>
+@php($emailMethod = ($method ?? 'totp') === 'email')
 <body class="rd-auth">
 <button type="button" class="rd-auth__theme rd-icon-btn" data-theme-toggle aria-label="Switch color theme" title="Switch color theme">
     <i class="ri-sun-line" aria-hidden="true"></i>
@@ -39,7 +40,7 @@
         <div class="rd-stack rd-stack--md">
             <span class="rd-page-header__eyebrow">Account protection</span>
             <p class="rd-page-header__title">One more check keeps remote operations in trusted hands.</p>
-            <p class="rd-page-header__description">Use your authenticator code or one of the recovery codes saved during enrollment.</p>
+            <p class="rd-page-header__description">{{ $emailMethod ? 'Enter the verification code we just emailed to the address on your account.' : 'Use your authenticator code or one of the recovery codes saved during enrollment.' }}</p>
         </div>
 
         <p class="rd-muted">This verification completes your admin-console sign-in.<br>Independent open-source project — not affiliated with or endorsed by RustDesk.</p>
@@ -53,8 +54,8 @@
             </div>
 
             <div>
-                <h1 class="rd-page-title" id="challenge-title">Two-factor authentication</h1>
-                <p class="rd-muted">Enter the six-digit code from your authenticator app, or a recovery code.</p>
+                <h1 class="rd-page-title" id="challenge-title">{{ $emailMethod ? 'Email verification' : 'Two-factor authentication' }}</h1>
+                <p class="rd-muted">{{ $emailMethod ? 'Enter the six-digit code from the verification email. It expires in five minutes.' : 'Enter the six-digit code from your authenticator app, or a recovery code.' }}</p>
             </div>
 
             @if ($errors->any())
@@ -80,7 +81,7 @@
 
             <a href="{{ route('admin.login') }}" class="rd-btn rd-btn--ghost rd-btn--block">Cancel</a>
 
-            <footer class="rd-auth__footer">If you no longer have access to your authenticator, use an unused recovery code.</footer>
+            <footer class="rd-auth__footer">{{ $emailMethod ? 'No email? Check your spam folder, then sign in again to receive a new code.' : 'If you no longer have access to your authenticator, use an unused recovery code.' }}</footer>
         </div>
     </section>
 </main>

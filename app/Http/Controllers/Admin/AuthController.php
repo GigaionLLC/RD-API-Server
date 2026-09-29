@@ -280,6 +280,11 @@ class AuthController extends Controller
             return TwoFactorController::startChallenge($request, $user, $request->boolean('remember'));
         }
 
+        // Email login verification applies to the console exactly as it does to the client API.
+        if ($user->login_verify === User::LOGIN_VERIFY_EMAIL) {
+            return TwoFactorController::startEmailChallenge($request, $user, $request->boolean('remember'));
+        }
+
         $request->session()->regenerate();
 
         $user->forceFill([

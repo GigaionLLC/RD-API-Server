@@ -14,10 +14,14 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use JsonException;
+use Throwable;
 
 /**
  * TOTP two-factor authentication for the admin console. Reuses the same secret/columns as
@@ -40,6 +44,21 @@ class TwoFactorController extends Controller
     private const PENDING_PASSWORD = '2fa.password_fingerprint';
 
     private const PENDING_EXPIRES_AT = '2fa.expires_at';
+
+    /** Which second factor the deferred login is waiting for: totp (default) or email. */
+    private const PENDING_METHOD = '2fa.method';
+
+    /** Email challenge binding: the opaque challenge secret and this browser's pseudo device. */
+    private const PENDING_EMAIL_SECRET = '2fa.email_secret';
+
+    private const PENDING_EMAIL_DEVICE = '2fa.email_device';
+
+    /** RustDesk-id slot used for console email challenges (they have no client device). */
+    private const CONSOLE_CHALLENGE_ID = 'admin-console';
+
+    private const METHOD_TOTP = 'totp';
+
+    private const METHOD_EMAIL = 'email';
 
     private const CHALLENGE_LIFETIME_SECONDS = 300;
 
@@ -312,7 +331,9 @@ class TwoFactorController extends Controller
             return redirect()->route('admin.login');
         }
 
-        return view('admin.two_factor.challenge');
+        return view('admin.two_factor.challenge', [
+            'method' => $request->session()->get(self::PENDING_METHOD, self::METHOD_TOTP),
+        ]);
     }
 
     public function verifyChallenge(Request $request): RedirectResponse
@@ -339,9 +360,19 @@ class TwoFactorController extends Controller
         }
 
         $code = (string) $request->input('code');
-        $ok = $this->twoFactor->verifyTotp($user, $code);
-        if (! $ok) {
-            $ok = $this->twoFactor->verifyRecoveryCode($user, $code);
+        if ($request->session()->get(self::PENDING_METHOD) === self::METHOD_EMAIL) {
+            $ok = $this->twoFactor->verifyEmailCode(
+                $user,
+                self::CONSOLE_CHALLENGE_ID,
+                (string) $request->session()->get(self::PENDING_EMAIL_DEVICE, ''),
+                (string) $request->session()->get(self::PENDING_EMAIL_SECRET, ''),
+                $code,
+            );
+        } else {
+            $ok = $this->twoFactor->verifyTotp($user, $code);
+            if (! $ok) {
+                $ok = $this->twoFactor->verifyRecoveryCode($user, $code);
+            }
         }
 
         if (! $ok) {
@@ -390,6 +421,56 @@ class TwoFactorController extends Controller
     }
 
     /**
+     * Called by Admin\AuthController after a correct password for an account whose login
+     * verification is "email": the console honours it the same way the client API does. A code
+     * is mailed and the login is deferred exactly like the TOTP challenge. If the code cannot be
+     * sent the sign-in fails closed.
+     */
+    public static function startEmailChallenge(Request $request, User $user, bool $remember): RedirectResponse
+    {
+        Auth::logout();
+        $request->session()->regenerate();
+        self::clearPendingChallenge($request);
+
+        if (trim((string) $user->email) === '') {
+            return redirect()->route('admin.login')
+                ->withErrors(['username' => 'Email verification is required for this account, but it has no email address. Ask an administrator to fix the account.']);
+        }
+
+        $device = Str::random(40);
+        $challenge = app(TwoFactorService::class)->issueEmailCode($user, $device, self::CONSOLE_CHALLENGE_ID);
+
+        try {
+            Mail::raw(
+                "Your RD-API-Server console verification code is: {$challenge['code']}\n\nIt expires in 5 minutes. If you did not just sign in to the admin console, change your password.",
+                function ($message) use ($user): void {
+                    $message->to($user->email)->subject('RD-API-Server console verification code');
+                }
+            );
+        } catch (Throwable $e) {
+            Log::warning('Console email verification code could not be sent', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.login')
+                ->withErrors(['username' => 'The verification email could not be sent. Check the mail settings or contact an administrator.']);
+        }
+
+        $request->session()->put([
+            self::PENDING_USER => $user->getAuthIdentifier(),
+            self::PENDING_REMEMBER => $remember,
+            self::PENDING_PASSWORD => self::passwordFingerprint($user),
+            self::PENDING_EXPIRES_AT => now()->getTimestamp() + self::CHALLENGE_LIFETIME_SECONDS,
+            self::PENDING_METHOD => self::METHOD_EMAIL,
+            self::PENDING_EMAIL_SECRET => $challenge['secret'],
+            self::PENDING_EMAIL_DEVICE => $device,
+        ]);
+
+        return redirect()->route('admin.2fa.challenge');
+    }
+
+    /**
      * Resolve a still-valid deferred login. The HMAC deliberately binds the challenge to the
      * password hash and credential version accepted during primary authentication without
      * storing either value in the session. Password replacement or explicit credential
@@ -401,16 +482,21 @@ class TwoFactorController extends Controller
         $fingerprint = $request->session()->get(self::PENDING_PASSWORD);
         $expiresAt = $request->session()->get(self::PENDING_EXPIRES_AT);
 
+        $method = $request->session()->get(self::PENDING_METHOD, self::METHOD_TOTP);
+
         $user = is_scalar($userId) ? User::find($userId) : null;
+        $factorStillRequired = $user instanceof User && ($method === self::METHOD_EMAIL
+            ? $user->login_verify === User::LOGIN_VERIFY_EMAIL && trim((string) $user->email) !== ''
+            : $user->two_factor_enabled
+                && is_string($user->two_factor_secret)
+                && $user->two_factor_secret !== '');
         $valid = $user instanceof User
             && is_string($fingerprint)
             && is_numeric($expiresAt)
             && (int) $expiresAt > now()->getTimestamp()
             && $user->isActive()
             && ($user->is_admin || $user->adminRoles()->exists())
-            && $user->two_factor_enabled
-            && is_string($user->two_factor_secret)
-            && $user->two_factor_secret !== ''
+            && $factorStillRequired
             && hash_equals(self::passwordFingerprint($user), $fingerprint);
 
         if (! $valid) {
@@ -438,6 +524,9 @@ class TwoFactorController extends Controller
             self::PENDING_REMEMBER,
             self::PENDING_PASSWORD,
             self::PENDING_EXPIRES_AT,
+            self::PENDING_METHOD,
+            self::PENDING_EMAIL_SECRET,
+            self::PENDING_EMAIL_DEVICE,
         ]);
     }
 
