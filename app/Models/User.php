@@ -17,6 +17,7 @@ use Illuminate\Notifications\Notifiable;
  * Mirrors the client UserPayload (see docs/modernization/02-client-api-contract.md §3b).
  *
  * @property int $credential_version
+ * @property int|null $two_factor_last_counter Last accepted TOTP time step (replay protection).
  */
 #[Fillable([
     'username', 'email', 'password', 'display_name', 'avatar', 'is_admin', 'status',
@@ -57,6 +58,7 @@ class User extends Authenticatable
             'force_sso' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'two_factor_secret' => 'encrypted',
+            'two_factor_last_counter' => 'integer',
             'email_alarm_notification' => 'boolean',
             'status' => 'integer',
             'two_factor_recovery_codes' => 'array',

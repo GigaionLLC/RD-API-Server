@@ -51,7 +51,28 @@ class TwoFactorService
      */
     public function verifyTotp(User $user, string $code): bool
     {
-        return $this->verifyCode((string) $user->two_factor_secret, $code);
+        $counter = $this->matchingCounter((string) $user->two_factor_secret, $code);
+        if ($counter === null) {
+            return false;
+        }
+
+        // Replay protection: atomically claim this time step. A code for the last accepted step
+        // or any earlier one is refused, so an observed code cannot be reused in its window.
+        $claimed = User::query()
+            ->whereKey($user->getKey())
+            ->where(fn ($query) => $query
+                ->whereNull('two_factor_last_counter')
+                ->orWhere('two_factor_last_counter', '<', $counter))
+            ->toBase()
+            ->update(['two_factor_last_counter' => $counter]);
+
+        if ($claimed !== 1) {
+            return false;
+        }
+
+        $user->forceFill(['two_factor_last_counter' => $counter])->syncOriginalAttribute('two_factor_last_counter');
+
+        return true;
     }
 
     /**
@@ -61,26 +82,34 @@ class TwoFactorService
      */
     public function verifyCode(string $secret, string $code): bool
     {
+        return $this->matchingCounter($secret, $code) !== null;
+    }
+
+    /**
+     * The TOTP time step a code is valid for (within the clock-skew window), or null.
+     */
+    private function matchingCounter(string $secret, string $code): ?int
+    {
         $code = preg_replace('/\D/', '', $code) ?? '';
 
         if ($secret === '' || strlen($code) !== self::DIGITS) {
-            return false;
+            return null;
         }
 
         $key = $this->base32Decode($secret);
         if ($key === '') {
-            return false;
+            return null;
         }
 
         $counter = intdiv(time(), self::PERIOD);
 
         for ($offset = -self::WINDOW; $offset <= self::WINDOW; $offset++) {
             if (hash_equals($this->hotp($key, $counter + $offset), $code)) {
-                return true;
+                return $counter + $offset;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**
