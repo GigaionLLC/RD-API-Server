@@ -74,7 +74,7 @@ services:
 
   k6:
     profiles: ["load"]
-    image: grafana/k6:1.4.2@sha256:3656673de3f30424e8ebcfa46acd9558d83b6a43612d0f668ffeac953950c6c7
+    image: grafana/k6:2.3.0@sha256:9c2dee7f8ed74d317e4027c06a10f169b625638189de8d4555d0b3486a5aeb34
     user: "${PERF_K6_USER:-12345:12345}"
     read_only: true
     cap_drop: ["ALL"]
