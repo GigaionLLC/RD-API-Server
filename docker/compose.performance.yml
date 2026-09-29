@@ -50,7 +50,7 @@ services:
     restart: "no"
 
   db:
-    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    image: mariadb:13.0.2@sha256:d4fdec0510ad498e4f3127da30a99df3745bd6d5e611ae6ac5f76403d9284a8d
     environment:
       MARIADB_ROOT_PASSWORD: rustdesk_performance_root
       MARIADB_DATABASE: rustdesk_api_performance
