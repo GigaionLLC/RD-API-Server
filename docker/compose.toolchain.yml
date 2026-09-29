@@ -214,7 +214,7 @@ services:
 
   # Mailpit: catch-all SMTP for testing the mail subsystem (UI on :8025, SMTP on :1025)
   mail:
-    image: axllent/mailpit:v1.30.4@sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6
+    image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     ports:
       - "8025:8025"
       - "1025:1025"
