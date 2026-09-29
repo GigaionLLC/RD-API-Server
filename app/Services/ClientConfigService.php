@@ -25,6 +25,24 @@ class ClientConfigService
     public const UNLOCK_PIN_MAX_LENGTH = 128;
 
     /**
+     * Strategy option keys that redirect a client to other infrastructure (rendezvous, relay,
+     * API server, server key) or route it through a proxy with credentials. Whoever sets them
+     * controls every later policy push to the device, so only unrestricted administrators may
+     * add, change or remove them; delegated administrators keep whatever value is stored.
+     *
+     * @var list<string>
+     */
+    public const FULL_ADMIN_ONLY_OPTION_KEYS = [
+        'custom-rendezvous-server',
+        'relay-server',
+        'api-server',
+        'key',
+        'proxy-url',
+        'proxy-username',
+        'proxy-password',
+    ];
+
+    /**
      * The reversed url-safe-base64 config string (no padding).
      */
     public function configString(string $host, string $relay, string $api, string $key): string
@@ -155,6 +173,42 @@ class ClientConfigService
         return $length >= self::UNLOCK_PIN_MIN_LENGTH
             && $length <= self::UNLOCK_PIN_MAX_LENGTH
             && preg_match('/\A[A-Za-z0-9._~-]+\z/D', $pin) === 1;
+    }
+
+    /**
+     * Full-admin-only option keys whose presence or value differs between two option maps.
+     * Keys are compared case-insensitively so a case variant cannot slip past the check.
+     *
+     * @param  array<array-key, mixed>  $before
+     * @param  array<array-key, mixed>  $after
+     * @return list<string>
+     */
+    public static function changedFullAdminOnlyKeys(array $before, array $after): array
+    {
+        $protected = static function (array $options): array {
+            $result = [];
+            foreach ($options as $key => $value) {
+                $normalized = strtolower(trim((string) $key));
+                if (in_array($normalized, self::FULL_ADMIN_ONLY_OPTION_KEYS, true)) {
+                    $result[$normalized] = (string) $value;
+                }
+            }
+
+            return $result;
+        };
+
+        $old = $protected($before);
+        $new = $protected($after);
+        $changed = [];
+        foreach (array_unique(array_merge(array_keys($old), array_keys($new))) as $key) {
+            if (($old[$key] ?? null) !== ($new[$key] ?? null)) {
+                $changed[] = $key;
+            }
+        }
+
+        sort($changed);
+
+        return $changed;
     }
 
     public static function containsControlCharacters(string $value): bool

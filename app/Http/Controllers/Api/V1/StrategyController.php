@@ -67,6 +67,15 @@ class StrategyController extends Controller
             $strategy->enabled = $data['enabled'];
         }
         if (array_key_exists('options', $data)) {
+            $options = (array) ($data['options'] ?? []);
+            if (! $this->scope->isUnrestricted($request->user(), 'strategies.edit')) {
+                $changed = ClientConfigService::changedFullAdminOnlyKeys((array) ($strategy->options ?? []), $options);
+                if ($changed !== []) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Only a full administrator can set or change: '.implode(', ', $changed).'.',
+                    ]);
+                }
+            }
             $strategy->options = $data['options'];
         }
 

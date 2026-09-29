@@ -203,8 +203,10 @@ class AdminScopeService
     }
 
     /**
-     * Strategies are in-scope only when they are not global defaults and every assignment is
-     * resolvable inside the same permission boundary. Unassigned strategies are global-only.
+     * Strategies are in-scope only when they are not global defaults, every assignment is
+     * resolvable inside the same permission boundary, and every device that references the
+     * strategy directly (devices.strategy_id) is in scope too. Unassigned strategies are
+     * global-only.
      *
      * @return list<int>|null
      */
@@ -223,13 +225,28 @@ class AdminScopeService
         $userIds = array_flip($this->userIds($user, $permission) ?? []);
         $deviceGroupIds = array_flip($this->deviceGroupIds($user, $permission) ?? []);
 
+        // Devices can also reference a strategy directly (devices.strategy_id), which outranks
+        // every assignment row. A strategy used directly by any out-of-scope device is not the
+        // delegate's to edit, however its assignment rows look.
+        $directDeviceIds = Device::query()
+            ->whereNotNull('strategy_id')
+            ->get(['id', 'strategy_id'])
+            ->groupBy('strategy_id')
+            ->map(static fn ($devices) => $devices->pluck('id')->map(static fn ($id): int => (int) $id)->all());
+
         $ids = Strategy::query()
             ->where('is_default', false)
             ->with('assignments')
             ->get()
-            ->filter(function (Strategy $strategy) use ($deviceIds, $userIds, $deviceGroupIds): bool {
+            ->filter(function (Strategy $strategy) use ($deviceIds, $userIds, $deviceGroupIds, $directDeviceIds): bool {
                 if ($strategy->assignments->isEmpty()) {
                     return false;
+                }
+
+                foreach ($directDeviceIds->get($strategy->id, []) as $directDeviceId) {
+                    if (! isset($deviceIds[$directDeviceId])) {
+                        return false;
+                    }
                 }
 
                 return $strategy->assignments->every(static function (StrategyAssignment $assignment) use (
