@@ -4,6 +4,15 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.7.1] - 2026-10-21
+
+### Security
+
+- **PHP `session.upload_progress` turned off in the runtime image.** The server never uses upload
+  progress tracking; turning it off removes the entry point of the PHP session upload-progress
+  use-after-free (CVE-2026-109618 / CVE-2026-109619, PHP security release 2026-10-21 14:00 UTC).
+  Still upgrade to the image built on the patched PHP once it is published.
+
 ## [1.7.0] - 2026-09-28
 
 Security hardening from an adversarial review. The RustDesk client wire protocol is unchanged;
