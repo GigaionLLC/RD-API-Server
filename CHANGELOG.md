@@ -4,6 +4,18 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.7.2] - 2026-10-21
+
+### Security
+
+- **Runtime image moved to PHP 8.5.12**, which fixes two critical, unauthenticated remote code execution
+  vulnerabilities in PHP itself: CVE-2026-109618 (out-of-memory handling corrupts request state) and
+  CVE-2026-109619 (stale request state survives into the next request on the same worker). Every PHP-FPM
+  installation serving web requests was affected; **update now**. See the
+  [PHP security advisory](https://www.php.net/archive/2026.php).
+- Defense in depth from the advisory: `fatal_error_backtraces = 0` (next to `session.upload_progress.enabled = Off`
+  from 1.7.1) in the runtime image.
+
 ## [1.7.1] - 2026-10-21
 
 ### Security
