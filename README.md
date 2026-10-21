@@ -12,7 +12,7 @@ command, backed by MariaDB.
 > compatibility with its open‑source client. This is a **separate implementation** of the
 > client's public API, maintained independently.
 
-> ✅ **Stable release: [v1.7.0](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.7.0).**
+> ✅ **Stable release: [v1.7.1](https://github.com/GigaionLLC/RD-API-Server/releases/tag/v1.7.1).**
 > **Connect** on any device opens a remote desktop in the browser — screen, sound, mouse, keyboard,
 > clipboard and chat — with no plugin, no download and no client install. Two environment values
 > stand it up on the console's own hostname and certificate, with no reverse-proxy change and no
@@ -90,7 +90,7 @@ local `.env` file with your DB password and RustDesk endpoints. `ADMIN_PASS` is 
 and a strong password is generated at first boot and shown once in the container log.
 
 For a deployment that must remain on the current stable release, set
-`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.7.0`; `latest` moves only with a
+`RUSTDESK_API_IMAGE=ghcr.io/gigaionllc/rustdesk-api-server:1.7.1`; `latest` moves only with a
 verified, annotated stable release tag.
 
 ```env

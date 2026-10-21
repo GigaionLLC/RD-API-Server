@@ -72,6 +72,9 @@ RUN apt-get update \
 
 # Production PHP ini plus generated Nginx/FPM runtime configuration (docroot -> public/).
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+# Upload progress tracking is unused; turning it off removes the entry point of the PHP session
+# upload_progress use-after-free (CVE-2026-109618 / CVE-2026-109619, PHP release 2026-10-21).
+RUN printf 'session.upload_progress.enabled = Off\n' > "$PHP_INI_DIR/conf.d/zz-session.ini"
 
 WORKDIR /var/www/html
 COPY --from=build /app /var/www/html
