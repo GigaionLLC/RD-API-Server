@@ -12,7 +12,7 @@ FROM mlocati/php-extension-installer:2.12.0@sha256:1afade3e29cfc97362cf5885e5ac3
 # The dependency and final stages share this exact extension layer. Native extensions are
 # therefore compiled only once per architecture, while the final image still contains neither
 # Composer nor the extension installer.
-FROM php:8.5.12-fpm-bookworm@sha256:740a5adab5af19504d8aa0754e903e20b40b0153cfd4013c11e4df2029a7b73c AS php_runtime
+FROM php:8.5.12-fpm-bookworm@sha256:d3db5340c7ecfb1e3a26af5d3d9de8b4e160cdd75692a830b5cb74b0b85db2cf AS php_runtime
 
 COPY --from=php_extension_installer /usr/bin/install-php-extensions /usr/local/bin/
 # MariaDB uses PDO's MySQL-compatible driver. The upstream PHP image's statically compiled
