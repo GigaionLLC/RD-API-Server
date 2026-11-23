@@ -195,26 +195,20 @@ class OidcDestinationGuard
      */
     public function requestOptions(array $destination): array
     {
-        foreach (['CURLOPT_RESOLVE', 'CURLOPT_FRESH_CONNECT', 'CURLOPT_FORBID_REUSE', 'CURLOPT_PROXY', 'CURLOPT_FOLLOWLOCATION'] as $constant) {
+        foreach (['CURLOPT_RESOLVE', 'CURLOPT_FRESH_CONNECT', 'CURLOPT_FORBID_REUSE'] as $constant) {
             if (! defined($constant)) {
                 throw new RuntimeException('Secure OIDC transport requires the PHP cURL extension.');
             }
         }
 
+        // Proxy, redirect and protocol restrictions go through Guzzle's own request options
+        // (below), not raw CURLOPT_* values: Guzzle 8.2 rejects CURLOPT_PROXY,
+        // CURLOPT_FOLLOWLOCATION and CURLOPT_PROTOCOLS(_STR) in the "curl" option because they
+        // conflict with options it manages itself, so passing them aborted every request.
         $curl = [
             constant('CURLOPT_FRESH_CONNECT') => true,
             constant('CURLOPT_FORBID_REUSE') => true,
-            constant('CURLOPT_PROXY') => '',
-            constant('CURLOPT_FOLLOWLOCATION') => false,
         ];
-
-        if (defined('CURLOPT_PROTOCOLS_STR')) {
-            $curl[constant('CURLOPT_PROTOCOLS_STR')] = 'https';
-        } elseif (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {
-            $curl[constant('CURLOPT_PROTOCOLS')] = constant('CURLPROTO_HTTPS');
-        } else {
-            throw new RuntimeException('Secure OIDC transport cannot restrict libcurl protocols.');
-        }
 
         if (! $destination['is_ip_literal']) {
             $ip = str_contains($destination['ip'], ':') ? '['.$destination['ip'].']' : $destination['ip'];
@@ -226,6 +220,7 @@ class OidcDestinationGuard
         return [
             'allow_redirects' => false,
             'proxy' => '',
+            'protocols' => ['https'],
             'curl' => $curl,
         ];
     }

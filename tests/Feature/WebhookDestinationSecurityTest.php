@@ -7,6 +7,10 @@ use App\Models\Webhook;
 use App\Models\WebhookDelivery;
 use App\Services\WebhookDestinationGuard;
 use App\Services\WebhookDnsResolver;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Handler\CurlHandler;
+use GuzzleHttp\HandlerStack;
 use App\Services\WebhookService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -148,23 +152,32 @@ class WebhookDestinationSecurityTest extends TestCase
 
         $options = $guard->requestOptions($guard->resolve('https://hooks.example.com/events'));
 
+        $this->assertFalse($options['allow_redirects']);
         $this->assertSame('', $options['proxy']);
-        $this->assertSame('', $options['curl'][constant('CURLOPT_PROXY')]);
-        $this->assertFalse($options['curl'][constant('CURLOPT_FOLLOWLOCATION')]);
-        if (defined('CURLOPT_PROTOCOLS_STR')) {
-            $this->assertSame('http,https', $options['curl'][constant('CURLOPT_PROTOCOLS_STR')]);
-        } else {
-            $this->assertSame(
-                constant('CURLPROTO_HTTP') | constant('CURLPROTO_HTTPS'),
-                $options['curl'][constant('CURLOPT_PROTOCOLS')]
-            );
-        }
+        $this->assertSame(['http', 'https'], $options['protocols']);
         $this->assertSame(
             ['hooks.example.com:443:8.8.8.8'],
             $options['curl'][constant('CURLOPT_RESOLVE')]
         );
         $this->assertTrue($options['curl'][constant('CURLOPT_FRESH_CONNECT')]);
         $this->assertTrue($options['curl'][constant('CURLOPT_FORBID_REUSE')]);
+    }
+
+    public function test_request_options_are_accepted_by_the_guzzle_curl_handler(): void
+    {
+        // Regression: raw CURLOPT_PROXY / CURLOPT_FOLLOWLOCATION / CURLOPT_PROTOCOLS_STR in the
+        // "curl" option made Guzzle 8.2 throw InvalidArgumentException before any connection,
+        // so every webhook delivery failed. The only acceptable failure here is a connect error.
+        $resolver = $this->mock(WebhookDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->once()->andReturn(['8.8.8.8']);
+        });
+        $guard = new WebhookDestinationGuard($resolver);
+        $options = $guard->requestOptions($guard->resolve('https://hooks.example.com/events'));
+        $client = new Client(['handler' => HandlerStack::create(new CurlHandler)]);
+
+        $this->expectException(ConnectException::class);
+
+        $client->post('http://127.0.0.1:1/', $options + ['connect_timeout' => 2]);
     }
 
     public function test_public_ipv6_literal_does_not_need_a_dns_pin(): void
