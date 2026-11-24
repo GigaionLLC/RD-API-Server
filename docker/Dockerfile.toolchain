@@ -43,7 +43,7 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sf ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 # Match package-lock.json exactly so the project CLI and preinstalled browser revision agree.
-RUN npm install --global --ignore-scripts --no-audit --no-fund playwright@1.61.0 \
+RUN npm install --global --ignore-scripts --no-audit --no-fund playwright@1.65.1 \
     && playwright install --with-deps chromium \
     && npm cache clean --force
 
