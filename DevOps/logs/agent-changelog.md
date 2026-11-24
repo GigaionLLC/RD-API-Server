@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-23 22:10] - CLA bot: store signatures on a `cla-signatures` branch
+**Agent:** rustdesk-api (Claude Opus 5.5)
+**Files Modified:**
+- `.github/workflows/cla.yml` (signatures now go to `signatures/rd-api-server.json` on the unprotected `cla-signatures` branch of this repo via the workflow token; no separate repo or PAT; action pinned to the v2.6.1 commit; owner allowlisted)
+- `CONTRIBUTING.md` (how signing works: one reply with the sign phrase)
+**Database/API Changes:** None.
+**Summary:** The `cla` check failed on every pull request: the workflow pointed at a separate signatures repository and a PAT that were never created, so the bot accepted a contributor's sign comment but could not save it ("Resource not accessible by integration"), and nothing was recorded. The workflow now writes to a dedicated branch of this repository with `contents: write`, which is the stock CLA Assistant Lite setup. The record holds only data already public on the pull request (login, user id, comment id, time, PR number). The branch was seeded with the signature jb2barrels posted on #67 (comment 7117406916). The workflow never checks out pull request code, so the write token is not exposed to it.
+
 ## [2026-09-28 22:30] - v1.7.0 security hardening (adversarial review fixes F1–F10)
 **Agent:** rustdesk-api (Claude Opus 5.5)
 **Files Modified:**

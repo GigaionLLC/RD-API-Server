@@ -14,8 +14,9 @@ The reason is stated plainly in the agreement: the project keeps the option of l
 codebase on other terms in future. Without an assignment, that decision would need the agreement of
 every past contributor, which in practice means it could never be made.
 
-Signing is one click. A bot comments on your first pull request with a link, and remembers your
-account afterwards.
+Signing takes one comment. A bot comments on your first pull request with a link to the agreement;
+reply with `I have read the CLA Document and I hereby sign the CLA` and it records your signature
+(GitHub login, user id, comment and time) and remembers your account afterwards.
 
 ## Ground rules
 
