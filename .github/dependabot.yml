@@ -5,6 +5,7 @@
 # Major versions (jQuery 4, MariaDB 13, PHPUnit 13, Node 26, ...) are
 # migrations, not maintenance: they are ignored here and planned by hand.
 # Advisories against an ignored major still raise Dependabot alerts.
+# The PHP images additionally hold their minor line — see the docker entry.
 version: 2
 updates:
   - package-ecosystem: composer
@@ -45,6 +46,16 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # PHP holds its minor line: a new minor needs the extension set, php.ini and the
+      # image tag suffix re-validated by hand. Release candidates (8.6.0RC*, ...) are never
+      # what we run, and they arrive as minor bumps, so this one rule covers both. Both
+      # Dockerfiles are updated together, so one dependency name covers them.
+      # Patch releases on the pinned minor line still arrive. Pre-releases of a *patch*
+      # release cannot be filtered here: the docker ecosystem only accepts Bundler-style
+      # `versions` operators and discards the pre-release suffix when matching
+      # (dependabot-core#15154), so those are closed by hand.
+      - dependency-name: "php"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   - package-ecosystem: docker-compose
     directories: [/, /docker, /examples]
