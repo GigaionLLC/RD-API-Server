@@ -12,7 +12,7 @@ application stack:
 - both candidates receive the same deterministic devices and Strategy fixture;
 - candidates run sequentially under the same fixed CPU, memory, and PID limits;
 - k6 is pinned to the multi-architecture image
-  `grafana/k6:1.4.2@sha256:3656673de3f30424e8ebcfa46acd9558d83b6a43612d0f668ffeac953950c6c7`.
+  `grafana/k6:1.8.3@sha256:2cd9cd09e4119340a122aaf06f30cf3009c19db23b87954909fba0d3eda58e08`.
 
 The workload uses bounded constant-arrival-rate workers rather than allocating one JavaScript
 isolate per device. Over each 15-second time unit it schedules one iteration per idle device and
