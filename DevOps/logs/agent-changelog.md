@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 05:24] - Fix #51: renamed installer emitted a filename Windows cannot create
+**Agent:** rustdesk-api (Mistral Vibe)
+**Files Modified:**
+- `app/Services/ClientConfigService.php` (installerFilename: drop `api=`, add the `,` terminator; new `installerFilenameProblems()`)
+- `app/Http/Controllers/Admin/ClientConfigController.php`, `resources/views/admin/client_config/index.blade.php` (refuse + explain an impossible filename; honest About-vs-Network help text)
+- `tests/Feature/ClientConfigTest.php` (format assertion updated; Windows-name validity, duplicate-suffix, problem-reporting and page-warning tests; local reimplementation of the client's comma parser)
+- `QUICKSTART.md` (client rollout + "devices do not appear" enrolment section), `docs/modernization/11-client-feature-opportunities.md` (filename caveat note)
+**Database/API Changes:** None. The generated installer filename changes shape (`rustdesk-host=…,key=…,relay=…,.exe`) — it is admin-UI output, not part of the client wire protocol.
+**Summary:** Issue #51 reported that a renamed installer shows its values in the client's About box but leaves Settings → Network empty, and that devices never appear in the dashboard. Upstream (`rustdesk/rustdesk` master `51f9439`, tags 1.4.9/1.5.3) shows the About-vs-Network split is client design (`get_license()` vs `ServerConfig.fromOptions`; options are only written by `install_me()`), but our generator had a real bug: it embedded `api=https://…` in the filename, and `:`/`/` are invalid in Windows file names, so the name the panel offered could not be created. The generator now omits the API server (the client derives `http://<host>:21114`), always ends with the comma terminator the client's parser documents, and refuses to emit a filename when a value (e.g. a base64 key containing `/`) cannot live in one — replacing it with a warning plus the config-string/`--config` alternatives. Device visibility was traced to the shipped enrolment defaults (`RUSTDESK_REQUIRE_DEPLOYMENT=true` + `RUSTDESK_AUTO_REGISTER=false` reject unknown devices without creating a row, so neither Devices nor Pending Devices can show them) and is now documented with the `--deploy`/`--assign` commands. Verified in the toolchain: `pint --test` clean (329 files), PHPStan L5 clean, PHPUnit 36 tests / 282 assertions green (ClientConfig + device-enrolment/telemetry/strategy suites).
+
 ## [2026-11-23 22:10] - CLA bot: store signatures on a `cla-signatures` branch
 **Agent:** rustdesk-api (Claude Opus 5.5)
 **Files Modified:**

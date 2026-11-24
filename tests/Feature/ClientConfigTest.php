@@ -40,10 +40,82 @@ class ClientConfigTest extends TestCase
 
     public function test_installer_filename_matches_the_client_parser(): void
     {
+        // host first (the client requires it), then key/relay, and a trailing "," terminator.
+        // The API server is never included: an api= value needs a scheme and Windows file names
+        // reject ':' and '/'.
         $this->assertSame(
-            'rustdesk-host=h,key=k,api=a,relay=r.exe',
+            'rustdesk-host=h,key=k,relay=r,.exe',
             (new ClientConfigService)->installerFilename('h', 'r', 'a', 'k'),
         );
+    }
+
+    public function test_installer_filename_is_a_usable_windows_file_name(): void
+    {
+        $svc = new ClientConfigService;
+        // A realistic hbbs key: standard base64, so '=' padding and '+' are expected (a '/'
+        // cannot appear in a file name and is covered separately below).
+        $key = 'abcDEF0123456789+xyzABCdef0123456789xyzABC=';
+        $name = $svc->installerFilename('rd.example.com', 'relay.example.com', 'https://api.example.com', $key);
+
+        $this->assertDoesNotMatchRegularExpression('/[<>:"\/\\\\|?*\x00-\x1F]/', $name);
+        $this->assertStringEndsWith(',.exe', $name);
+        $this->assertSame(
+            ['host' => 'rd.example.com', 'key' => $key, 'api' => '', 'relay' => 'relay.example.com'],
+            $this->parseInstallerName($name),
+        );
+    }
+
+    public function test_installer_filename_survives_a_duplicate_download_suffix(): void
+    {
+        // Windows renames a second copy to "… (1).exe". The trailing comma keeps the last value
+        // (relay here) intact instead of letting the suffix become part of it.
+        $name = (new ClientConfigService)->installerFilename('rd.example.com', 'relay.example.com', '', 'K');
+
+        $this->assertSame(
+            ['host' => 'rd.example.com', 'key' => 'K', 'api' => '', 'relay' => 'relay.example.com'],
+            $this->parseInstallerName(substr($name, 0, -4).' (1).exe'),
+        );
+    }
+
+    public function test_installer_filename_problems_block_impossible_file_names(): void
+    {
+        $svc = new ClientConfigService;
+
+        // '=' padding and '+' are fine.
+        $this->assertSame([], $svc->installerFilenameProblems('h.example.com', 'r.example.com', 'abc+def='));
+
+        // '/' in a base64 key cannot exist in a Windows file name, and must not be stripped
+        // (that would silently break server authentication).
+        $problems = $svc->installerFilenameProblems('h.example.com', 'r.example.com', 'ab/cd=');
+        $this->assertArrayHasKey('key', $problems);
+        $this->assertStringContainsString('Public key', $problems['key']);
+
+        // A host with a port is only kept out because ':' is illegal too.
+        $this->assertArrayHasKey('host', $svc->installerFilenameProblems('h.example.com:21116', '', ''));
+
+        // No host at all: the client cannot parse the comma form.
+        $this->assertArrayHasKey('host', $svc->installerFilenameProblems('', 'r.example.com', 'K'));
+
+        // The API server is not a filename field, so it is never a problem.
+        $this->assertSame([], $svc->installerFilenameProblems('h.example.com', '', 'K'));
+    }
+
+    public function test_page_refuses_a_renamed_installer_for_a_key_windows_cannot_store(): void
+    {
+        $admin = User::create([
+            'username' => 'admin', 'password' => 'secret12345',
+            'is_admin' => true, 'status' => User::STATUS_NORMAL,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.client-config.generate'), [
+                'host' => 'rd.example.com',
+                'key' => 'ab/cd=',
+            ])
+            ->assertOk()
+            ->assertDontSee('rustdesk-host=')
+            ->assertSee('Windows forbids in a file name')
+            ->assertSee('Use the config string or the');
     }
 
     public function test_page_renders_an_svg_qr_for_an_admin(): void
@@ -301,5 +373,48 @@ class ClientConfigTest extends TestCase
             ])
             ->assertRedirect(route('admin.strategies.edit', $strategy))
             ->assertSessionHasErrors(['option_keys.1', 'option_values.1']);
+    }
+
+    public function test_local_parser_matches_the_upstream_client_test_vectors(): void
+    {
+        // Vectors copied from rustdesk/rustdesk src/custom_server.rs::test_filename_license_string,
+        // so the round-trip assertions above are checked against the real client's expectations.
+        $this->assertSame(
+            ['host' => 'server.example.net', 'key' => '', 'api' => '', 'relay' => ''],
+            $this->parseInstallerName('rustdesk-host=server.example.net.exe'),
+        );
+        $this->assertSame(
+            ['host' => 'server.example.net', 'key' => 'Zm9vYmFyLiwyCg==', 'api' => 'abc', 'relay' => ''],
+            $this->parseInstallerName('rustdesk-host=server.example.net,api=abc,key=Zm9vYmFyLiwyCg==.exe'),
+        );
+        $this->assertSame(
+            ['host' => 'server.example.net', 'key' => 'Zm9vYmFyLiwyCg==', 'api' => '', 'relay' => 'server.example.net'],
+            $this->parseInstallerName('rustdesk-Host=server.example.net,Key=Zm9vYmFyLiwyCg==,RELAY=server.example.net.exe'),
+        );
+    }
+
+    /**
+     * The parse the RustDesk client performs on a renamed installer
+     * (src/custom_server.rs::get_custom_server_from_string, comma branch).
+     *
+     * @return array{host: string, key: string, api: string, relay: string}
+     */
+    private function parseInstallerName(string $fileName): array
+    {
+        $name = (string) preg_replace('/\.exe$/i', '', $fileName);
+        $start = stripos($name, 'host=');
+        $this->assertNotFalse($start, 'The client only parses the comma form when the name contains host=');
+
+        $parsed = ['host' => '', 'key' => '', 'api' => '', 'relay' => ''];
+        foreach (explode(',', substr($name, (int) $start)) as $part) {
+            $lower = strtolower($part);
+            foreach (['host' => 5, 'key' => 4, 'api' => 4, 'relay' => 6] as $field => $skip) {
+                if (str_starts_with($lower, $field.'=')) {
+                    $parsed[$field] = substr($part, $skip);
+                }
+            }
+        }
+
+        return $parsed;
     }
 }

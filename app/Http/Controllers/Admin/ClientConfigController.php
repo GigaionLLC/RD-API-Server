@@ -84,10 +84,17 @@ class ClientConfigController extends Controller
         $unlockPin = trim((string) ($input['unlock_pin'] ?? ''));
 
         $configString = $installer = $qrSvg = null;
+        $installerProblems = [];
         if ($host !== '' || $key !== '') {
             $configString = $config->configString($host, $relay, $api, $key);
-            $installer = $config->installerFilename($host, $relay, $api, $key);
             $qrSvg = $config->qrSvg($config->qrPayload($host, $relay, $api, $key));
+            // A renamed installer is a file name: values Windows cannot store in one (a base64
+            // key with '/', any API URL, a host with a port) are reported instead of silently
+            // dropped, because a truncated key would break server authentication.
+            $installerProblems = $config->installerFilenameProblems($host, $relay, $key);
+            if ($installerProblems === []) {
+                $installer = $config->installerFilename($host, $relay, $api, $key);
+            }
         }
 
         // Optional: turn a Strategy's options into a paste-ready install script
@@ -126,9 +133,9 @@ class ClientConfigController extends Controller
         }
 
         $response = response()->view('admin.client_config.index', compact(
-            'host', 'relay', 'api', 'key', 'configString', 'installer', 'qrSvg', 'unlockPin',
-            'strategies', 'strategyId', 'selectedStrategy', 'installScript', 'pinCommands',
-            'scriptWarning'
+            'host', 'relay', 'api', 'key', 'configString', 'installer', 'installerProblems', 'qrSvg',
+            'unlockPin', 'strategies', 'strategyId', 'selectedStrategy', 'installScript',
+            'pinCommands', 'scriptWarning'
         ));
         $this->applyNoStoreHeaders($response);
 

@@ -68,7 +68,18 @@ class ClientConfigService
     }
 
     /**
-     * The Windows renamed-installer filename (the client parses host=,key=,api=,relay= from it).
+     * The Windows renamed-installer filename (the client parses host=,key=,relay= from it).
+     *
+     * The API server is deliberately NOT emitted, even when one is configured. The client only
+     * accepts an `api=` value that carries a scheme (`http://…` / `https://…` — see the client's
+     * `setServerConfig`), and `:` plus `/` are invalid in a Windows file name, so the value can
+     * never be part of a renamed installer. Omitting it is also what the client expects: with no
+     * explicit API server it derives `http://<ID server>:21114` itself (`get_api_server_` in
+     * `src/common.rs`). Deployments whose API is only reachable on https/443 therefore need the
+     * config string or `--config` form instead. See installerFilenameProblems().
+     *
+     * The trailing comma is the terminator the client's parser documents: Windows appends
+     * " (1)", " (2)", … to a duplicate download, which would otherwise corrupt the last value.
      */
     public function installerFilename(string $host, string $relay, string $api, string $key): string
     {
@@ -76,14 +87,45 @@ class ClientConfigService
         if (trim($key) !== '') {
             $parts[] = 'key='.trim($key);
         }
-        if (trim($api) !== '') {
-            $parts[] = 'api='.trim($api);
-        }
         if (trim($relay) !== '') {
             $parts[] = 'relay='.trim($relay);
         }
 
-        return 'rustdesk-'.implode(',', $parts).'.exe';
+        return 'rustdesk-'.implode(',', $parts).',.exe';
+    }
+
+    /**
+     * Reasons the renamed installer cannot carry this configuration, keyed by field. An empty
+     * array means the generated filename is usable.
+     *
+     * A renamed installer is a *file name*, so every value it carries has to survive Win32 name
+     * rules. A base64 server key may contain `/` (illegal) and an API URL always contains `:` and
+     * `/`, which is why neither can be smuggled in silently: stripping characters would corrupt
+     * the key and silently disable server authentication.
+     *
+     * @return array<string, string>
+     */
+    public function installerFilenameProblems(string $host, string $relay, string $key): array
+    {
+        $problems = [];
+        $labels = ['host' => 'ID/rendezvous server', 'key' => 'Public key', 'relay' => 'Relay server'];
+
+        if (trim($host) === '') {
+            $problems['host'] = 'An ID/rendezvous server host is required for a renamed installer.';
+        }
+
+        foreach (['host' => $host, 'key' => $key, 'relay' => $relay] as $field => $value) {
+            $value = trim($value);
+            if ($value === '') {
+                continue; // An empty optional value is simply omitted; the host is checked above.
+            }
+            if (preg_match('/[<>:"\/\\\\|?*\x00-\x1F]/', $value) === 1) {
+                $problems[$field] = $labels[$field].' contains a character Windows forbids in a file name '
+                    .'(< > : " / \ | ? * and control characters), so it cannot be part of a renamed installer.';
+            }
+        }
+
+        return $problems;
     }
 
     /**

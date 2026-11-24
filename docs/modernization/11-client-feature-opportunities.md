@@ -251,6 +251,12 @@ contain storage abuse. This is one of the most-requested Pro features; no OSS se
    `rustdesk-host=server,key=...,api=...,relay=....exe` (comma-delimited, case-insensitive, tolerant of
    Windows `(1)` duplicate suffixes) — `custom_server.rs:39-108`.
 
+> **Implementation note (issue #51):** the parser accepts `api=`, but a Windows file name cannot
+> contain `:` or `/`, so an API URL can never actually travel in the file name. The generator emits
+> `rustdesk-host=…,key=…,relay=…,.exe` only (trailing comma = the duplicate-suffix terminator the
+> parser documents) and leaves the API server to the client's own derivation
+> (`http://<ID server>:21114`); see `App\Services\ClientConfigService::installerFilename`.
+
 `--config` then writes `key` / `custom-rendezvous-server` / `api-server` / `relay-server` into config
 (`src/core_main.rs:496-520`).
 
