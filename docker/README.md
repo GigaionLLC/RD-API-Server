@@ -6,22 +6,23 @@ digest prevents a registry tag from silently resolving to different bytes later.
 
 ## Current pins
 
-| Input | Version | Multi-architecture digest |
-|---|---:|---|
-| PHP CLI | 8.5.11 Bookworm | `sha256:d551e79d694fd91c4fdf34c4adcc52dd2042a064b881e25c319b2533ead0682c` |
-| PHP FPM | 8.5.11 Bookworm | `sha256:53eab56a8f43f51a92119f6c29b3448af98eec288ff17f92829354a4b4c9ca05` |
-| Node.js | 24.21.0 Bookworm slim | `sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6` |
-| Composer | 2.10.2 | `sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760` |
-| PHP extension installer | 2.11.12 | `sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138` |
-| MariaDB | 11.8.9 | `sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68` |
-| Mailpit | 1.30.4 | `sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6` |
-| RustDesk server (full-stack example) | 1.1.15 | `sha256:10818ec05b179039c6660f4d8e74b303f0db2858bbad2b18e24992ea22d54cd6` |
+| Input | Version | Multi-architecture digest | Used by |
+|---|---:|---|---|
+| PHP CLI | 8.5.13 Bookworm | `sha256:d6991172c4282d2a09d6418073923a81664173bb0a0e07a16663a9a645746092` | `docker/Dockerfile.toolchain` |
+| PHP FPM | 8.5.13 Bookworm | `sha256:bad1d3498eaa489efe88c1d532e47e2f4111304c3f0b19fbc428842c39ec155c` | `docker/Dockerfile.runtime` |
+| Node.js | 24.22.3 Bookworm slim | `sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54` | `docker/Dockerfile.toolchain`, `ci.yml` (`node-version`) |
+| Composer | 2.11.2 | `sha256:50ea4d33fdcde1adb0f045547295faa1548b33872e5f789dae5b02ce2fb5de93` | both Dockerfiles |
+| PHP extension installer | 2.13.3 | `sha256:edda5f9d936fba9b495bdc96ecd19cc8fda7c2574f85db4574795644ae57b456` | both Dockerfiles |
+| MariaDB | 11.8.9 | `sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc` | both Compose files, toolchain (`app`/`test`/`e2e`/`screenshots`), performance harness, `examples/full-stack`, `ci.yml`, `scripts/ci-runtime-smoke.sh` |
+| Mailpit | 1.34.0 | `sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e` | `docker/compose.toolchain.yml` (dev SMTP) |
+| k6 | 1.8.3 | `sha256:2cd9cd09e4119340a122aaf06f30cf3009c19db23b87954909fba0d3eda58e08` | `docker/compose.performance.yml`, `ci.yml` (perf harness validation) |
+| RustDesk server (full-stack example) | 1.1.16 | `sha256:8ecdab65deb7c84652a626380e31d11a8f1fbafd97916d57f95c20628f943c00` | `examples/full-stack.docker-compose.yml` |
 
-The toolchain installs `playwright@1.61.0` explicitly. This must match the resolved
+The toolchain installs `playwright@1.65.1` explicitly. This must match the resolved
 `node_modules/playwright` version in `package-lock.json`, because each Playwright release expects
-a specific browser revision. Node 24 is used because the [official Node.js release
-schedule](https://github.com/nodejs/Release) marks Node 20 as end-of-life and Node 24 as an
-active LTS release.
+a specific browser revision (1.65.1 -> chromium revision 1255). Node 24 is used because the
+[official Node.js release schedule](https://github.com/nodejs/Release) marks Node 20 as
+end-of-life and Node 24 as an active LTS release.
 
 The Debian packages installed with `apt` intentionally follow the signed Bookworm repositories
 instead of freezing individual package revisions that those repositories may retire. The image
@@ -342,7 +343,7 @@ instance completed every migration before restoring traffic or starting another 
 2. Resolve the tag's manifest-list digest (not a platform-specific child manifest):
 
    ```bash
-   docker buildx imagetools inspect node:24.21.0-bookworm-slim
+   docker buildx imagetools inspect node:24.22.3-bookworm-slim
    ```
 
    Confirm that the output includes both `linux/amd64` and `linux/arm64`, then copy the top-level
@@ -361,7 +362,7 @@ instance completed every migration before restoring traffic or starting another 
 
    ```bash
    docker run --rm -v "$PWD":/app -w /app \
-     node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 \
+     node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 \
      node -p "require('./package-lock.json').packages['node_modules/playwright'].version"
    ```
 5. Rebuild and verify from clean inputs:

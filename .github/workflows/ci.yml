@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mariadb:
-        image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+        image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
         env:
           MARIADB_ROOT_PASSWORD: rustdesk_test_root
           MARIADB_DATABASE: rustdesk_api_testing
@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.21.0'
+          node-version: '24.22.3'
           cache: npm
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -124,7 +124,7 @@ jobs:
           docker compose -f docker/compose.performance.yml --profile load config --quiet
           docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
             -v "$PWD/tests/Performance:/performance:ro" \
-            grafana/k6:1.4.2@sha256:3656673de3f30424e8ebcfa46acd9558d83b6a43612d0f668ffeac953950c6c7 \
+            grafana/k6:1.8.3@sha256:2cd9cd09e4119340a122aaf06f30cf3009c19db23b87954909fba0d3eda58e08 \
             inspect /performance/heartbeat.js >/dev/null
 
   runtime:
@@ -160,7 +160,7 @@ jobs:
     needs: php
     services:
       mariadb:
-        image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+        image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
         env:
           MARIADB_ROOT_PASSWORD: rustdesk_e2e_root
           MARIADB_DATABASE: rustdesk_api_e2e
@@ -261,7 +261,7 @@ jobs:
           PHP
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.21.0'
+          node-version: '24.22.3'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npx playwright install --with-deps chromium

@@ -8,10 +8,10 @@
 #
 # Every external build image is pinned to an exact release and multi-architecture digest.
 # Keep these pins and the Playwright version in sync via docker/README.md.
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS node
-FROM composer:2.10.3@sha256:9715c7f69044da2a212a5fbde29ee7da24e364d426560ae6367b060236f847d7 AS composer
-FROM mlocati/php-extension-installer:2.12.0@sha256:1afade3e29cfc97362cf5885e5ac333bf2faab1146cb28ebbb59b17e68f87e88 AS php_extension_installer
-FROM php:8.5.11-cli-bookworm@sha256:d551e79d694fd91c4fdf34c4adcc52dd2042a064b881e25c319b2533ead0682c AS toolchain
+FROM node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS node
+FROM composer:2.11.2@sha256:50ea4d33fdcde1adb0f045547295faa1548b33872e5f789dae5b02ce2fb5de93 AS composer
+FROM mlocati/php-extension-installer:2.13.3@sha256:edda5f9d936fba9b495bdc96ecd19cc8fda7c2574f85db4574795644ae57b456 AS php_extension_installer
+FROM php:8.5.13-cli-bookworm@sha256:d6991172c4282d2a09d6418073923a81664173bb0a0e07a16663a9a645746092 AS toolchain
 
 ENV DEBIAN_FRONTEND=noninteractive \
     COMPOSER_ALLOW_SUPERUSER=1 \
@@ -43,7 +43,7 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sf ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 # Match package-lock.json exactly so the project CLI and preinstalled browser revision agree.
-RUN npm install --global --ignore-scripts --no-audit --no-fund playwright@1.61.0 \
+RUN npm install --global --ignore-scripts --no-audit --no-fund playwright@1.65.1 \
     && playwright install --with-deps chromium \
     && npm cache clean --force
 

@@ -12,7 +12,7 @@ fi
 readonly image="$1"
 readonly expected_arch="$2"
 readonly platform="$3"
-readonly mariadb_image='mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68'
+readonly mariadb_image='mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc'
 readonly admin_user='ci-runtime-admin'
 readonly admin_password='CI-Runtime-Only_8462!Delete-Me'
 readonly app_key='base64:dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHQ='

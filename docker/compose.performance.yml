@@ -50,7 +50,7 @@ services:
     restart: "no"
 
   db:
-    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
       MARIADB_ROOT_PASSWORD: rustdesk_performance_root
       MARIADB_DATABASE: rustdesk_api_performance
@@ -74,7 +74,7 @@ services:
 
   k6:
     profiles: ["load"]
-    image: grafana/k6:1.8.1@sha256:23f2279054c3e01535455c4d92914a625df12aeb631ea0e3ea7a43f96bcbc843
+    image: grafana/k6:1.8.3@sha256:2cd9cd09e4119340a122aaf06f30cf3009c19db23b87954909fba0d3eda58e08
     user: "${PERF_K6_USER:-12345:12345}"
     read_only: true
     cap_drop: ["ALL"]

@@ -3,6 +3,17 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 05:44] - Dependency refresh: base images, Composer/Node/Playwright pins, npm group
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `maint`)
+**Files Modified:**
+- `docker/Dockerfile.toolchain`, `docker/Dockerfile.runtime` (PHP 8.5.13 CLI + FPM, Composer 2.11.2, php-extension-installer 2.13.3, Node 24.22.3, playwright@1.65.1)
+- `docker-compose.yml`, `docker-compose.dev.yml`, `docker/compose.toolchain.yml`, `docker/compose.performance.yml`, `examples/full-stack.docker-compose.yml`, `.github/workflows/ci.yml`, `scripts/ci-runtime-smoke.sh`, `README.md` (mariadb:11.8.9 index digest)
+- `docker/compose.toolchain.yml` (Mailpit v1.34.0), `docker/compose.performance.yml`, `.github/workflows/ci.yml`, `tests/Performance/README.md` (k6 1.8.3)
+- `package.json`, `package-lock.json`, `public/assets/vendor/{THIRD_PARTY_NOTICES.txt,licenses/bootstrap.txt,bootstrap/bootstrap.min.css,bootstrap/bootstrap.bundle.min.js}`
+- `docker/README.md` ("Current pins" table rewritten from the Dockerfiles/Compose files, "Updating a pin" examples re-pinned)
+**Database/API Changes:** None. No app version bump: the release decision stays with the maintainer.
+**Summary:** Replaced the open Dependabot PRs (#25, #27, #31, #39, #40, #54, #62, #63, #64, #66) with one branch of digest-pinned bumps; the npm group also gets the regenerated admin vendor assets and the matching `playwright@1.65.1` toolchain pin, so `check:vendor` and the documented `--profile e2e` container path both work again.
+
 ## [2026-11-24 05:24] - Fix #51: renamed installer emitted a filename Windows cannot create
 **Agent:** rustdesk-api (Mistral Vibe)
 **Files Modified:**
