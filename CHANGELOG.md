@@ -4,6 +4,41 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.7.3] - 2026-11-24
+
+A maintenance release: the sign-in and webhook breakage introduced with Guzzle 8.2 is fixed, and the
+runtime image moves to PHP 8.5.13. **Upgrade:** pull the new image (`docker compose pull`); there is
+nothing to migrate and nobody is signed out.
+
+### Security
+
+- **Runtime image moved to PHP 8.5.13** (PHP security release 2026-11-19): CVE-2026-129474
+  (use-after-free in magic-method backtraces, leading to remote code execution) and CVE-2026-129182
+  (use-after-free via repopulation of the `last_fatal_error_backtrace` global after shutdown). See
+  the [PHP 8 changelog](https://www.php.net/ChangeLog-8.php).
+- The rebuilt image also carries Debian's nginx security update (DSA-6642-1): `nginx-light`
+  1.22.1-9+deb12u11.
+
+### Fixed
+
+- **Single sign-on and webhook delivery work again.** Since 1.7.0 (Guzzle 8.2) the outbound request
+  guards passed cURL options Guzzle 8.2 rejects, so every OIDC discovery and every webhook delivery
+  threw before connecting — sign-in failed with "Could not start SSO". The same SSRF protections
+  (scheme/port allow-list, pinned resolved address, no redirects, no proxy) are now expressed as
+  Guzzle request options. Thanks `jb2barrels`.
+- **The Client Config page no longer offers a "renamed installer" Windows cannot create** (#51).
+  The `api=` value carried a scheme, and `:`/`/` are invalid in file names. The generated name now
+  omits `api=` (the client derives `http://<host>:21114`), ends with the terminator the client's
+  parser expects, and the page explains — with the config-string/`--config` alternatives — when a
+  value cannot live in a file name. `QUICKSTART.md` documents client rollout and device enrolment.
+
+### Dependencies
+
+- Composer group (#65): `laravel/framework` 13.43.0, `guzzlehttp/guzzle` 8.5.2 and friends; Actions
+  group (#55); base images, Composer 2.11.2, Node and MariaDB digest pins (#70); development-only
+  npm bumps (vite, shell-quote/concurrently). The CLA check now records signatures on a branch of
+  this repository (#68).
+
 ## [1.7.2] - 2026-10-21
 
 ### Security
