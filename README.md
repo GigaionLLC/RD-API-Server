@@ -173,7 +173,7 @@ services:
     depends_on:
       db: { condition: service_healthy }
   db:
-    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: rustdesk_api

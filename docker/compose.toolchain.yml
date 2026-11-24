@@ -144,7 +144,7 @@ services:
     command: ["sleep", "infinity"]
 
   db:
-    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_DATABASE: rustdesk_api
@@ -163,7 +163,7 @@ services:
 
   test-db:
     profiles: ["test"]
-    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
       MARIADB_ROOT_PASSWORD: rustdesk_test_root
       MARIADB_DATABASE: rustdesk_api_testing
@@ -180,7 +180,7 @@ services:
 
   e2e-db:
     profiles: ["e2e"]
-    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
       MARIADB_ROOT_PASSWORD: rustdesk_e2e_root
       MARIADB_DATABASE: rustdesk_api_e2e
@@ -197,7 +197,7 @@ services:
 
   screenshot-db:
     profiles: ["screenshots"]
-    image: mariadb:11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
       MARIADB_ROOT_PASSWORD: rustdesk_screenshots_root
       MARIADB_DATABASE: rustdesk_api_screenshots

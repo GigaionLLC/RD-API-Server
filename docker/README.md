@@ -13,7 +13,7 @@ digest prevents a registry tag from silently resolving to different bytes later.
 | Node.js | 24.21.0 Bookworm slim | `sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6` |
 | Composer | 2.10.2 | `sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760` |
 | PHP extension installer | 2.11.12 | `sha256:b6d3fa381b9ba5cf051117c1c601d6a523b590e534bf3d56eb4fbe352949c138` |
-| MariaDB | 11.8.9 | `sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68` |
+| MariaDB | 11.8.9 | `sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc` |
 | Mailpit | 1.30.4 | `sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6` |
 | RustDesk server (full-stack example) | 1.1.15 | `sha256:10818ec05b179039c6660f4d8e74b303f0db2858bbad2b18e24992ea22d54cd6` |
 
