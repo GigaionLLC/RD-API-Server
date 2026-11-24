@@ -1,11 +1,14 @@
 # Records signatures for the Contributor Assignment Agreement.
 #
-# Signatures are stored as a JSON file in a SEPARATE private repository, not in this one: the
-# record contains contributor names and timestamps, and it is rewritten on every signature, which
-# would otherwise churn this repository's history with personal data.
+# A contributor signs by replying to the bot on their pull request with the sign phrase below. The
+# bot then records the signature (GitHub login, numeric user id, comment id, timestamp, PR number:
+# all of it already public on the pull request) in signatures/rd-api-server.json on the dedicated
+# `cla-signatures` branch of this repository. That branch holds only the signature file, is never
+# merged into main, and must stay unprotected so the workflow token can write to it.
 #
-# Before enabling, create that repository and add a PAT with `repo` scope as the
-# PERSONAL_ACCESS_TOKEN secret, then set the path below.
+# Security: this runs on pull_request_target / issue_comment with a write token, so it must never
+# check out or execute pull request code. It only runs the pinned CLA action, which reads PR
+# metadata and comments through the API.
 name: CLA
 
 on:
@@ -16,7 +19,7 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write # only to update signatures/rd-api-server.json on the cla-signatures branch
   pull-requests: write
   statuses: write
 
@@ -25,19 +28,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check or record the signature
-        # Skips the owner's own pull requests: the owner is the assignee.
         if: (github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
-        uses: contributor-assistant/github-action@v2.6.1
+        # v2.6.1, pinned by commit
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_SIGNATURES_TOKEN }}
         with:
           path-to-signatures: signatures/rd-api-server.json
           path-to-document: https://github.com/${{ github.repository }}/blob/main/CLA.md
-          branch: main
-          # Set this to the private signature repository, e.g. "your-org/cla-signatures".
-          remote-repository-name: ${{ vars.CLA_SIGNATURES_REPO }}
-          allowlist: dependabot[bot]
+          branch: cla-signatures
+          # The owner is the assignee, so the owner's own pull requests need no signature.
+          allowlist: TheJakeBraun,dependabot[bot],github-actions[bot]
           custom-notsigned-prcomment: >
             Thanks for the pull request. This project requires a signed
             [Contributor Assignment Agreement](https://github.com/${{ github.repository }}/blob/main/CLA.md)
@@ -46,3 +47,5 @@ jobs:
             keep the right to use your own work however you like. To sign, reply with:
           custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
           custom-allsigned-prcomment: 'All contributors have signed the CLA. Thanks.'
+          signed-commit-message: 'cla: $contributorName signed the CLA in $owner/$repo'
+          create-file-commit-message: 'cla: create the signature file'
