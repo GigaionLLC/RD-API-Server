@@ -336,6 +336,17 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   rate-limited requests receive the normal empty JSON acknowledgement (`{}`) but produce no
   database, email, or webhook side effects. This preserves the client wire contract without
   exposing validation details to an unauthenticated caller.
+- Since client 1.5.0 every event also carries a per-record `nonce` and the client treats only a
+  2xx with an **empty** body as success, re-posting the record otherwise (10 s, then 30 s, deadline
+  120 s). A stored event is therefore acknowledged with `200` and no body, and a repeated nonce
+  from the same device is acknowledged identically without a second row and without repeating its
+  alarm, mail, or webhook. The guarantee is a database fact — `unique(peer_id, client_nonce)` on
+  `audit_conns`/`alarms`, `unique(from_peer, client_nonce)` on `audit_files` — so it holds under
+  concurrent retries, and the scope is the reporting device, which stops one device from
+  suppressing another's record. Identity binding and the rate limits above run before the dedupe
+  write, so a duplicate cannot be probed to learn whether a nonce exists elsewhere. A write that
+  fails rolls back and answers `{"error":…}` with 200, which the client retries, so a transient
+  database failure cannot silently lose an audit record.
 - Body ceilings are 16 KiB for connection events, 64 KiB for file events, and 16 KiB for alarms.
   Stored strings, enums, IPs, arrays, and counters also have destination-appropriate limits;
   JSON nesting is capped and random `u64` session identifiers are decoded without precision loss.

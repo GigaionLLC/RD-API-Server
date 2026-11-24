@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 #[Fillable([
     'peer_id', 'from_peer', 'from_name', 'info', 'is_file', 'path', 'type', 'ip',
-    'num', 'uuid',
+    'num', 'uuid', 'client_nonce',
 ])]
 class AuditFile extends Model
 {

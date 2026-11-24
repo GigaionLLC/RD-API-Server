@@ -38,7 +38,7 @@ class AuditIngestionSecurityTest extends TestCase
                 .'"session_id":18446744073709551615,"peer":["viewer-1","Alice"],"type":0}'
         );
         $this->assertSame(200, $conn->getStatusCode());
-        $this->assertSame('{}', $conn->getContent());
+        $this->assertSame('', $conn->getContent());
 
         $this->postJson('/api/audit/file', [
             'id' => 'host-1',
@@ -163,7 +163,10 @@ class AuditIngestionSecurityTest extends TestCase
             ]);
 
             $response->assertOk();
-            $this->assertSame('{}', $response->getContent());
+
+            // The stored event is acknowledged with an empty 200; the rate-limited one keeps
+            // the silent `{}` no-op shape.
+            $this->assertSame($attempt === 1 ? '' : '{}', $response->getContent());
         }
 
         $this->assertSame(1, Alarm::count());

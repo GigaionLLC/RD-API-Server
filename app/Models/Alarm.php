@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * A security/operational alarm raised for a peer or device (e.g. a new connection).
  */
 #[Fillable([
-    'device_id', 'peer_id', 'type', 'message', 'ip', 'emailed',
+    'device_id', 'peer_id', 'type', 'message', 'ip', 'client_nonce', 'conn_audit_ref', 'emailed',
 ])]
 class Alarm extends Model
 {

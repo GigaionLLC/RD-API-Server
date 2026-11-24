@@ -16,6 +16,29 @@ notes.
   CLA check are removed; contributions are accepted under MIT. Releases up to and including
   `1.7.4` remain available under the AGPL-3.0-or-later they were published with.
 
+### Fixed
+
+- **Audit events from RustDesk 1.5.0 and later were stored up to three times, and every record
+  triggered its alarm, mail, and webhook again.** Since client 1.5.0 (#15759) the three audit
+  feeds are retried, deduplicated requests: every body carries a per-record UUID `nonce`, success
+  is a 2xx whose body is **empty**, and the client re-posts the record (10 s, then 30 s, deadline
+  120 s) on any non-empty 2xx body — including the `{}` we returned, so each event was sent three
+  times and nothing deduplicated it. `/api/audit/conn`, `/api/audit/file` and `/api/audit/alarm`
+  now acknowledge a stored event with `200` and no body, persist the nonce in a new nullable
+  `client_nonce` column, and treat a repeated nonce from the same device as already stored: one
+  row, no second alarm, mail, or webhook, and the same empty 200. The uniqueness is a database
+  fact scoped to the reporting device (`unique(peer_id, client_nonce)` on `audit_conns`/`alarms`,
+  `unique(from_peer, client_nonce)` on `audit_files`), so it holds under concurrent retries and one
+  device cannot suppress another's record. A write that fails rolls back and answers 200 with
+  `{"error":"Audit record could not be stored"}`, which the client retries, so a transient database
+  failure cannot silently lose an audit record. Clients at 1.4.9 and older are unaffected —
+  they discard the response body — and their nonce-less requests behave exactly as before.
+  Also: alarm type 10 (`ID whitelist blocked connection`, `AlarmAuditType::IdWhitelist`) is now
+  labelled instead of rendering as "Security alarm (type 10)", and `/api/audit/alarm` accepts and
+  stores the optional `conn_audit_ref` the IP- and ID-whitelist alarms carry. **Upgrade:** run
+  `php artisan migrate` (adds `client_nonce` to `audit_conns`, `audit_files`, and `alarms`, plus
+  `conn_audit_ref` on `alarms`); no data backfill and no configuration change.
+
 ## [1.7.4] - 2026-11-24
 
 A correctness release for outbound single-sign-on and webhook traffic. **Upgrade:** pull the new

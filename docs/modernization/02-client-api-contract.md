@@ -302,8 +302,9 @@ all three event shapes in `connection.rs` (`post_conn_audit`, `post_file_audit`,
 event can create an audit row, raise an alarm, send mail, or dispatch a webhook.
 
 Rejected identity, invalid fields, oversized bodies, and rate-limited events still receive the
-wire-compatible `{}` acknowledgement because the client ignores the response body. They have no
-side effects. Connection and alarm bodies are capped at 16 KiB; file bodies at 64 KiB. Default
+wire-compatible `{}` acknowledgement they have always received; they have no side effects.
+**A stored event is different since client 1.5.0 — see §8.2: the success response is 200 with an
+empty body.** Connection and alarm bodies are capped at 16 KiB; file bodies at 64 KiB. Default
 one-minute ceilings are 300 invalid events/source IP, 12,000 valid events/source IP, and 240
 connection, 1,200 file, or 60 alarm events/device. The corresponding `RUSTDESK_AUDIT_*`
 environment settings are documented in `.env.example`.
@@ -352,6 +353,43 @@ attempts an action outside its granted scope. The event-specific detail is seria
 sysinfo, devices/deploy, and recording are all unchanged — audit ingestion is the only
 surface the 1.4.9 client→API contract touched. (`#15524 "remove feature cli"` removes the
 client's Cargo build feature, **not** the `/api/devices/cli` endpoint.)
+
+### 8.2 RustDesk 1.5.0 audit retry + nonce contract (PR #15759) ✅
+
+RustDesk **1.5.0** (PR #15759, "audit retry nonce") turned the three fires on this path into
+retried, deduplicated requests. Read from rustdesk master `a0c0963c`
+(`src/server/connection.rs`):
+
+- every body now carries **`nonce`**, a fresh UUID v4 per record and per endpoint
+  (`:1605` conn, `:1655` file, `:1677` alarm);
+- success is a **2xx whose body is empty** — `if text.trim().is_empty() { return Ok(text); }`
+  (`:1746`). Any other non-empty 2xx body is treated as *not stored* and retried, and the client
+  specifically recognises a `{"error": …}` body as a retryable server-side failure;
+- retries on transport errors, on 5xx/408/429, and on the non-empty-2xx case above; backoff
+  **10 s then 30 s**, `RETRY_DEADLINE` **120 s** (`:1726-1728`);
+- the client states the server half of the contract in the same comment block: "the api server
+  only remembers a record's nonce for five minutes" and "the server releases the record's nonce
+  when its write fails".
+
+Our side (migration `2026_11_24_100001_add_client_nonce_to_audit_tables`):
+
+| Aspect | Behaviour |
+|--------|-----------|
+| Success body | **200, empty** (`Content-Length: 0`) from `/api/audit/conn`, `/file`, `/alarm`. Pre‑1.5.0 clients are unaffected: at tag `1.4.9` `post_audit_async()` is `crate::post_request(url, v.to_string(), "")` behind `allow_err!`, i.e. the body and the status are discarded. |
+| Rejection body | Unchanged `{}` for failed device binding, invalid fields, oversized bodies, and rate limits — no side effects, no new information for an unauthenticated caller. |
+| Write failure | 200 `{"error":"Audit record could not be stored"}` — generic text, no internals. The client retries this shape exactly as it retries 5xx, and the failed write's transaction rolled back, so the retry stores the record. Chosen over 5xx so one failed insert is not reported as an upstream outage by proxies/monitors in front of us (and so a proxy cannot substitute its own error page for the body). |
+| `nonce` | Optional string, ≤ 64 chars, loosely validated (`[A-Za-z0-9._-]{8,64}` — a UUID v4 today). Garbage is dropped as a normal validation rejection. Stored as `client_nonce` on `audit_conns`, `audit_files`, and `alarms`. |
+| Duplicate nonce | The same device re-sending the same nonce answers the same empty 200, creates no second row, and fires **no** alarm, mail, notification, or webhook. |
+| Uniqueness scope | `unique(peer_id, client_nonce)` on `audit_conns`/`alarms` and `unique(from_peer, client_nonce)` on `audit_files` — scoped to the reporting device, so one device can never suppress another device's record. A global nonce-only index plus a "same device?" check would have added an error branch for a case that cannot occur (a UUID v4 minted on another host is unguessable) and would let a rejected cross-device collision look like an authorization failure. |
+| Ordering | Device identity binding and every rate limit run **before** the dedupe write, so a duplicate cannot be used as an oracle across devices: a wrong `id`/`uuid` is rejected identically whether or not the nonce exists. |
+| Rate-limit headroom | Unchanged. A retried duplicate consumes one more slot of the per-device and per-source-IP budgets, which is deliberate (the limits must run before dedupe). Headroom: with success now being an empty body, the 10 s/30 s retry only happens after a real failure — worst case a device's 240 conn/1,200 file/60 alarm events per minute become 3× that many requests for 120 s, far inside 12,000 valid events/source IP/min. No default needs changing; raise `RUSTDESK_AUDIT_*` only for a deployment with many devices behind one NAT address. |
+| Requests without a nonce | Pre‑1.5.0 behaviour exactly: nothing to dedupe, and `NULL` values are not constrained by a unique index, so two identical events stay two events. |
+| Alarm type 10 | `AlarmAuditType::IdWhitelist = 10` (`a0c0963c:src/server/connection.rs:6697`, posted from `:1507` as `{id, ip, name}`) renders as "ID whitelist blocked connection". |
+| `conn_audit_ref` on alarms | Since 1.5.0 the `IpWhitelist` and `IdWhitelist` alarms additionally carry the same controller-attribution token as the connection feed (`:1678-1684`), so `/api/audit/alarm` accepts it and stores it in `alarms.conn_audit_ref` (nullable). |
+
+**Not part of this contract:** `PUT /api/audit` (operator note) is not retried and sends no
+nonce — the Flutter client only checks `statusCode == 200`
+(`flutter/lib/common/widgets/dialog.dart:1668` at `a0c0963c`), so it keeps its `{}` success body.
 
 ---
 

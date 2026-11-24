@@ -47,15 +47,17 @@ class ApiResponseTest extends TestCase
         $this->assertSame('[]', $res->getContent()); // list endpoint: empty array, not "{}"
     }
 
-    public function test_audit_endpoints_return_objects(): void
+    public function test_audit_endpoints_acknowledge_with_an_empty_body(): void
     {
+        // RustDesk 1.5.0+ re-posts a record on any non-empty 2xx body, so a stored connection,
+        // file, or alarm event must answer 200 with nothing in the body.
         Device::create(['rustdesk_id' => 'p1', 'uuid' => 'u1']);
 
-        $this->assertSame('{}', $this->postJson('/api/audit/conn', [
+        $this->assertSame('', $this->postJson('/api/audit/conn', [
             'id' => 'p1', 'uuid' => 'u1', 'action' => 'new', 'conn_id' => 1,
             'session_id' => 1,
         ])->getContent());
-        $this->assertSame('{}', $this->postJson('/api/audit/alarm', [
+        $this->assertSame('', $this->postJson('/api/audit/alarm', [
             'id' => 'p1', 'uuid' => 'u1', 'typ' => 0, 'info' => 'x',
         ])->getContent());
     }
