@@ -49,7 +49,8 @@
 
 * `[x]` HTTPS required? → **Yes.** No insecure-context fallback.
 * `[x]` Browser targets? → **Chrome/Chromium desktop only.** No Firefox/Safari/touch/mobile.
-* `[x]` Licence? → **AGPL-3.0**, same as the repo.
+* `[x]` Licence? → **MIT**, same as the repo (relicensed 2026-11-24; it was AGPL-3.0 when this
+  plan was written).
 * `[x]` Build step? → **None.** Native ES modules, hand-written codec, JSDoc + `checkJs`.
 * `[x]` Copy code from RustDesk/the reviewed implementation? → **No.** Clean-room: implement from `docs/spec/`.
 * `[ ]` v1 release scope → recommend Phase 5 (view + control + audio); files/terminal follow.

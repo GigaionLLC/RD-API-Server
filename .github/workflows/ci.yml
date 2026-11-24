@@ -366,6 +366,7 @@ jobs:
             type=raw,value=sha-${{ github.sha }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
 
   publish_build:
     name: Build image (${{ matrix.platform }})
