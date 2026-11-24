@@ -4,11 +4,53 @@ This is an exhaustive catalog of the client option keys a self-hosted API server
 RustDesk clients via the heartbeat **Strategy** mechanism (the Pro "Security Settings sync /
 Strategy" feature). It drives our Strategy feature implementation.
 
-Everything here is sourced from the RustDesk client at `D:\git\rustdesk` (the
-`hbb_common` git submodule, pinned at commit `387603f47cbb`). The single authoritative
-source is the `keys` module in `libs/hbb_common/src/config.rs`
-(`libs/hbb_common/src/config.rs:2853`-`3225`). File:line citations throughout are relative
-to `D:\git\rustdesk`.
+Everything here is sourced from the RustDesk client at **rustdesk commit `a0c0963c`**
+(master, 2026-11-24; the `1.4.9` → `1.5.3` changes are noted where they matter). The single
+authoritative source is now `libs/base/src/config/keys.rs` in the rustdesk repo — the option
+`keys` module moved out of the `hbb_common` submodule in 1.5.0 (#16107/#598), and
+`libs/hbb_common/src/config.rs` keeps only the ~33 constants that `hbb_common` itself reads.
+Key lists at `a0c0963c`: `KEYS_DISPLAY_SETTINGS:191`, `KEYS_LOCAL_SETTINGS:223`,
+`KEYS_SETTINGS:276`, `KEYS_BUILDIN_SETTINGS:343`; individual constants are cited by line
+(`keys.rs:NN`).
+
+> Line numbers of the form `config.rs:NNNN` further down are from the pre-1.5.0 layout and were
+> **not** re-verified against `keys.rs`; treat the file above as the source of truth and the
+> numbers as historical anchors.
+
+**Client versions verified against:** `1.4.9` (the original baseline) and `1.5.3`
+(`95cca3f6`) / master `a0c0963c`. Two behaviours changed in between and are load-bearing for
+any server that pushes a Strategy:
+
+1. **1.5.3+ strips 24 keys from a server push** — see §1b.
+2. **`allow-linux-headless` no longer exists** (deleted in 1.5.0, #15866).
+
+### 1b. What a 1.5.3+ client refuses to apply (`BLOCKED_CONFIG_OPTIONS`)
+
+`src/hbbs_http/sync.rs:297-326` (list) + `:329-341` (`filter_config_options`) at `a0c0963c`;
+added by #16696 (first tag 1.5.3) and extended by #17130 on master. The client logs
+`Rejected heartbeat strategy options: [...]` and drops these keys **before**
+`Config::set_options`, so an admin who believes they disabled insecure TLS, WebSocket or
+trusted devices gets none of it on a 1.5.3+ client:
+
+| Group | Keys |
+|-------|------|
+| Server endpoints and trust | `custom-rendezvous-server`, `rendezvous-servers`, `api-server`, `relay-server`, `key`, `ice-servers` |
+| Transport security | `allow-insecure-tls-fallback`, `allow-websocket`, `websocket-port` |
+| Authentication and credentials | `2fa`, `bot`, `preset-address-book-password`, `enable-trusted-devices`, `trusted-device-expiration-days` |
+| Deployment and address-book metadata | `preset-address-book-name`, `preset-address-book-tag`, `preset-address-book-alias`, `preset-address-book-note`, `preset-device-name`, `preset-device-username`, `preset-note` |
+| Recording location and service state | `windows-service-video-save-directory`, `stop-service`, `reg_recovery` |
+
+Consequences for us (implemented in `config/strategy_options.php` +
+`ClientConfigService::STRATEGY_IGNORED_SINCE`):
+
+- The catalog keeps the three keys it offers from that list
+  (`allow-insecure-tls-fallback`, `allow-websocket`, `enable-trusted-devices`) because **older
+  clients still apply them**; each is flagged `'strategy_ignored_since' => '1.5.3'` and the
+  editor prints the warning under the control.
+- A free-form custom option that names a blocked key is saved but the save response carries a
+  `warning`, so the admin is told instead of silently pushing nothing.
+- Install-time delivery still works: `rustdesk --option <key> <value>`, the config string and a
+  custom client's `default-settings`/`override-settings` are not filtered this way.
 
 ---
 
@@ -161,10 +203,11 @@ Definitions: `config.rs:2899`-`2910`. The Control-Role override mapping lives in
 | `allow-remote-config-modification` | OFF | bool Y/N | Let a connected operator change this host's settings | Strategy: security |
 | `verification-method` … | — | — | (enum resolution: `libs/hbb_common/src/password_security.rs:42`-`51`) | — |
 | `whitelist` | `""` (none) | string (comma/`,`-sep IPs/CIDRs; `0.0.0.0` = allow all) | IP allow-list for incoming connections | Strategy: Access control |
+| `id-whitelist` | `""` (none) | string (comma`,`-separated client IDs, `*` wildcards) | Client-ID allow-list, enforced **in addition to** the IP whitelist | Strategy: Access control (1.5.0+, #15586) |
 | `allow-auto-disconnect` | OFF | bool Y/N | Auto-drop idle incoming sessions | Strategy: security |
 | `auto-disconnect-timeout` | `""` (mins) | string (minutes) | Idle timeout used by the above | Strategy: security |
 | `allow-only-conn-window-open` | OFF | bool Y/N | Only accept connections while the main window is open | Strategy: security |
-| `enable-trusted-devices` | ON | bool Y/N | Allow "trusted device" 2FA bypass | Strategy: security |
+| `enable-trusted-devices` | ON | bool Y/N | Allow "trusted device" 2FA bypass | **not strategy-settable on 1.5.3+** (§1b); trusted-device V2 moved it to its own auth path |
 | `allow-logon-screen-password` | OFF (built-in)\* | bool Y/N | Allow permanent password at the Windows logon screen | Strategy: security |
 | `allow-remove-wallpaper` | OFF | bool Y/N | Allow removing wallpaper during a session | Strategy: privacy |
 
@@ -191,9 +234,10 @@ normally a custom-client preset rather than a strategy push.
 | `direct-server` | OFF | bool Y/N | Enable direct IP access (listen locally) | Strategy: network |
 | `direct-access-port` | `""` | string (port) | Port for direct IP access | Strategy: network |
 | `enable-lan-discovery` | ON | bool Y/N | Respond to LAN discovery broadcasts | Strategy: network |
-| `allow-websocket` | OFF | bool Y/N | Use WebSocket transport | Strategy: network (WebSocket feature) |
+| `allow-websocket` | OFF | bool Y/N | Use WebSocket transport | **not strategy-settable on 1.5.3+** (§1b) |
+| `allow-kcp-congestion-control` | OFF | bool Y/N | Run KCP with its congestion window instead of the turbo profile | Strategy: network (opt-in; `src/common.rs:2756`-`2763`) |
 | `disable-udp` | OFF | bool Y/N | Disable UDP (force TCP) | Strategy: network |
-| `allow-insecure-tls-fallback` | OFF | bool Y/N | Permit insecure TLS fallback | Strategy: network |
+| `allow-insecure-tls-fallback` | OFF | bool Y/N | Permit insecure TLS fallback | **not strategy-settable on 1.5.3+** (§1b) |
 | `ice-servers` | `""` | string (JSON) | Custom ICE/STUN/TURN servers | Strategy: network |
 | `relay-server` … | — | — | — | — |
 | `register-device` | `""` | bool Y/N | Auto-register device with the server | Strategy: device mgmt |
@@ -212,7 +256,7 @@ endpoint from `api-server` + `custom-rendezvous-server` (`src/hbbs_http/sync.rs:
 | `enable-record-session` | ON | bool Y/N | Allow operator-initiated recording (also a permission, §2a) | Control Role: recording |
 | `allow-auto-record-incoming` | OFF | bool Y/N | Auto-record incoming (host) sessions | Strategy: recording |
 | `allow-auto-record-outgoing` | OFF | bool Y/N | Auto-record outgoing (viewer) sessions — *local setting* | Strategy: recording (viewer) |
-| `video-save-directory` | `""` | string (path) | Where recordings are written — *local setting* | Strategy: recording |
+| `video-save-directory` / `windows-service-video-save-directory` | `""` | string (path) | Where recordings are written — *local setting* / service key | local; the service key is **not strategy-settable on 1.5.3+** (§1b) |
 | `disable_audio` | OFF | bool Y/N | (viewer-side) mute remote audio — *display setting* | viewer pref |
 | `enable-audio` | ON | bool Y/N | Allow audio (host permission, §2a) | Control Role: audio |
 
@@ -235,7 +279,11 @@ Host-side (`KEYS_SETTINGS`):
 | `enable-directx-capture` | ON | bool Y/N | Use DirectX capture (Windows) |
 | `enable-android-software-encoding-half-scale` | ON | bool Y/N | Android half-scale software encoding |
 | `allow-always-software-render` | OFF | bool Y/N | Force software rendering |
-| `allow-linux-headless` | OFF | bool Y/N | Allow headless Linux sessions |
+| `allow-drm-capture` | OFF | bool Y/N | Linux + Wayland: capture scanout through the service (no portal prompt, works at the login screen) — `keys.rs:92`, `KEYS_SETTINGS:339`; needs a build **newer than 1.5.3** (#17089) and the `drm` feature + a loadable `libdrmtap`; X11 unaffected; toggling it restarts `--server` |
+
+`allow-linux-headless` was **removed upstream** in 1.5.0 (#15866): no client reads it, so it is
+no longer in `keys.rs` and must not be offered as a Strategy control (our catalog lists it under
+its `removed` map instead: stored value kept, not pushed).
 
 Definitions: `config.rs:2925`-`2929`, `2945`-`2946`. Viewer-side display keys (codec
 preference, image quality, fps, view style, cursor options, etc.) are listed in
@@ -274,9 +322,16 @@ pseudo-keys `config.rs:3050`-`3052` (note the comment: these are not real keys, 
 `config.rs:2954`-`2963`. The preset-* keys are read back into the sysinfo upload at
 `src/hbbs_http/sync.rs:135`-`178`.
 
+**1.5.x changes here:** every `preset-*` key and `windows-service-video-save-directory` are in
+the 1.5.3+ deny-list (§1b), so onboarding data must arrive through `/api/assign` /
+`/api/devices/cli` or a custom client, not a Strategy. On master, `/api/sysinfo` **no longer
+uploads `preset-address-book-password`** at all (#17130, `src/hbbs_http/sync.rs:145-152`): our
+`/api/sysinfo` handler still accepts the field, which is now a dead path (keep it for 1.4.9
+clients, do not build on it).
+
 ### 2h. Built-in / UI-hiding keys (custom-client only — NOT strategy)
 
-`KEYS_BUILDIN_SETTINGS` (`config.rs:3189`-`3224`) are baked at client-generation time and read
+`KEYS_BUILDIN_SETTINGS` (`keys.rs:343`-`380`) are baked at client-generation time and read
 via `get_builtin_option` (the hard/preset layer), e.g. `hide-security-settings`,
 `hide-network-settings`, `hide-server-settings`, `hide-proxy-settings`, `hide-tray`,
 `disable-change-permanent-password`, `disable-change-id`, `disable-unlock-pin`,
@@ -285,6 +340,15 @@ via `get_builtin_option` (the hard/preset layer), e.g. `hide-security-settings`,
 `allow-command-line-settings-when-settings-disabled`. These configure the *client build*, not
 a per-device strategy, and are surfaced via the Custom Client Generator rather than the
 Strategy editor.
+
+**Why that matters for 1.5.x keys.** `BUILTIN_SETTINGS` is filled *only* from a custom client's
+`custom.txt` default/override settings (`src/common.rs:2563` at `a0c0963c`); `Config::set_options`
+writes `CONFIG2.options` and nothing copies it into the builtin layer. So the 1.5.x additions in
+that list — `hide-general-settings` (`keys.rs:119`), `hide-account-password-login`
+(`keys.rs:127`), `quit-button-text` (`keys.rs:128`) — are **inert when pushed by a strategy** and
+are deliberately absent from the editor. The same is true for the new `KEYS_LOCAL_SETTINGS` keys
+read through `LocalConfig` / `mainGetLocalOption`: `keep-awake-during-outgoing-sessions`
+(`keys.rs:184`), `relay-fallback-delay` (`keys.rs:138`), `hide-recording-button` (`keys.rs:65`).
 
 ---
 
@@ -378,9 +442,18 @@ apply.
 | `KEYS_DISPLAY_SETTINGS` / `KEYS_LOCAL_SETTINGS` | viewer/UI prefs | Technically pushable (no allow-list), but they describe the controlling viewer, not the device — avoid unless intentional |
 
 Practical rule for the editor: a Strategy should expose the **`KEYS_SETTINGS`** group
-(`config.rs:3130`-`3186`). Pushing a key that the target client has locked via
-`OVERWRITE_SETTINGS` is silently ignored on the client; everything else takes effect on the
-next heartbeat.
+(`keys.rs:276`-`340`). Pushing a key that the target client has locked via `OVERWRITE_SETTINGS`
+is silently ignored on the client, and so is every key in the 1.5.3+ deny-list (§1b) — which is
+why the catalog flags those instead of hiding them (older clients still honour them).
+
+Two more facts worth knowing when reading a saved strategy back:
+
+- **A pushed option is sticky.** `handle_config_options` merges the pushed map into the client's
+  current options and stores the whole map, so *removing* a key from a Strategy does not revert a
+  device. Pushing `""` deletes the key (back to the client default), pushing `"N"` pins it off.
+- **Keys the client no longer defines** (`allow-linux-headless`) stay in stored strategies. The
+  editor shows them read-only under "Removed upstream", saving keeps the value verbatim, and the
+  heartbeat/install script skip them until an admin ticks them for removal.
 
 ---
 

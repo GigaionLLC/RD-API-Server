@@ -137,10 +137,18 @@
                                                             $inputId = 'strategy-opt-'.$opt['key'];
                                                         @endphp
                                                         <div class="rd-strategy-option">
-                                                            <label class="rd-strategy-option__label" for="{{ $inputId }}">
-                                                                <span>{{ $opt['label'] }}</span>
-                                                                <code class="rd-strategy-option__key">{{ $opt['key'] }}</code>
-                                                            </label>
+                                                            <div class="rd-strategy-option__label">
+                                                                <label for="{{ $inputId }}">
+                                                                    <span>{{ $opt['label'] }}</span>
+                                                                    <code class="rd-strategy-option__key">{{ $opt['key'] }}</code>
+                                                                </label>
+                                                                @if (! empty($opt['strategy_ignored_since']))
+                                                                    <p class="rd-strategy-section__help">RustDesk {{ $opt['strategy_ignored_since'] }}+ ignores this when pushed by a server; set it at install time with <code>--option</code> or the config string.</p>
+                                                                @endif
+                                                                @if (! empty($opt['note']))
+                                                                    <p class="rd-strategy-section__help">{{ $opt['note'] }}</p>
+                                                                @endif
+                                                            </div>
                                                             <div class="rd-strategy-option__control">
                                                                 @if ($opt['type'] === 'toggle')
                                                                     <select class="rd-select @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" name="opt[{{ $opt['key'] }}]" @disabled(! $canEdit)>
@@ -170,6 +178,31 @@
                             @endforeach
 
                             <div class="rd-strategy-pane" id="strategy-pane-custom" role="tabpanel" aria-labelledby="strategy-tab-custom" data-pane="custom" hidden>
+                                @if (! empty($retiredOptions))
+                                    <section class="rd-strategy-section">
+                                        <header class="rd-strategy-section__header">
+                                            <div>
+                                                <h3 class="rd-strategy-section__title">Removed upstream</h3>
+                                                <p class="rd-strategy-section__help">These keys are no longer defined by the client. They stay in this strategy, unchanged and visible, but are no longer pushed to devices. Tick one to delete it here.</p>
+                                            </div>
+                                        </header>
+                                        <div class="rd-stack rd-stack--sm">
+                                            @foreach ($retiredOptions as $retiredKey => $retired)
+                                                <div class="rd-stack rd-stack--sm">
+                                                    <div class="rd-strategy-custom-row">
+                                                        <input class="rd-input rd-mono" id="retired-{{ $retiredKey }}" value="{{ $retiredKey }}" aria-label="Retired option key" readonly disabled>
+                                                        <input class="rd-input rd-mono" value="{{ $retired['value'] }}" aria-label="Stored value for {{ $retiredKey }}" readonly disabled>
+                                                        @if ($canEdit)
+                                                            <label class="rd-check"><input type="checkbox" name="drop_retired[]" value="{{ $retiredKey }}"><span class="visually-hidden">Remove {{ $retiredKey }} from this strategy</span></label>
+                                                        @endif
+                                                    </div>
+                                                    <p class="rd-strategy-section__help">{{ $retired['note'] }}</p>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </section>
+                                @endif
+
                                 <section class="rd-strategy-section">
                                     <header class="rd-strategy-section__header">
                                         <div>

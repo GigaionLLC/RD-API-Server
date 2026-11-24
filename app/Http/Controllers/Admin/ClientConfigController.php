@@ -118,7 +118,7 @@ class ClientConfigController extends Controller
 
         try {
             if ($selectedStrategy) {
-                $installScript = $config->installScript((array) ($selectedStrategy->options ?? []), $unlockPin);
+                $installScript = $config->installScript($selectedStrategy->pushableOptions(), $unlockPin);
             }
             if ($unlockPin !== '') {
                 // The standalone PIN card consumes the same safely quoted service output.

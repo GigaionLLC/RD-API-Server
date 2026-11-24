@@ -7,8 +7,22 @@ client (the `rustdesk` Rust repo) actually speaks to its API server. If we want 
 **Verification legend** — ✅ read directly from client source during this dive ·
 🔎 reported from client source by research agent (cross‑checked against existing routes).
 
+**Client versions verified against**
+
+| Client | Commit | What it changed for this contract |
+|--------|--------|-----------------------------------|
+| `1.4.9` (baseline, 2026-07-06) | `6c578292` | the shapes this document was written from |
+| `1.5.0` | `fada664d` | `POST /api/switch-grant`; audit bodies gain `nonce` + retries; `apiDomain` on `POST /api/oidc/auth`; alarm type `10`; `id-whitelist` option; option keys move to `libs/base/src/config/keys.rs`; `allow-linux-headless` removed |
+| `1.5.1` | `23e5bb47` | trusted-device V2 (auth options take a separate path); the client warns when its API server is plain HTTP and non-loopback |
+| `1.5.3` | `95cca3f6` | the client strips 24 keys out of a heartbeat `strategy.config_options` push (`BLOCKED_CONFIG_OPTIONS`) |
+| master `a0c0963c` (2026-11-24) | `a0c0963c` | `allow-drm-capture`; the preset address-book password is no longer uploaded by `/api/sysinfo`; the deny-list gains the `preset-*` / `key` / `ice-servers` groups |
+
+Per-endpoint notes for the differences that matter here are in §1 (strategy push), §3 (`apiDomain`),
+§9 (`/api/switch-grant`) and §10. Anything described below without a version note is unchanged from
+1.4.9.
+
 Client source anchors:
-- `src/hbbs_http/sync.rs` — heartbeat, sysinfo, strategy ✅
+- `src/hbbs_http/sync.rs` — heartbeat, sysinfo, strategy, `/api/switch-grant` ✅
 - `src/hbbs_http/account.rs` — login/OIDC, auth body, 2FA fields ✅
 - `src/hbbs_http/record_upload.rs` — session recording upload ✅
 - `src/auth_2fa.rs` — TOTP/2FA ✅
@@ -128,8 +142,12 @@ name, preset device username, preset device name, preset note. These are produce
 1. `POST /api/oidc/auth`
    ```json
    { "op": "<provider>", "id": "...", "uuid": "...",
-     "deviceInfo": { "os": "...", "type": "client|browser", "name": "..." } }
+     "deviceInfo": { "os": "...", "type": "client|browser", "name": "..." },
+     "apiDomain": "https://api.example.com" }
    ```
+   `apiDomain` (RustDesk 1.5.0+, #15710, `account.rs:169‑175`) is the API URL the client itself
+   resolved — informational only. It is the *claimant's* own claim, so it must never authorize or
+   redirect anything; we ignore it (and keep tolerating unknown fields).
    → `{ "code": "...", "url": "<provider auth url>" }`
 2. Client opens `url`, then polls `GET /api/oidc/auth-query?code=&id=&uuid=` (1s, ≤3min).
    While pending the server returns an error containing `"No authed oidc is found"`.
@@ -406,6 +424,23 @@ nonce — the Flutter client only checks `statusCode == 200`
 
 ---
 
+### 9.1 `POST /api/switch-grant` — RustDesk **Pro** hbbs feature we do not implement
+
+RustDesk 1.5.0+ posts `{id, switch_code_verifier, timestamp, signature}` (device-key signed, retried
+once with `server_time` on a clock-skew answer) to `{api-server}/api/switch-grant` when a user
+switches sides/accounts (`sync.rs:391‑450` at `a0c0963c`). The response contract is
+`{"accepted": true}` or `{"accepted": false, "server_time": <unix>}`.
+
+- It belongs to the Pro `hbbs`, which consumes the grant to bypass ACL — the open-source
+  `rustdesk-server` has no code that reads it.
+- The call is **fire-and-forget**: the client only logs a failure and continues, so answering
+  404/405 (what we do today) has no user-visible effect beyond a log line.
+- We therefore do not implement it. If a future client makes it mandatory, the safe shape is
+  `{"accepted": false, "server_time": <now>}` with the ed25519 signature verified against the
+  stored device `pk` first — never `accepted: true` without proof.
+
+---
+
 ## 10. Endpoint summary (client → server)
 
 | Endpoint | Method | Auth | Implemented here? |
@@ -422,4 +457,5 @@ nonce — the Flutter client only checks `statusCode == 200`
 | `/api/ab*` | GET/POST/PUT/DELETE | yes | ✅ |
 | `/api/audit/conn` · `/api/audit/file` | POST | no | ✅ |
 | `/api/record` | POST | explicit IP/CIDR or upload token; disabled by default | ✅ |
+| `/api/switch-grant` | POST | device key (Pro hbbs only) | ❌ not implemented — fire-and-forget, the client only logs (§9.1) |
 | `/api/devices/deploy` · `/api/devices/cli` | POST | token | ❌ |

@@ -20,7 +20,7 @@ delivered to a *stock* client without a client change — those are called out p
 
 | # | Finding | Net-new? | Server-influenceable on a **stock** client? | Effort | Value |
 |---|---------|----------|---------------------------------------------|--------|-------|
-| 1 | **Custom plugin registry + `plugin-sign` license endpoint** | ✅ Yes | ⚠️ Partial — only if client built with `plugin_framework` (NOT default) | M | ★★★☆☆ |
+| ~~1~~ | ~~**Custom plugin registry + `plugin-sign` license endpoint**~~ — **dropped: upstream deleted the plugin framework in 1.5.0 (#15854)**; `src/plugin/` is empty at `a0c0963c`, so nothing calls `plugin-sign` | — | ❌ No — the subsystem no longer exists | — | — |
 | 2 | **`UserStatus::Unverified (-1)` gating + `third_auth_type` round-trip** | ✅ Yes (doc 11 #3 covered whitelist/email, not these) | ✅ Yes — pure server policy | S | ★★★★☆ |
 | 3 | **Per-tag address-book colors (`tag_colors`) round-trip** | ✅ Yes (doc 11 #7 listed AB but not colors) | ✅ Yes — server stores/returns | S | ★★★☆☆ |
 | 4 | **Console-operation / admin-action audit log** (new audit *category*, not client-driven) | ✅ Yes | n/a (panel-internal) | S–M | ★★★★☆ |
@@ -32,49 +32,30 @@ delivered to a *stock* client without a client change — those are called out p
 | 10 | **Wake-on-LAN orchestration** | — (doc 11 #12) | ❌ Client-LAN-only (magic packet from local config) | — | ★★☆☆☆ *(confirmed client-only)* |
 
 **Headline honesty:** the two most attractive-sounding items — a **custom auto-update channel**
-(#6) and a **plugin distribution store** (#1) — are both gated. #6 is **hardcoded** to
-rustdesk.com and cannot be redirected on a stock client. #1 only works on clients compiled with
-the non-default `plugin_framework` feature. The genuinely *free, stock-client* wins are the
-small server-policy items (#2, #3, #4).
+(#6) and a **plugin distribution store** (#1) — are both dead. #6 is **hardcoded** to
+rustdesk.com and cannot be redirected on a stock client. #1 no longer exists at all: upstream
+deleted the plugin framework in 1.5.0 (#15854), so there is no client-side caller left. The
+genuinely *free, stock-client* wins are the small server-policy items (#2, #3, #4).
 
 ---
 
-## 1. Plugin system — custom registry + `plugin-sign` license endpoint  ✅ net-new (M, ★★★☆☆)
+## 1. Plugin system — **dropped** (was: custom registry + `plugin-sign` license endpoint)
 
-**What the client does.**
-- Plugin sources are a list of `PluginSource { name, url, description }`
-  (`src/plugin/manager.rs:42-46`). The list is fetched from a registry URL: the manager GETs
-  `"{source.url}/meta.toml"` and parses a `ManagerMeta { plugins: [...] }`
-  (`manager.rs:68-111`), filtering by `PLUGIN_PLATFORM`.
-- Install pulls a zip from a deterministic path:
-  `"{source.url}/plugins/{id}/{platform}/{id}_{version}.zip"` (`manager.rs:234-241`).
-- **License/signature check hits the configured api-server**: on signature verification the
-  client POSTs `"{get_api_server()}/lic/web/api/plugin-sign"` with
-  `PluginSignReq { plugin_id, version, msg }` and expects `PluginSignResp { signed_msg }`
-  (`src/plugin/callback_msg.rs:283-296`). **This is the one plugin endpoint that already
-  resolves to *our* server**, not GitHub.
+**Status: not buildable — the upstream plugin framework is gone.** `d1da05c4` (#15854,
+"refact: remove feature plugin-framework", first tag **1.5.0**) deleted the whole `src/plugin/`
+tree: `git ls-tree a0c0963c src/plugin/` is empty. That removes every anchor this plan rested on:
 
-**What the server would build.**
-- A **plugin registry**: serve `GET /meta.toml` (TOML list of `{id, name, version, platforms,
-  description, ...}`) and host the zips under `/plugins/{id}/{platform}/{id}_{version}.zip`. The
-  panel becomes the client's plugin store; admins curate an **allowlist** of approved plugins.
-- A **`POST /lic/web/api/plugin-sign`** handler that signs/approves a plugin-supplied message
-  (`{plugin_id, version, msg}` → `{signed_msg}`). This is the gate by which a panel can
-  *authorize* which plugins a fleet may load.
-- (Model) `plugins` table (id, version, platform, zip path, sha, enabled), `plugin_signing_key`.
+- `src/plugin/manager.rs` (plugin sources, registry `meta.toml`, zip install path) — deleted.
+- `src/plugin/callback_msg.rs:283-296` — the `{api-server}/lic/web/api/plugin-sign` call — deleted.
+  It was the only client→API endpoint besides `/api/*` and the only one removed since 1.4.9.
+- the `plugin_framework` Cargo feature — gone with the code.
 
-**Honest caveats.**
-- `get_plugin_source_list()` currently returns `vec![]` (`manager.rs:58-66`) — the upstream
-  default ships **no** source, so the client lists nothing until a source URL is configured.
-- The whole subsystem is behind the **`plugin_framework` Cargo feature, which is NOT in
-  `default`** (`Cargo.toml:23-34`, `default = ["use_dasp"]`; gated call sites e.g.
-  `src/core_main.rs:186,733`, `src/lib.rs:52`). Stock release binaries are built without it, so
-  for most fleets this is dormant. Treat as a **forward-looking differentiator**: build the
-  registry + sign endpoint so that *if/when* a custom client (or a future stock release) enables
-  plugins, the panel is already the trusted source. Lower priority than #2–#4.
+So a plugin registry, an allowlist and a signing endpoint would have **no caller on any client**,
+1.4.9's plugin builds included (those are the versions we would be signing for, and they also
+resolve `plugin-sign` against the configured API server — but 1.5.0+ fleets cannot use it at all).
 
-**Server-influenceable:** ⚠️ Partial (only `plugin_framework` builds). **Beats OSS:** neither OSS
-server hosts a plugin registry or implements `plugin-sign`.
+**Server-influenceable:** ❌ No. **Beats OSS:** moot. Do not implement; this document previously
+ranked it as a forward-looking differentiator, which the upstream removal invalidates.
 
 ---
 
@@ -295,11 +276,9 @@ panel-internal:
 3. **#3 Tag colors round-trip** — S, fold into the address-book work; visible polish.
 4. **#8 Admin-console live online feed (panel websocket/SSE off heartbeat data)** — M, genuinely
    useful fleet view; scope it as an *admin* feature, not client AB dots.
-5. **#1 Plugin registry + `plugin-sign`** — M, build the registry + sign endpoint as a
-   forward-looking differentiator, but **deprioritise** (gated behind non-default
-   `plugin_framework`; dormant for stock fleets).
-
 **Explicitly do NOT build (blocked / no stock-client payoff):**
+- **#1 plugin registry + `plugin-sign`** — the upstream plugin framework was deleted in 1.5.0
+  (#15854); no client calls the endpoint any more.
 - **#6 custom auto-update channel** — hardcoded to `api.rustdesk.com/version/latest`; impossible
   on a stock client without a client patch.
 - **#7 generic distribution endpoint** — no stock-client trigger consumes it.
@@ -318,9 +297,9 @@ panel-internal:
   `const URL = "https://api.rustdesk.com/version/latest"`.
 - `src/hbbs_http/account.rs:46-97` — `UserInfo { settings, login_device_whitelist, other }`,
   `UserStatus { Disabled, Normal, Unverified=-1 }`, `UserPayload.third_auth_type`.
-- `src/plugin/manager.rs:42-46,58-111,225-241` — `PluginSource`, registry `meta.toml`, zip path.
-- `src/plugin/callback_msg.rs:270-296` — `{api-server}/lic/web/api/plugin-sign`.
-- `Cargo.toml:23-34` — `plugin_framework` feature, **absent from `default`**.
+- `src/plugin/` — **deleted** at `a0c0963c` (#15854, first tag 1.5.0). The 1.4.9 anchors were
+  `src/plugin/manager.rs:42-46,58-111,225-241` and `src/plugin/callback_msg.rs:270-296`
+  (`{api-server}/lic/web/api/plugin-sign`).
 - `src/lan.rs:86-105` — Wake-on-LAN magic packet (local config, local interfaces).
 - `flutter/lib/models/ab_model.dart:233,251,260-297,522-523,628,689-691,1284-1295,1327,
   1342-1349,1500` — AB settings/personal/shared routes, `tag_colors`, per-tag color, online cache.

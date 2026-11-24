@@ -82,7 +82,16 @@ class StrategyController extends Controller
         $strategy->modified_at = time();
         $strategy->save();
 
-        return response()->json(['data' => $this->shape($strategy)]);
+        $response = ['data' => $this->shape($strategy)];
+
+        // A key the client strips from a server push is still accepted (older clients honour it),
+        // but the caller is told instead of believing the policy now applies.
+        $warning = ClientConfigService::strategyIgnoredWarning(array_keys((array) ($strategy->options ?? [])));
+        if ($warning !== null) {
+            $response['warning'] = $warning;
+        }
+
+        return response()->json($response);
     }
 
     /**

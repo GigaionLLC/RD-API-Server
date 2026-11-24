@@ -39,6 +39,28 @@ class Strategy extends Model
     }
 
     /**
+     * The stored options minus the keys the client no longer defines. A legacy strategy may still
+     * carry one (the editor shows it read-only and keeps it on save), but nothing should push it:
+     * no client reads it, so it would only litter the config.
+     *
+     * @return array<string, string>
+     */
+    public function pushableOptions(): array
+    {
+        $removed = array_map(strval(...), array_keys((array) config('strategy_options.removed', [])));
+
+        $options = [];
+        foreach ((array) ($this->options ?? []) as $key => $value) {
+            $key = (string) $key;
+            if (! in_array($key, $removed, true)) {
+                $options[$key] = (string) $value;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
      * @return HasMany<StrategyAssignment, $this>
      */
     public function assignments(): HasMany
