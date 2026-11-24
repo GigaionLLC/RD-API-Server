@@ -208,11 +208,19 @@
                         <article class="rd-card rd-card--quiet">
                             <div class="rd-card__header"><div><p class="rd-card__eyebrow">Windows first run</p><h3 class="rd-card__title">Renamed installer</h3></div></div>
                             <div class="rd-card__body rd-stack rd-stack--sm">
-                                <p class="rd-help">Rename the downloaded <code>rustdesk-*.exe</code> to this filename so the config is applied on first run.</p>
-                                <div class="rd-config-output">
-                                    <div class="rd-config-output__header"><label class="visually-hidden" for="cfgInstaller">Installer filename</label><button type="button" class="rd-icon-btn rd-copy" data-copy="#cfgInstaller" aria-label="Copy installer filename" title="Copy"><i class="ri-file-copy-line" aria-hidden="true"></i></button></div>
-                                    <textarea class="rd-code-output rd-mono" readonly id="cfgInstaller">{{ $installer }}</textarea>
-                                </div>
+                                @if ($installer)
+                                    <p class="rd-help">Rename the downloaded <code>rustdesk-*.exe</code> to this filename and run it. RustDesk keeps a file-name preset at the top of the client: it is used for the connection and shown in <strong>About</strong>, but it appears under <strong>Settings → Network</strong> only after the client is <em>installed</em> from that renamed file.</p>
+                                    <div class="rd-config-output">
+                                        <div class="rd-config-output__header"><label class="visually-hidden" for="cfgInstaller">Installer filename</label><button type="button" class="rd-icon-btn rd-copy" data-copy="#cfgInstaller" aria-label="Copy installer filename" title="Copy"><i class="ri-file-copy-line" aria-hidden="true"></i></button></div>
+                                        <textarea class="rd-code-output rd-mono" readonly id="cfgInstaller">{{ $installer }}</textarea>
+                                    </div>
+                                    <p class="rd-help">The API server is not part of the filename, because a Windows file name cannot contain <code>:</code> or <code>/</code>. The client derives <code>http://&lt;ID server&gt;:21114</code> instead, so an API reachable only over https on port 443 needs the config string or the <code>--config</code> command above.</p>
+                                @else
+                                    <div class="rd-callout rd-callout--warning" role="alert">
+                                        <i class="ri-error-warning-line" aria-hidden="true"></i>
+                                        <p>{{ implode(' ', $installerProblems) }} Use the config string or the <code>--config</code> command above instead — both carry the same values without a file name's restrictions.</p>
+                                    </div>
+                                @endif
                             </div>
                         </article>
                     </div>

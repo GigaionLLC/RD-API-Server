@@ -56,6 +56,42 @@ PORT=21114
 
 In the RustDesk client, set **API Server** to your `RUSTDESK_API_SERVER` and log in.
 
+### Rolling out configured clients and enrolling devices
+
+**Client Config** (Policies & Rollout) turns this server's own values into a **config string**
+(paste into *Settings → Network → ID/Relay server → Import Server Config*, or pass it to
+`rustdesk --config <string>`), a mobile **QR** code, and a Windows **renamed-installer
+filename**. Two limits of the renamed installer belong to the client, not to this server:
+
+- The values live in the **file name only**. The client shows them under **About** and uses them
+  for the connection, but **Settings → Network stays empty** and nothing is stored until the
+  client is *installed* from that renamed file (installing writes ID server, key and API server;
+  the client derives the relay itself).
+- **An API server cannot be part of a file name.** The client needs `api=http://…`/`https://…`,
+  and Windows forbids `:` and `/` in file names. The generator therefore leaves `api=` out and
+  the client derives `http://<ID server>:21114` on its own. If your API is reachable only over
+  https on port 443, distribute the config string or the `--config` command instead — both carry
+  the API server.
+
+**Devices do not appear under Devices or Pending Devices?** That is the default enrollment
+policy (§5): an unknown client is answered with `{}` from heartbeat and `ID_NOT_FOUND` from
+sysinfo and **no row is created**, so it cannot show up in either list. *Pending Devices* lists
+devices an administrator set to *not approved*; it is not a queue that unknown clients land in.
+Enroll devices with a deploy token (Policies & Rollout → Deploy Tokens), with the client's **API
+Server** pointing at this server:
+
+```powershell
+# as administrator on the device, installed client
+& "$env:ProgramFiles\RustDesk\rustdesk.exe" --deploy --token <deploy-token>                 # RustDesk 1.4.7+
+& "$env:ProgramFiles\RustDesk\rustdesk.exe" --assign --token <deploy-token> --user_name alice
+```
+
+`--deploy` posts to `/api/devices/deploy`; `--assign` posts to `/api/devices/cli` and can set
+owner (`--user_name`), `--strategy_name`, `--device_group_name`, `--address_book_name` and the
+device identity at the same time. On Linux/macOS run the same flags as root with `sudo rustdesk`.
+To trust first contact instead (only on a trusted network), set `RUSTDESK_REQUIRE_DEPLOYMENT=false`
+and `RUSTDESK_AUTO_REGISTER=true` together.
+
 Upgrades do not alter an existing administrator. If an earlier install used a default password,
 reset it in **Users** or run `php artisan rustdesk:user admin --admin` inside the application
 container. The command asks for the password twice without echoing it. For non-interactive
