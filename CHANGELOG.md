@@ -4,6 +4,25 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [1.7.4] - 2026-11-24
+
+A correctness release for outbound single-sign-on and webhook traffic. **Upgrade:** pull the new
+image (`docker compose pull`); there is nothing to migrate and nobody is signed out.
+
+### Fixed
+
+- **Single sign-on and webhook delivery could still fail on hosts whose DNS search domain has a
+  wildcard record.** The outbound request guards resolved hosts with names that were not fully
+  qualified, so when a record type had no answer (CNAME usually, AAAA often) the system resolver
+  retried `<host>.<search domain from /etc/resolv.conf>` and, where that search domain publishes a
+  wildcard, answered with a real-looking address record for our own infrastructure. That address
+  was unioned into the validated set and could be the one pinned into the request, so TLS then
+  failed with "unrecognized name". Every lookup is now fully qualified (the trailing root dot
+  switches the search list off) and an answer is ignored unless its owner name is the host that
+  was asked for. The protections themselves are unchanged: every resolved address still has to be
+  globally routable, the pinned address, the disabled redirects and the dropped proxy inheritance
+  all work as before.
+
 ## [1.7.3] - 2026-11-24
 
 A maintenance release: the sign-in and webhook breakage introduced with Guzzle 8.2 is fixed, and the
