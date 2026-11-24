@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 #[Fillable([
     'guid', 'action', 'conn_id', 'peer_id', 'from_peer', 'from_name', 'ip', 'session_id',
-    'type', 'primary_auth', 'two_factor', 'conn_audit_ref', 'uuid', 'closed_at', 'note',
+    'type', 'primary_auth', 'two_factor', 'conn_audit_ref', 'uuid', 'client_nonce', 'closed_at',
+    'note',
 ])]
 class AuditConn extends Model
 {
