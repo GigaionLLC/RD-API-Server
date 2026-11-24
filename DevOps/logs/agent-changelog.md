@@ -3,6 +3,13 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 06:26] - v1.7.3 release commit (OIDC/webhook Guzzle 8.2 fix, PHP 8.5.13 runtime)
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `release`)
+**Files Modified:**
+- `CHANGELOG.md` (new `[1.7.3]` entry: Security / Fixed / Dependencies), `README.md` (stable-release link, `RUSTDESK_API_IMAGE` example), `config/app.php` and `tests/Feature/SmokeTest.php` (`1.7.2` → `1.7.3`), this log entry
+**Database/API Changes:** None. No migration between v1.7.2 and this commit; `/api/version` reports `1.7.3`.
+**Summary:** Prepares the v1.7.3 tag the same way 1.7.1/1.7.2 were prepared (version strings + CHANGELOG only, no behaviour change): the release ships #67 (OIDC sign-in and webhook delivery no longer rejected by Guzzle 8.2 since the SSRF guards now use Guzzle request options), #69/#51 (client-config renamed-installer fix + enrolment docs), the PHP 8.5.13 security release with the nginx DSA-6642-1 rebuild, and the November dependency refresh (#65, #55, #70, #68). Gates in the toolchain: `pint --test` clean (329 files), PHPStan L5 clean (207 files), PHPUnit green; runtime image built and checked (`php -v` 8.5.13, `nginx-light` 1.22.1-9+deb12u11).
+
 ## [2026-11-24 05:44] - Dependency refresh: base images, Composer/Node/Playwright pins, npm group
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `maint`)
 **Files Modified:**
