@@ -100,6 +100,10 @@ argument is deprecated because shells can expose it in history and process listi
 
 ### Production HTTPS and reverse proxies
 
+RustDesk **1.5.1+** clients warn their user when the resolved API server is plain `http://` and not
+loopback, so front this server with TLS (the configuration below) instead of publishing port 21114
+directly.
+
 When 1Panel/OpenResty, Nginx Proxy Manager, Nginx, or another reverse proxy terminates TLS,
 configure the public origin and the inbound trust boundary together:
 

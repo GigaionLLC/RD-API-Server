@@ -85,7 +85,7 @@ class StrategyService
                 // as "[]", which fails serde (expects a map) and silently drops the whole
                 // strategy — the client keeps modified_at but never applies config_options.
                 // Cast to object so empty becomes "{}".
-                'config_options' => (object) ($strategy->options ?? []),
+                'config_options' => (object) $strategy->pushableOptions(),
                 'extra' => (object) ($strategy->extra ?? []),
             ],
         ];

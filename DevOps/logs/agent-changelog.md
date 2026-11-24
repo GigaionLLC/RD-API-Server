@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 22:30] - Strategy options: RustDesk 1.5.x client changes
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `options`)
+**Files Modified:**
+- `config/strategy_options.php` (header re-pinned to rustdesk `libs/base/src/config/keys.rs` @ `a0c0963c`; new per-option `note` / `strategy_ignored_since` fields; new top-level `removed` map; `allow-drm-capture` replaces the deleted `allow-linux-headless`; `id-whitelist` + `allow-kcp-congestion-control` added; the three 1.5.3 deny-listed keys flagged)
+- `app/Services/ClientConfigService.php` (`STRATEGY_IGNORED_SINCE` mirror of the client's 24-key `BLOCKED_CONFIG_OPTIONS`, `strategyIgnoredWarning()`, `allow-drm-capture` added to `FULL_ADMIN_ONLY_OPTION_KEYS`)
+- `app/Models/Strategy.php` (`pushableOptions()` — stored options minus client-removed keys), `app/Services/StrategyService.php` (heartbeat pushes `pushableOptions()`), `app/Http/Controllers/Admin/ClientConfigController.php` (install script uses the same filter)
+- `app/Http/Controllers/Admin/StrategyController.php` (notes/retired options to the view, `drop_retired[]` handling, `catalogKeys()` helper, `warning` in the save response), `app/Http/Controllers/Api/V1/StrategyController.php` (`warning` on update), `resources/views/admin/strategies/edit.blade.php` (option notes, "Removed upstream" block), `public/assets/js/app.js` (live form shows a server `warning` toast)
+- `tests/Feature/StrategyOptionLifecycleTest.php` (new, 9 tests), `tests/Feature/StrategyCatalogTest.php` (new keys)
+- `docs/modernization/10-client-config-keys.md` (re-pinned, new §1b deny-list, `allow-drm-capture` / `id-whitelist` / `allow-kcp-congestion-control` rows, `allow-linux-headless` marked removed, preset/sysinfo + builtin/local explanations), `docs/modernization/02-client-api-contract.md` (client-version table, `apiDomain`, §9.1 `/api/switch-grant`), `docs/modernization/14-deepscan-management.md` (plugin/`plugin-sign` plan dropped, #15854), `QUICKSTART.md` (1.5.1+ plain-HTTP warning sentence), `CHANGELOG.md` ([Unreleased] Added/Changed), this log entry
+**Database/API Changes:** No migration. Additive API change only: `PUT /api/v1/strategies/{id}` may now include a `warning` string beside `data` when the saved options contain a key a RustDesk 1.5.3+ client strips from a server push; the admin save endpoint returns `{"warning": "..."}` instead of `{}` in the same situation.
+**Summary:** The Strategy surface now matches the RustDesk 1.5.x client: `allow-drm-capture` (Linux DRM/KMS capture, full-admin only) is offered with its caveats, the two genuinely server-pushable new policy keys (`id-whitelist`, `allow-kcp-congestion-control`) are added, the three catalog keys a 1.5.3+ client refuses from a push are flagged and warn on custom entry, and the dead `allow-linux-headless` toggle is retired without touching stored data or the heartbeat payload.
+
 ## [2026-11-24 22:20] - Audit ingest: empty-body 200 + client-nonce dedupe (RustDesk 1.5.0 #15759), alarm type 10
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `audit`)
 **Files Modified:**

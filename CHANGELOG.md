@@ -6,8 +6,34 @@ notes.
 
 ## [Unreleased]
 
+### Added
+
+- **Strategy: DRM screen capture for Linux.** The editor's *Performance & display* section can now
+  push `allow-drm-capture`, which lets the RustDesk service capture the Linux login screen and
+  Wayland sessions directly through DRM/KMS instead of prompting through the portal. It is a
+  Linux-only toggle, off by default, and only a **full administrator** may change it: on the device
+  it makes the *root* service read the framebuffer, so a delegated editor cannot turn it on. The
+  client build must be newer than RustDesk `1.5.3`.
+- **Strategy: `id-whitelist` (client-ID allow-list) and `allow-kcp-congestion-control`.** Two more
+  policy keys that a client really honours when pushed by a server (`KEYS_SETTINGS` at rustdesk
+  `a0c0963c`). The ID whitelist is enforced in addition to the IP whitelist and accepts `*`
+  wildcards.
+
 ### Changed
 
+- **Strategy: options a RustDesk 1.5.3+ client refuses to take from a server are flagged instead of
+  silently ignored.** `allow-insecure-tls-fallback`, `allow-websocket` and
+  `enable-trusted-devices` stay settable — older clients still apply them and an install-time
+  `--option` still works — but the editor now says "RustDesk 1.5.3+ ignores this when pushed by a
+  server; set it at install time with `--option` or the config string", and a free-form custom
+  option that names any of the 24 client-blocked keys makes the save respond with a warning
+  (the admin UI shows it as a toast, `PUT /api/v1/strategies/{id}` as a `warning` field) instead of
+  pretending the policy now applies.
+- **Strategy: `allow-linux-headless` is retired, not deleted from your data.** RustDesk removed the
+  option in `1.5.0` (#15866), so no client reads it. Existing strategies that still carry it keep
+  loading, the editor lists it read-only under *Removed upstream*, the stored value is preserved on
+  every save until an administrator ticks it for removal, and the heartbeat and the install-script
+  generator stop sending it.
 - **Licence: the project is now under the MIT License (previously AGPL-3.0-or-later).** `LICENSE`
   is the standard MIT text (`Copyright (c) 2026 Gigaion LLC`), and `composer.json`,
   `web-client/package.json` and the published image metadata declare `MIT`. The AGPL's

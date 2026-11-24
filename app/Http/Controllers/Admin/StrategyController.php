@@ -111,17 +111,23 @@ class StrategyController extends Controller
 
         // The known-option catalog (client-Settings-style tabs → sections → options) plus any
         // options the strategy carries that are NOT in the catalog — those keep the free-form
-        // key/value editor.
+        // key/value editor. Keys the client no longer defines get their own read-only block so a
+        // legacy strategy stays loadable without looking like a supported control.
         $tabs = config('strategy_options.tabs', []);
-        $catalogKeys = [];
-        foreach ($tabs as $tab) {
-            foreach ($tab['sections'] as $section) {
-                foreach ($section['options'] as $opt) {
-                    $catalogKeys[] = $opt['key'];
-                }
-            }
-        }
+        $catalogKeys = $this->catalogKeys();
         $customOptions = array_diff_key((array) ($strategy->options ?? []), array_flip($catalogKeys));
+
+        $retiredDefinitions = (array) config('strategy_options.removed', []);
+        $retiredOptions = [];
+        foreach ($retiredDefinitions as $key => $definition) {
+            if (! array_key_exists($key, (array) ($strategy->options ?? []))) {
+                continue;
+            }
+            $retiredOptions[$key] = $definition + [
+                'value' => (string) $strategy->options[$key],
+            ];
+        }
+        $customOptions = array_diff_key($customOptions, $retiredDefinitions);
 
         return view('admin.strategies.edit', compact(
             'strategy',
@@ -130,7 +136,8 @@ class StrategyController extends Controller
             'userMap',
             'deviceGroupMap',
             'tabs',
-            'customOptions'
+            'customOptions',
+            'retiredOptions'
         ));
     }
 
@@ -159,6 +166,8 @@ class StrategyController extends Controller
                     $fail('Strategy option values must be a single line without control characters.');
                 }
             }],
+            'drop_retired' => ['nullable', 'array'],
+            'drop_retired.*' => ['nullable', 'string', 'max:255'],
         ]);
 
         foreach (array_keys((array) $request->input('opt', [])) as $key) {
@@ -193,6 +202,18 @@ class StrategyController extends Controller
             $options[$key] = (string) ($values[$i] ?? '');
         }
 
+        // Keys the client no longer defines are preserved exactly as stored (the editor shows
+        // them read-only) until an admin ticks them for removal. Only retired keys qualify, so
+        // this path cannot be used to inject an arbitrary option.
+        $retiredKeys = array_keys((array) config('strategy_options.removed', []));
+        $droppedKeys = array_map(strval(...), (array) $request->input('drop_retired', []));
+        foreach ((array) ($strategy->options ?? []) as $storedKey => $storedValue) {
+            $storedKey = (string) $storedKey;
+            if (in_array($storedKey, $retiredKeys, true) && ! in_array($storedKey, $droppedKeys, true)) {
+                $options[$storedKey] = (string) $storedValue;
+            }
+        }
+
         $this->guardFullAdminOnlyOptions($request, (array) ($strategy->options ?? []), $options);
 
         $strategy->fill([
@@ -204,7 +225,12 @@ class StrategyController extends Controller
             'modified_at' => time(),
         ])->save();
 
-        return response()->json((object) []);
+        // Catalog entries carry the same warning inline; only free-form keys need it here, so
+        // an admin who pastes a deny-listed key is told instead of silently pushing nothing.
+        $customIgnored = array_diff(array_keys($options), $this->catalogKeys());
+        $warning = ClientConfigService::strategyIgnoredWarning($customIgnored);
+
+        return response()->json($warning === null ? (object) [] : ['warning' => $warning]);
     }
 
     public function storeAssignment(Request $request, Strategy $strategy): RedirectResponse
@@ -274,6 +300,25 @@ class StrategyController extends Controller
         return redirect()
             ->route('admin.strategies.index')
             ->with('status', 'Strategy deleted.');
+    }
+
+    /**
+     * Every option key the catalog offers, in tab order.
+     *
+     * @return list<string>
+     */
+    private function catalogKeys(): array
+    {
+        $keys = [];
+        foreach ((array) config('strategy_options.tabs', []) as $tab) {
+            foreach ($tab['sections'] as $section) {
+                foreach ($section['options'] as $opt) {
+                    $keys[] = (string) $opt['key'];
+                }
+            }
+        }
+
+        return $keys;
     }
 
     /**

@@ -26,9 +26,10 @@ class ClientConfigService
 
     /**
      * Strategy option keys that redirect a client to other infrastructure (rendezvous, relay,
-     * API server, server key) or route it through a proxy with credentials. Whoever sets them
-     * controls every later policy push to the device, so only unrestricted administrators may
-     * add, change or remove them; delegated administrators keep whatever value is stored.
+     * API server, server key), route it through a proxy with credentials, or make the root
+     * service read the framebuffer directly (`allow-drm-capture`). Whoever sets them controls
+     * every later policy push to the device, so only unrestricted administrators may add, change
+     * or remove them; delegated administrators keep whatever value is stored.
      *
      * @var list<string>
      */
@@ -37,9 +38,55 @@ class ClientConfigService
         'relay-server',
         'api-server',
         'key',
+        'allow-drm-capture',
         'proxy-url',
         'proxy-username',
         'proxy-password',
+    ];
+
+    /**
+     * Option keys a RustDesk 1.5.3+ client strips out of a heartbeat strategy push
+     * (`BLOCKED_CONFIG_OPTIONS`, `src/hbbs_http/sync.rs:297-342` at rustdesk a0c0963c — added by
+     * #16696, extended by #17130). The value is the first client version that ignores the key
+     * when a server pushes it.
+     *
+     * None of these are removed from the catalog or from stored strategies: clients older than
+     * that version still apply them, and an install-time `rustdesk --option <key> <value>` (or the
+     * config string) still sets them. The editor and the Strategy API warn instead of pretending
+     * the push works.
+     *
+     * @var array<string, string>
+     */
+    public const STRATEGY_IGNORED_SINCE = [
+        // Server endpoints and trust.
+        'custom-rendezvous-server' => '1.5.3',
+        'rendezvous-servers' => '1.5.3',
+        'api-server' => '1.5.3',
+        'relay-server' => '1.5.3',
+        'key' => '1.5.3',
+        'ice-servers' => '1.5.3',
+        // Transport security.
+        'allow-insecure-tls-fallback' => '1.5.3',
+        'allow-websocket' => '1.5.3',
+        'websocket-port' => '1.5.3',
+        // Authentication and credentials.
+        '2fa' => '1.5.3',
+        'bot' => '1.5.3',
+        'preset-address-book-password' => '1.5.3',
+        'enable-trusted-devices' => '1.5.3',
+        'trusted-device-expiration-days' => '1.5.3',
+        // Deployment and address-book metadata.
+        'preset-address-book-name' => '1.5.3',
+        'preset-address-book-tag' => '1.5.3',
+        'preset-address-book-alias' => '1.5.3',
+        'preset-address-book-note' => '1.5.3',
+        'preset-device-name' => '1.5.3',
+        'preset-device-username' => '1.5.3',
+        'preset-note' => '1.5.3',
+        // Recording location and service state.
+        'windows-service-video-save-directory' => '1.5.3',
+        'stop-service' => '1.5.3',
+        'reg_recovery' => '1.5.3',
     ];
 
     /**
@@ -256,6 +303,36 @@ class ClientConfigService
     public static function containsControlCharacters(string $value): bool
     {
         return preg_match('/[\x00-\x1F\x7F]/', $value) === 1;
+    }
+
+    /**
+     * One-line warning for the option keys in $keys that a 1.5.3+ client ignores when a server
+     * pushes them. Null when nothing in $keys is affected.
+     *
+     * @param  array<array-key, mixed>  $keys
+     */
+    public static function strategyIgnoredWarning(array $keys): ?string
+    {
+        $ignored = [];
+        foreach ($keys as $key) {
+            $key = (string) $key;
+            if (isset(self::STRATEGY_IGNORED_SINCE[$key])) {
+                $ignored[$key] = true;
+            }
+        }
+
+        if ($ignored === []) {
+            return null;
+        }
+
+        $list = array_keys($ignored);
+        sort($list);
+
+        return 'RustDesk '.self::STRATEGY_IGNORED_SINCE[$list[0]].'+ ignores '
+            .implode(', ', $list)
+            .' when pushed by a server; set '
+            .(count($list) === 1 ? 'it' : 'them')
+            .' at install time with --option or the config string.';
     }
 
     private static function quotePosixArgument(string $value): string

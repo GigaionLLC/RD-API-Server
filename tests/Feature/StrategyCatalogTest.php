@@ -44,6 +44,8 @@ class StrategyCatalogTest extends TestCase
             'enable-directx-capture', 'keep-awake-during-incoming-sessions',
             'enable-perm-change-in-accept-window',
             'main-window-always-on-top', 'allow-command-line-settings-when-settings-disabled',
+            // 1.5.x client additions (verified at rustdesk a0c0963c, libs/base/src/config/keys.rs).
+            'allow-drm-capture', 'id-whitelist', 'allow-kcp-congestion-control',
         ] as $key) {
             $this->assertContains($key, $keys, "Catalog is missing {$key}");
         }

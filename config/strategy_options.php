@@ -6,8 +6,9 @@
  * window (General / Security / Network) so the admin editor feels like the client.
  *
  * Keys are the exact wire keys the client honours — taken verbatim from the client's
- * libs/hbb_common/src/config.rs `keys::KEYS_SETTINGS` and `keys::KEYS_BUILDIN_SETTINGS` (the
- * server-pushable policy sets) + password_security.rs; do NOT rename them.
+ * `keys::KEYS_SETTINGS` / `keys::KEYS_BUILDIN_SETTINGS` + password_security.rs; do NOT rename
+ * them. The authoritative list is rustdesk `libs/base/src/config/keys.rs` at commit a0c0963c
+ * (the module moved out of `libs/hbb_common/src/config.rs` in RustDesk 1.5.0, #16107).
  *
  * Control types:
  *   - 'toggle' : tri-state select "" (client default) / "Y" / "N". Works uniformly because
@@ -18,6 +19,17 @@
  *
  * An option is only included in the pushed config when its value is non-empty, so leaving a
  * control on "Default" keeps the client's own setting.
+ *
+ * Optional per-option fields:
+ *   - 'note' : short help text rendered under the control.
+ *   - 'strategy_ignored_since' : first client version that strips the key out of a server push
+ *     (`BLOCKED_CONFIG_OPTIONS`, src/hbbs_http/sync.rs:297-342 at a0c0963c). The option stays in
+ *     the catalog because older clients still apply it and an install-time
+ *     `rustdesk --option <key> <value>` still sets it.
+ *
+ * The top-level 'removed' map lists keys the client no longer defines at all. They can still be
+ * present in stored strategies; those stay loadable, are shown read-only in the editor and are
+ * filtered out of the heartbeat push (StrategyService).
  */
 
 return [
@@ -41,7 +53,8 @@ return [
                         ['key' => 'enable-hwcodec', 'label' => 'Hardware codec', 'type' => 'toggle'],
                         ['key' => 'enable-directx-capture', 'label' => 'DirectX capture (Windows)', 'type' => 'toggle'],
                         ['key' => 'allow-always-software-render', 'label' => 'Always software render', 'type' => 'toggle'],
-                        ['key' => 'allow-linux-headless', 'label' => 'Linux headless support', 'type' => 'toggle'],
+                        ['key' => 'allow-drm-capture', 'label' => 'DRM screen capture (Linux)', 'type' => 'toggle',
+                            'note' => 'Lets RustDesk capture the Linux login screen and Wayland sessions through DRM/KMS (runs as root on the device). Needs a RustDesk build newer than 1.5.3.'],
                         ['key' => 'allow-remove-wallpaper', 'label' => 'Remove wallpaper during session', 'type' => 'toggle'],
                         ['key' => 'keep-awake-during-incoming-sessions', 'label' => 'Keep screen awake during incoming sessions', 'type' => 'toggle'],
                     ],
@@ -100,7 +113,8 @@ return [
                         ['key' => 'approve-mode', 'label' => 'Approve mode', 'type' => 'select', 'choices' => [
                             '' => 'Client default', 'password-click' => 'Password or click', 'password' => 'Password only', 'click' => 'Accept manually only',
                         ]],
-                        ['key' => 'enable-trusted-devices', 'label' => 'Trusted devices (2FA)', 'type' => 'toggle'],
+                        ['key' => 'enable-trusted-devices', 'label' => 'Trusted devices (2FA)', 'type' => 'toggle',
+                            'strategy_ignored_since' => '1.5.3'],
                         ['key' => 'default-connect-password', 'label' => 'Default connect password (pre-set)', 'type' => 'text'],
                         ['key' => 'remove-preset-password-warning', 'label' => 'Remove preset-password warning', 'type' => 'toggle'],
                         ['key' => 'disable-unlock-pin', 'label' => 'Disable the unlock PIN', 'type' => 'toggle'],
@@ -113,12 +127,15 @@ return [
                         ['key' => 'direct-access-port', 'label' => 'Direct access port', 'type' => 'number'],
                         ['key' => 'enable-lan-discovery', 'label' => 'LAN discovery', 'type' => 'toggle'],
                         ['key' => 'whitelist', 'label' => 'IP whitelist (comma/space separated)', 'type' => 'text'],
+                        ['key' => 'id-whitelist', 'label' => 'Client-ID whitelist (comma separated)', 'type' => 'text',
+                            'note' => 'IDs allowed to connect, in addition to the IP whitelist. Accepts * wildcards; empty allows every ID.'],
                         ['key' => 'allow-auto-disconnect', 'label' => 'Auto-close on user inactivity', 'type' => 'toggle'],
                         ['key' => 'auto-disconnect-timeout', 'label' => 'Inactivity timeout (minutes)', 'type' => 'number'],
                         ['key' => 'allow-only-conn-window-open', 'label' => 'Only allow connection if window open', 'type' => 'toggle'],
                         ['key' => 'allow-logon-screen-password', 'label' => 'Allow logon-screen password', 'type' => 'toggle'],
                         ['key' => 'allow-remote-cm-modification', 'label' => 'Allow modifying connection-manager', 'type' => 'toggle'],
-                        ['key' => 'allow-insecure-tls-fallback', 'label' => 'Allow insecure TLS fallback', 'type' => 'toggle'],
+                        ['key' => 'allow-insecure-tls-fallback', 'label' => 'Allow insecure TLS fallback', 'type' => 'toggle',
+                            'strategy_ignored_since' => '1.5.3'],
                         ['key' => 'allow-hostname-as-id', 'label' => 'Allow hostname as ID', 'type' => 'toggle'],
                         ['key' => 'register-device', 'label' => 'Register device with the server', 'type' => 'toggle'],
                         ['key' => 'allow-deep-link-password', 'label' => 'Allow password via deep link', 'type' => 'toggle'],
@@ -135,12 +152,15 @@ return [
                 [
                     'label' => 'Network',
                     'options' => [
-                        ['key' => 'allow-websocket', 'label' => 'Use WebSocket', 'type' => 'toggle'],
+                        ['key' => 'allow-websocket', 'label' => 'Use WebSocket', 'type' => 'toggle',
+                            'strategy_ignored_since' => '1.5.3'],
                         ['key' => 'enable-udp-punch', 'label' => 'UDP hole punching', 'type' => 'toggle'],
                         ['key' => 'enable-ipv6-punch', 'label' => 'IPv6 hole punching', 'type' => 'toggle'],
                         ['key' => 'disable-udp', 'label' => 'Disable UDP', 'type' => 'toggle'],
                         ['key' => 'allow-https-21114', 'label' => 'Allow HTTPS on port 21114', 'type' => 'toggle'],
                         ['key' => 'use-raw-tcp-for-api', 'label' => 'Use raw TCP for the API', 'type' => 'toggle'],
+                        ['key' => 'allow-kcp-congestion-control', 'label' => 'KCP congestion control', 'type' => 'toggle',
+                            'note' => 'Run KCP with its congestion window instead of the turbo profile. Opt in only if you know the link loses packets to real congestion.'],
                     ],
                 ],
                 [
@@ -191,6 +211,16 @@ return [
                     ],
                 ],
             ],
+        ],
+    ],
+    // Keys the client no longer defines (verified absent at rustdesk a0c0963c). A strategy that
+    // still stores one keeps loading, the editor shows it read-only and the heartbeat stops
+    // pushing it; nothing rewrites the stored value until an admin removes it.
+    'removed' => [
+        'allow-linux-headless' => [
+            'label' => 'Linux headless support',
+            'removed_in' => '1.5.0',
+            'note' => 'Removed upstream in RustDesk 1.5.0 (#15866). No client reads it, so it is kept in this strategy but no longer pushed.',
         ],
     ],
 ];

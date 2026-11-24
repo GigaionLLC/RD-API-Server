@@ -202,7 +202,11 @@
           }
 
           setLiveFormState($button, 'saved');
-          RD.toast('Saved successfully', 'success');
+          if (response && typeof response.warning === 'string' && response.warning !== '') {
+            RD.toast(response.warning, 'warning');
+          } else {
+            RD.toast('Saved successfully', 'success');
+          }
           window.setTimeout(function () {
             if (($form.data('rdRevision') || 0) === submittedRevision &&
                 $button.attr('data-state') === 'saved') {
