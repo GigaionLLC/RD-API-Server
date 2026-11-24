@@ -6,6 +6,11 @@ use App\Models\OauthProvider;
 use App\Services\OauthService;
 use App\Services\OidcDestinationGuard;
 use App\Services\OidcDnsResolver;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Handler\CurlHandler;
+use GuzzleHttp\HandlerStack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -117,23 +122,39 @@ class OidcDestinationSecurityTest extends TestCase
 
         $this->assertFalse($options['allow_redirects']);
         $this->assertSame('', $options['proxy']);
-        $this->assertSame('', $options['curl'][constant('CURLOPT_PROXY')]);
-        $this->assertFalse($options['curl'][constant('CURLOPT_FOLLOWLOCATION')]);
+        $this->assertSame(['https'], $options['protocols']);
         $this->assertTrue($options['curl'][constant('CURLOPT_FRESH_CONNECT')]);
         $this->assertTrue($options['curl'][constant('CURLOPT_FORBID_REUSE')]);
         $this->assertSame(
             ['idp.example.com:443:8.8.8.8'],
             $options['curl'][constant('CURLOPT_RESOLVE')]
         );
+    }
 
-        if (defined('CURLOPT_PROTOCOLS_STR')) {
-            $this->assertSame('https', $options['curl'][constant('CURLOPT_PROTOCOLS_STR')]);
-        } else {
-            $this->assertSame(
-                constant('CURLPROTO_HTTPS'),
-                $options['curl'][constant('CURLOPT_PROTOCOLS')]
-            );
+    public function test_request_options_are_accepted_by_the_guzzle_curl_handler(): void
+    {
+        // Regression: raw CURLOPT_PROXY / CURLOPT_FOLLOWLOCATION / CURLOPT_PROTOCOLS_STR in the
+        // "curl" option made Guzzle 8.2 throw InvalidArgumentException before any connection,
+        // so SSO discovery failed for every provider. Drive the options through the real cURL
+        // handler against a closed loopback port: the only acceptable failure is a connect error.
+        $resolver = $this->mock(OidcDnsResolver::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->once()->andReturn(['8.8.8.8']);
+        });
+        $guard = new OidcDestinationGuard($resolver);
+        $options = $guard->requestOptions($guard->resolve('https://idp.example.com/oidc'));
+        $client = new Client(['handler' => HandlerStack::create(new CurlHandler)]);
+
+        try {
+            $client->get('https://127.0.0.1:1/', $options + ['connect_timeout' => 2]);
+            $this->fail('Expected a connection error.');
+        } catch (ConnectException) {
+            $this->addToAssertionCount(1);
         }
+
+        $this->expectException(RequestException::class);
+        $this->expectExceptionMessage('not allowed by the protocols request option');
+
+        $client->get('http://127.0.0.1:1/', $options + ['connect_timeout' => 2]);
     }
 
     public function test_public_custom_port_must_be_explicitly_allowed(): void
