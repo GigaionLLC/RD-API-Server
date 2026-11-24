@@ -194,7 +194,7 @@ with an existing protocol necessarily requires knowing what it is. What the proc
 guarantees is that the code is ours; it is not a claim that the protocol was invented
 independently.
 
-Licence: **AGPL-3.0-or-later**, matching the repository.
+Licence: **MIT**, matching the repository (see [../LICENSE](../LICENSE)).
 
 "RustDesk" is a trademark of its owner. This project is not affiliated with, endorsed by,
 or sponsored by the RustDesk project, and implements the protocol solely for

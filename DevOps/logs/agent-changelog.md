@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 19:30] - Licence: relicense to MIT and remove the CLA
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `mit`)
+**Files Modified:**
+- `LICENSE` (AGPL-3.0 text replaced with the standard MIT License text, `Copyright (c) 2026 Gigaion LLC`)
+- `composer.json`, `web-client/package.json` (`"license"` → `MIT`), `.github/workflows/ci.yml` (`org.opencontainers.image.licenses=MIT` in the `docker/metadata-action` labels)
+- `README.md` (License section: MIT + plain-language note; Trademark section's last sentence now says MIT), `CONTRIBUTING.md` (CLA section replaced by an inbound = outbound statement), `web-client/README.md` (licence line), `DevOps/plans/web-client-implementation.md` (licence decision line)
+- `.github/workflows/cla.yml`, `CLA.md` (deleted), `CHANGELOG.md` (new `[Unreleased]` → Changed entry), this log entry
+**Database/API Changes:** None. No migration, no wire-protocol change, no version bump.
+**Summary:** Per the maintainer decision of 2026-11-24 the project moves from AGPL-3.0-or-later to MIT: the licence text is the stock MIT text, repository and npm metadata plus the published image metadata declare MIT, the contributor assignment agreement and its workflow are removed (the signature record on the `cla-signatures` branch is kept as the historical record of the one outside contribution, #67, and is not touched by this change), and `CONTRIBUTING.md` now states the inbound = outbound rule in one sentence. Historical records (`CHANGELOG.md` release entries, `DevOps/logs/version-history.md`, older entries in this log, `docs/releases/*`) still describe the licences those releases shipped under and were deliberately left unchanged.
+
 ## [2026-11-24 07:10] - v1.7.4 release commit (fully qualified DNS lookups for OIDC/webhook egress)
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `dnsfix`)
 **Files Modified:**

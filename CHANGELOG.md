@@ -4,6 +4,18 @@ Notable changes to RD-API-Server are recorded here. Release tags follow Semantic
 operational agent records remain in `DevOps/logs/` and are not a substitute for public release
 notes.
 
+## [Unreleased]
+
+### Changed
+
+- **Licence: the project is now under the MIT License (previously AGPL-3.0-or-later).** `LICENSE`
+  is the standard MIT text (`Copyright (c) 2026 Gigaion LLC`), and `composer.json`,
+  `web-client/package.json` and the published image metadata declare `MIT`. The AGPL's
+  network-use copyleft (section 13) no longer applies: running a modified copy as a hosted service
+  carries no obligation to publish the modification. The contributor assignment agreement and its
+  CLA check are removed; contributions are accepted under MIT. Releases up to and including
+  `1.7.4` remain available under the AGPL-3.0-or-later they were published with.
+
 ## [1.7.4] - 2026-11-24
 
 A correctness release for outbound single-sign-on and webhook traffic. **Upgrade:** pull the new

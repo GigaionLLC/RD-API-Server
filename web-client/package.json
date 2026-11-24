@@ -2,7 +2,7 @@
     "name": "@rd-api-server/web-client",
     "version": "0.1.0",
     "description": "Browser RustDesk client — native ES modules, no build step.",
-    "license": "AGPL-3.0-or-later",
+    "license": "MIT",
     "type": "module",
     "private": true,
     "exports": {
