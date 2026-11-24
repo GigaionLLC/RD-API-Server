@@ -3,6 +3,13 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 22:15] - Dependabot: hold the PHP minor line
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `deps2`)
+**Files Modified:**
+- `.github/dependabot.yml` (docker entry: `php` ignore for `version-update:semver-minor` **and** `semver-major`, plus a header note), this log entry
+**Database/API Changes:** None.
+**Summary:** Dependabot opened #76 for `php:8.6.0RC7-cli-bookworm` because the docker ecosystem only ignored semver-major, so a release candidate of a new minor passed the filter. The `php` dependency now holds its minor line as well (a new minor needs the extension set, `php.ini` and the image tag suffix re-validated by hand) while patch releases on `8.5.x` still arrive; pre-releases of a *patch* release cannot be filtered in this ecosystem (dependabot-core#15154: only Bundler-style `versions` operators are accepted and the pre-release suffix is discarded) and are closed by hand. The file parses as `version: 2` with 5 update entries and no `versions` glob anywhere.
+
 ## [2026-11-24 22:20] - jQuery 3.8.0 and the admin vendor assets
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `deps2`)
 **Files Modified:**
