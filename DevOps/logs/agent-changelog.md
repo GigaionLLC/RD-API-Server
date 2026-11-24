@@ -3,6 +3,14 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 22:20] - jQuery 3.8.0 and the admin vendor assets
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `deps2`)
+**Files Modified:**
+- `package.json`, `package-lock.json` (jquery `3.7.1` -> `3.8.0`; the dependabot bump from #74)
+- `public/assets/vendor/jquery/jquery.min.js`, `public/assets/vendor/THIRD_PARTY_NOTICES.txt` (`npm run build:vendor` output — #74 changed the lockfile but not the checked-in copies, which is what turned `JS lint + vendor integrity` red), this log entry
+**Database/API Changes:** None.
+**Summary:** Completes the jQuery 3.8.0 bump: the admin UI loads the copy of `node_modules/jquery/dist/jquery.min.js` under `public/assets/vendor/`, so the lockfile change alone leaves the served file (and the third-party notice) at 3.7.1. The regenerated copies pass `check:vendor` (`Verified 20 checked-in admin vendor files`) and `lint:js`, and the container e2e profile (Blade + jQuery admin) is green with them: **71 passed / 21 skipped / 0 failed**. 3.8.0's behaviour changes were checked against our code first: we only toggle `hidden` with `.prop()` (never `.attr()`), use no `jQuery.expr[":"]`/`expr.filters`, no jQuery-object `push`/`sort`/`splice`, and `jquery/jquery.min.js` is the only jQuery file we serve.
+
 ## [2026-11-24 19:30] - Licence: relicense to MIT and remove the CLA
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `mit`)
 **Files Modified:**
