@@ -11,7 +11,7 @@
 FROM node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS node
 FROM composer:2.11.2@sha256:50ea4d33fdcde1adb0f045547295faa1548b33872e5f789dae5b02ce2fb5de93 AS composer
 FROM mlocati/php-extension-installer:2.13.3@sha256:edda5f9d936fba9b495bdc96ecd19cc8fda7c2574f85db4574795644ae57b456 AS php_extension_installer
-FROM php:8.5.13-cli-bookworm@sha256:d6991172c4282d2a09d6418073923a81664173bb0a0e07a16663a9a645746092 AS toolchain
+FROM php:8.6.0RC7-cli-bookworm@sha256:e1c663265e9754cb13ff34bd1c99feb6db58399be94c62f7f93a04cb3196fc83 AS toolchain
 
 ENV DEBIAN_FRONTEND=noninteractive \
     COMPOSER_ALLOW_SUPERUSER=1 \
