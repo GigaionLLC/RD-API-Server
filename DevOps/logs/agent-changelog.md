@@ -3,6 +3,21 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 07:10] - v1.7.4 release commit (fully qualified DNS lookups for OIDC/webhook egress)
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `dnsfix`)
+**Files Modified:**
+- `CHANGELOG.md` (new `[1.7.4]` entry: Fixed), `README.md` (stable-release link, `RUSTDESK_API_IMAGE` example), `config/app.php` and `tests/Feature/SmokeTest.php` (`1.7.3` → `1.7.4`), this log entry
+**Database/API Changes:** None. No migration between v1.7.3 and this commit; `/api/version` reports `1.7.4`.
+**Summary:** Prepares the v1.7.4 tag the same way 1.7.1–1.7.3 were prepared (version strings + CHANGELOG only, no behaviour change) on top of the DNS search-domain fix described in the entry below. Gates re-checked in the toolchain after the bump: `pint --test` clean, PHPStan L5 clean, `Tests\Feature\SmokeTest` green with `/api/version` = `1.7.4`.
+
+## [2026-11-24 07:05] - OIDC/webhook DNS lookups were not fully qualified (search-domain expansion pinned)
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `dnsfix`)
+**Files Modified:**
+- `app/Services/OidcDnsResolver.php`, `app/Services/WebhookDnsResolver.php` (look up `rtrim($name, '.').'.'` for `dns_get_record()` and `gethostbynamel()`; ignore an answer whose own owner name is not the queried name; `records()`/`switchAddresses()` protected seams; comments explaining the trailing dot)
+- `tests/Unit/DnsResolverSearchDomainTest.php` (new: qualification, dropped search-domain expansion, genuine CNAME chain followed, A/AAAA/switch union; both resolvers, no network)
+**Database/API Changes:** None.
+**Summary:** v1.7.3's guards resolved `accounts.google.com` unqualified, so with `search pve.gigaion.com` and `options ndots:0` the CNAME query retried as `accounts.google.com.pve.gigaion.com`, matched the `*.gigaion.com` wildcard, and returned a CNAME to our own WAN address; the resolver unioned that address, `sort(..., SORT_STRING)` picked it as `[0]`, and TLS failed with "unrecognized name" — every OIDC discovery and webhook delivery to a host without a CNAME was broken. Lookups are now absolute (trailing root dot), and an answer whose owner name differs from the queried host is dropped, so a search-domain expansion can neither contribute an address nor be followed as a CNAME. Verified in the toolchain (`pint --test` 330 files clean, PHPStan L5 207 files clean, PHPUnit 760 tests / 4178 assertions green) and on ai-dev1: `resolve('www')` (a name only the search domain can answer) returned `["172.67.215.71","104.21.24.10", …]` from origin/main and `[]` after the fix, while `accounts.google.com`, `github.com`, `www.github.com`, `www.php.net` and `localhost` resolve identically before and after. Sign-in and webhook tests unchanged and green.
+
 ## [2026-11-24 06:26] - v1.7.3 release commit (OIDC/webhook Guzzle 8.2 fix, PHP 8.5.13 runtime)
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `release`)
 **Files Modified:**
