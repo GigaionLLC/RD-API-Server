@@ -5,18 +5,9 @@ paperwork — open an issue.
 
 ## Before your first pull request
 
-Code and documentation contributions require a signed [Contributor Assignment Agreement](CLA.md).
-It assigns copyright in your contribution to the project owner, with a fallback exclusive licence
-for jurisdictions where assignment is not fully effective, and it leaves you free to use your own
-work however you like.
-
-The reason is stated plainly in the agreement: the project keeps the option of licensing the
-codebase on other terms in future. Without an assignment, that decision would need the agreement of
-every past contributor, which in practice means it could never be made.
-
-Signing takes one comment. A bot comments on your first pull request with a link to the agreement;
-reply with `I have read the CLA Document and I hereby sign the CLA` and it records your signature
-(GitHub login, user id, comment and time) and remembers your account afterwards.
+Nothing to sign. By submitting a contribution you agree it is licensed under the project's MIT
+License (see [LICENSE](LICENSE)); contributions are accepted inbound = outbound, so you keep the
+copyright in your work and everyone gets it on the same terms as the rest of the project.
 
 ## Ground rules
 
