@@ -6,6 +6,13 @@ notes.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-24
+
+Matches the RustDesk 1.5.x client: the new Linux DRM login-screen capture option, retried audit
+events stored once, and the project relicensed to MIT. **Upgrade:** pull the new image
+(`docker compose pull`); the container runs the migration on start (`php artisan migrate` if you
+run it yourself). Nobody is signed out and no configuration changes.
+
 ### Added
 
 - **Strategy: DRM screen capture for Linux.** The editor's *Performance & display* section can now
@@ -64,6 +71,13 @@ notes.
   stores the optional `conn_audit_ref` the IP- and ID-whitelist alarms carry. **Upgrade:** run
   `php artisan migrate` (adds `client_nonce` to `audit_conns`, `audit_files`, and `alarms`, plus
   `conn_audit_ref` on `alarms`); no data backfill and no configuration change.
+
+
+### Dependencies
+
+- jQuery 3.8.0 with the committed vendor bundle rebuilt (#78); Composer group: `laravel/pao`
+  1.1.6, `phpunit/phpunit` 12.5.45 (#73). Dependabot now offers only patch updates of the PHP base
+  image, so pre-release and minor/major PHP bumps no longer open pull requests (#79).
 
 ## [1.7.4] - 2026-11-24
 

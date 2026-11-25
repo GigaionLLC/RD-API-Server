@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-24 23:59] - Release v1.8.0
+**Agent:** rustdesk-api (Claude Opus 5.5, coordinator)
+**Files Modified:**
+- `config/app.php`, `tests/Feature/SmokeTest.php` (1.7.4 -> 1.8.0)
+- `README.md` (stable-release link and the `RUSTDESK_API_IMAGE` example)
+- `CHANGELOG.md` (`[Unreleased]` becomes `[1.8.0] - 2026-11-24` with the upgrade note; new `### Dependencies` for #73/#78/#79)
+- this log entry
+**Database/API Changes:** None in this commit; the release carries migration `2026_11_24_100001` (#80), run by the container entrypoint on start.
+**Summary:** Release preparation only. v1.8.0 ships the MIT relicense (#77), the audit empty-body/nonce dedupe (#80), the RustDesk 1.5.x option surface incl. `allow-drm-capture` (#81) and the dependency updates (#73, #78, #79).
+
 ## [2026-11-24 22:30] - Strategy options: RustDesk 1.5.x client changes
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `options`)
 **Files Modified:**
