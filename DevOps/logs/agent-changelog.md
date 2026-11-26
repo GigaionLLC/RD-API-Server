@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-25 05:00] - Release v1.8.1
+**Agent:** rustdesk-api (Claude Opus 5.5, coordinator)
+**Files Modified:**
+- `config/app.php`, `tests/Feature/SmokeTest.php` (1.8.0 -> 1.8.1)
+- `README.md` (stable-release link and the `RUSTDESK_API_IMAGE` example)
+- `CHANGELOG.md` (`[Unreleased]` becomes `[1.8.1] - 2026-11-25` with the upgrade note; `### Dependencies` for #75)
+- this log entry
+**Database/API Changes:** None.
+**Summary:** Release preparation only. v1.8.1 ships the stored-value precedence fix (#83: values the editor cannot express are kept, custom-row duplicate warning, one-time "added as a built-in control" notice, full-admin-only controls locked for delegated editors) and #75.
+
 ## [2026-11-25 20:10] - Strategy value precedence: stored values are never silently dropped
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `precedence`)
 **Files Modified:**
