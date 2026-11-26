@@ -3,6 +3,18 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-26 06:20] - v1.8.2 follow-ups: null option values, IPv4 pin, viewer stub, pin-table test
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `followups`)
+**Files Modified:**
+- `app/Http/Controllers/Api/V1/StrategyController.php` (new `storedOptions()` drops `null` option keys for `store()` and `update()` and feeds the full-admin-only guard; `postedOptions()` reads the option map out of the raw body because `ConvertEmptyStringsToNull` rewrites `""` before the controller; the update writes the map through `fill()`)
+- `app/Support/PinnedAddress.php` (NEW — `preferIpv4()`: first IPv4 in sorted order, else the first IPv6)
+- `app/Services/OidcDestinationGuard.php`, `app/Services/WebhookDestinationGuard.php` (the pin is chosen by `PinnedAddress::preferIpv4()` instead of `sort()` + `[0]`; validation loop untouched)
+- `tests/Feature/ApiStrategyOptionDefaultTest.php` (NEW — 4 tests), `tests/Unit/DestinationGuardPinTest.php` (NEW — 14 tests over both guards), `tests/Unit/DockerPinTableTest.php` (NEW — 3 tests)
+- `tests/Feature/WebClientTest.php` (`makeDirectory()` records every directory level the stub creates; `tearDown()` removes exactly those while empty), `tests/Feature/WebClientAssetsTest.php` (`isStub()` skips a stub tree instead of failing on it)
+- `docker/README.md` (the pin table now names the test that checks it), `docs/modernization/10-client-config-keys.md` (§1c: a `null` option value is *Default*), `docs/api/README.md`, `docs/api/openapi.yaml` (`StrategyWrite.options`), `CHANGELOG.md`, this log entry
+**Database/API Changes:** No migration and no route change. `PUT`/`POST /api/v1/strategies` now treat an `options` value of JSON `null` as *Default*: the key is dropped from the stored map and pushed as nothing, where it used to be stored as `null` and pushed as `""` (which a RustDesk client reads as "delete this key"). `""` keeps being stored and pushed as `""`. OIDC and webhook requests to a host with both A and AAAA records now pin the IPv4 address; every resolved address is still validated.
+**Summary:** Four independent v1.8.2 fixes — the v1 Strategy API's `null` option value now means *Default* instead of clearing the client's key, outbound OIDC and webhook requests pin the IPv4 address so a container without IPv6 egress can reach a dual-stack destination, the web-client test stub removes the directories it created and the assets test skips a stub tree, and a new PHPUnit test keeps `docker/README.md`'s pin table in step with the files.
+
 ## [2026-11-25 05:00] - Release v1.8.1
 **Agent:** rustdesk-api (Claude Opus 5.5, coordinator)
 **Files Modified:**

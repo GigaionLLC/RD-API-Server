@@ -6,6 +6,17 @@ notes.
 
 ## [Unreleased]
 
+### Added
+
+- **A test now keeps the container pin table honest.** Every third-party image this project builds
+  and tests with is pinned to a multi-architecture digest, and `docker/README.md`'s "Current pins"
+  table is where an operator reads them — but nothing compared the two, so a digest bump (one line
+  in a Dockerfile or a compose file) left the table describing an image nothing uses or a tag the
+  pinned digest no longer matches. `tests/Unit/DockerPinTableTest.php` parses every
+  `name:tag@sha256:…` reference out of the Dockerfiles, compose files, workflows and CI scripts
+  (no network, no Docker daemon) and fails naming the file and line against the exact README row,
+  in both directions. The table is currently accurate; no pins changed.
+
 ### Fixed
 
 - **A `null` option value in the v1 Strategy API now means *Default*.** `PUT`/`POST
