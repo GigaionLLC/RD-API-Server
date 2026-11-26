@@ -6,6 +6,12 @@ notes.
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-11-25
+
+A data-integrity release for the Strategy editor: a value an administrator stored in a strategy
+always wins. **Upgrade:** pull the new image (`docker compose pull`); there is nothing to migrate
+and nobody is signed out.
+
 ### Changed
 
 - **Strategy: a stored option value the editor's control does not offer stays visible and stays
@@ -42,6 +48,11 @@ notes.
   a request does not mention them at all, and pushed unchanged. A delegated editor's unrelated
   save therefore keeps a full-admin-only value intact, while setting, changing or removing one is
   still refused.
+
+
+### Dependencies
+
+- Actions group: `docker/login-action` 4.8.0 (#75).
 
 ## [1.8.0] - 2026-11-24
 
