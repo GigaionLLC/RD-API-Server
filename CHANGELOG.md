@@ -6,6 +6,41 @@ notes.
 
 ## [Unreleased]
 
+### Added
+
+- **A test now keeps the container pin table honest.** Every third-party image this project builds
+  and tests with is pinned to a multi-architecture digest, and `docker/README.md`'s "Current pins"
+  table is where an operator reads them — but nothing compared the two, so a digest bump (one line
+  in a Dockerfile or a compose file) left the table describing an image nothing uses or a tag the
+  pinned digest no longer matches. `tests/Unit/DockerPinTableTest.php` parses every
+  `name:tag@sha256:…` reference out of the Dockerfiles, compose files, workflows and CI scripts
+  (no network, no Docker daemon) and fails naming the file and line against the exact README row,
+  in both directions. The table is currently accurate; no pins changed.
+
+### Fixed
+
+- **A `null` option value in the v1 Strategy API now means *Default*.** `PUT`/`POST
+  /api/v1/strategies` stored the `null` verbatim, `Strategy::pushableOptions()` cast it to `""` on
+  the heartbeat, and a RustDesk client reads an empty value as "delete this key" — so an
+  administrator asking for the default actively cleared the client's own setting. The key now
+  leaves the stored map, so nothing is pushed for it and the client keeps its value. An empty
+  string is a value of its own and is still stored and pushed as `""`, and a delegated caller who
+  sends `null` for a full-administrator-only key is still removing it, so the guard still rejects
+  it.
+- **OIDC and webhook destinations that publish both an A and an AAAA record now pin the IPv4
+  address.** The pinned address was chosen by string order, and `"2606:…"` sorts before
+  `"93.184…"`, so the IPv6 answer usually won — and on a host or container without IPv6 egress,
+  which is the Docker default, the pinned request then failed outright: sign-in, or every webhook
+  delivery, broke for a destination that was reachable over IPv4 the whole time. Validation is
+  unchanged: every resolved address must still be public, one non-public answer in either family
+  still rejects the destination, and an IPv6-only host is still pinned over IPv6.
+- **The web-client test stub no longer leaks into the next test run.** `WebClientTest` deleted the
+  two stub files it wrote but left the empty `public/assets/webclient/src/ui` directory behind, and
+  `WebClientAssetsTest` skips only when that tree is absent — so in a checkout without the published
+  viewer (the normal source checkout) the second run tested the stub instead of skipping and failed
+  on its missing vendors. The stub now records and removes every directory it had to create, and
+  the assets test recognises a stub tree and skips it.
+
 ## [1.8.1] - 2026-11-25
 
 A data-integrity release for the Strategy editor: a value an administrator stored in a strategy

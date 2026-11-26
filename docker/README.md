@@ -18,6 +18,12 @@ digest prevents a registry tag from silently resolving to different bytes later.
 | k6 | 1.8.3 | `sha256:2cd9cd09e4119340a122aaf06f30cf3009c19db23b87954909fba0d3eda58e08` | `docker/compose.performance.yml`, `ci.yml` (perf harness validation) |
 | RustDesk server (full-stack example) | 1.1.16 | `sha256:8ecdab65deb7c84652a626380e31d11a8f1fbafd97916d57f95c20628f943c00` | `examples/full-stack.docker-compose.yml` |
 
+`tests/Unit/DockerPinTableTest.php` keeps this table honest: it reads every `name:tag@sha256:…`
+reference out of the Dockerfiles, the compose files, the workflows and the CI scripts, and fails
+naming the file and line against the row when this table states a different tag or digest or
+still lists a pin nothing uses. When it fails, correct the row here — the pins themselves come
+from the upstream registry.
+
 The toolchain installs `playwright@1.65.1` explicitly. This must match the resolved
 `node_modules/playwright` version in `package-lock.json`, because each Playwright release expects
 a specific browser revision (1.65.1 -> chromium revision 1255). Node 24 is used because the

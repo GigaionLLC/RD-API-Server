@@ -42,7 +42,7 @@ class StrategyController extends Controller
             'name' => $data['name'],
             'note' => $data['note'] ?? null,
             'enabled' => $data['enabled'] ?? true,
-            'options' => $data['options'] ?? [],
+            'options' => $this->storedOptions($request, (array) ($data['options'] ?? [])),
             'modified_at' => time(),
         ]);
 
@@ -58,7 +58,8 @@ class StrategyController extends Controller
      * The server adds nothing, rewrites nothing and drops nothing from it — a value an
      * administrator stored always wins, and only this endpoint's own caller decides what the map
      * contains. (`Strategy::pushableOptions()` filters keys the client no longer defines out of
-     * the heartbeat push only.)
+     * the heartbeat push only.) The one exception is a key sent as JSON `null`, which means the
+     * editor's *Default* and leaves the stored map — see `storedOptions()`.
      */
     public function update(Request $request, Strategy $strategy): JsonResponse
     {
@@ -74,7 +75,7 @@ class StrategyController extends Controller
             $strategy->enabled = $data['enabled'];
         }
         if (array_key_exists('options', $data)) {
-            $options = (array) ($data['options'] ?? []);
+            $options = $this->storedOptions($request, (array) ($data['options'] ?? []));
             if (! $this->scope->isUnrestricted($request->user(), 'strategies.edit')) {
                 $changed = ClientConfigService::changedFullAdminOnlyKeys((array) ($strategy->options ?? []), $options);
                 if ($changed !== []) {
@@ -83,7 +84,10 @@ class StrategyController extends Controller
                     ]);
                 }
             }
-            $strategy->options = $data['options'];
+            // Written through fill(), as the admin editor's save does: the analyzer reads the
+            // model's `casts()` docblock (@return array<string, string>) as the property's type,
+            // so a direct write of this array does not analyse.
+            $strategy->fill(['options' => $options]);
         }
 
         $strategy->modified_at = time();
@@ -128,6 +132,52 @@ class StrategyController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * The options map to store: a key the caller sent as JSON `null` is the editor's *Default*
+     * and leaves the map entirely, so nothing is pushed for it and the client keeps its own
+     * value. Stored as-is it would be cast to `""` by `Strategy::pushableOptions()`, and a
+     * RustDesk client reads an empty value as "delete this key" — the opposite of a default.
+     * An empty string is a value of its own: it is stored and pushed as `""` exactly as before.
+     *
+     * The full-admin-only guard is handed the returned map, so a delegated caller who sends
+     * `null` for a protected key that is stored is still removing it, and still rejected.
+     *
+     * @param  array<array-key, mixed>  $options
+     * @return array<string, string>
+     */
+    private function storedOptions(Request $request, array $options): array
+    {
+        $posted = $this->postedOptions($request);
+
+        $stored = [];
+        foreach ($options as $key => $value) {
+            // `ConvertEmptyStringsToNull` (a framework default) rewrites every `""` in the
+            // request to null before the controller sees it, so the raw body is the only place
+            // the difference between the two survives.
+            if ($value === null && ($posted[$key] ?? null) === '') {
+                $value = '';
+            }
+
+            if ($value !== null) {
+                $stored[(string) $key] = (string) $value;
+            }
+        }
+
+        return $stored;
+    }
+
+    /**
+     * The `options` map as the caller wrote it, before the framework's empty-string conversion.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function postedOptions(Request $request): array
+    {
+        $body = json_decode((string) $request->getContent(), true);
+
+        return is_array($body) && is_array($body['options'] ?? null) ? $body['options'] : [];
     }
 
     /**

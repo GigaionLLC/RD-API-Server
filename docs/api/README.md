@@ -62,6 +62,10 @@ paginator shape: `{ "data": [...], "total", "per_page", "current_page", ... }`.
 | POST | `/api/v1/address-books/{id}/peers` | `address_book.write` | body `{ id, alias?, note?, tags?[] }` → `201` |
 | DELETE | `/api/v1/address-books/{id}/peers/{peer}` | `address_book.write` | |
 
+A strategy `options` value of `null` means *Default*: the key is dropped from the stored map
+and pushed as no value at all, so the client keeps its own; `""` is stored and pushed as an
+empty value.
+
 Address‑book endpoints are scoped to the **key owner's** books (`403` otherwise).
 Administrator promotion, delegated-role assignment, and mutation of any full or delegated
 administrator are intentionally console-only operations available to a full administrator;
