@@ -3,6 +3,20 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-25 20:10] - Strategy value precedence: stored values are never silently dropped
+**Agent:** rustdesk-api (Mistral Vibe, sub-agent `precedence`)
+**Files Modified:**
+- `app/Support/StrategyOptionCatalog.php` (NEW — `definitions()`/`keys()` over `config('strategy_options.tabs')`, `acceptsValue()` for toggle/select/number/text, and `onlyYMeansOn()` mirroring `option2bool()`'s "on only for exactly `Y`" branch)
+- `app/Http/Controllers/Admin/StrategyController.php` (`edit()` builds a per-option `optionStates` map — `custom`, `only_y_means_on`, `kept_notice` — instead of the removed `catalogKeys()` helper; `update()` records custom rows that duplicate a built-in control, re-merges any stored catalog value the control cannot express when the request never mentions the key, and returns both warnings joined in one `warning` field)
+- `app/Services/ClientConfigService.php` (`customOverridesBuiltInWarning()`)
+- `config/strategy_options.php` (header documents `added_in`/`added_on` plus the precedence rule; the three 1.8.0 options — `allow-drm-capture`, `id-whitelist`, `allow-kcp-congestion-control` — carry `'added_in' => '1.8.0', 'added_on' => '2026-11-24'`)
+- `resources/views/admin/strategies/edit.blade.php` (`Custom: <value>` option for an unrecognised toggle/select value, text input for an unrecognised number value, the "Not a value this control offers" and `option2bool` help lines, and the one-time "Added as a built-in control" notice)
+- `app/Http/Controllers/Api/V1/StrategyController.php` (docblock only — the v1 `options` map has no duplicate case and is stored verbatim; no behaviour change)
+- `tests/Feature/StrategyValuePrecedenceTest.php` (NEW — 6 tests), `tests/Feature/StrategyOptionLifecycleTest.php` (a custom row naming `enable-audio` now also returns the precedence warning — intentional behaviour change)
+- `docs/modernization/10-client-config-keys.md` (new §1c with the verbatim precedence rule and the Custom/notice behaviour), `README.md` (Strategies bullet), `Wiki/core/15-security.md` (delegated-admin boundary), `CHANGELOG.md` (`[Unreleased]` → `### Changed` / `### Fixed`), this log entry
+**Database/API Changes:** No migration, no new routes, no wire change to the RustDesk client API. The admin save `PUT /admin/strategies/{id}` may now answer `{"warning": "..."}` where it answered `{}` (a custom row naming a built-in control); the JSON shape is unchanged. `PUT /api/v1/strategies/{id}` is untouched.
+**Summary:** A value an administrator stored in a strategy always wins — including one a later release turned into a built-in control — so the editor now renders a value its control cannot express as a selected `Custom: <value>` choice (text input for numbers) and the save path re-merges it from the stored map instead of dropping it, which also stops an unrecognised full-admin-only value from making a delegated editor's unrelated save fail, while setting, changing or removing such a value is still rejected.
+
 ## [2026-11-24 23:59] - Release v1.8.0
 **Agent:** rustdesk-api (Claude Opus 5.5, coordinator)
 **Files Modified:**

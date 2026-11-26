@@ -47,7 +47,9 @@ command, backed by MariaDB.
 - **Devices** — searchable list with **bulk‑assign** owner / device group / strategy, live‑search pickers
 - **Strategies** editor laid out like the RustDesk client's **Settings** (General / Security / Network),
   ~55 catalogued `config_options` with tri‑state toggles + "set all", plus custom keys and
-  device/user/group assignment
+  device/user/group assignment. A value an administrator stored always wins: it is never added,
+  rewritten or dropped by the server, and a stored value its control cannot express renders as
+  `Custom: …` instead of silently reverting to "Default" on the next save
 - **Address Books** — RustDesk‑client‑style manager (peer cards, tags, add/edit dialogs) for **any** user's book,
   with **shared / team books** (collaborators at read · read‑write · full‑control)
 - **Webhooks / notifications** — push alarms and connection / device events to **Slack**, **Telegram**,

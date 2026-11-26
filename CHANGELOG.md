@@ -6,6 +6,43 @@ notes.
 
 ## [Unreleased]
 
+### Changed
+
+- **Strategy: a stored option value the editor's control does not offer stays visible and stays
+  put.** A value outside a control's vocabulary — `allow-drm-capture` holding `true`, a select
+  holding a value that is not one of its choices, a non-numeric value in a number field — used to
+  render as *Default*. It now renders as an extra `Custom: <value>` choice, already selected, with
+  the note "Not a value this control offers; kept exactly as set." (number fields switch to a text
+  input so the browser cannot blank the value), and it stays until an administrator picks another
+  choice. For the `allow-` keys the editor also states that RustDesk treats anything other than
+  `Y` as off. A free-form custom row that names a key the editor also offers as a built-in control
+  still wins and now answers with `` `<key>` is also a built-in control; your custom value was
+  saved and takes precedence. ``, appended to the existing 1.5.3+ ignore notice in the same single
+  `warning` field (`{}` when there is nothing to say). Options added to the catalog carry
+  `added_in`/`added_on`; a strategy that stored such a key before that date shows a one-time
+  "Added as a built-in control in RD-API 1.8.0 …" note next to the control.
+- **Strategy: full-administrator-only controls are read-only for a delegated editor.** They render
+  disabled with "Only a full administrator can change this.", the section's *All on / All off /
+  All default* buttons skip them, and the save carries their stored value through server-side, so
+  a stray click or a bulk button no longer turns a delegated editor's save into a guard
+  rejection. The guard itself is unchanged.
+- **Strategy: the precedence rule is now stated in the docs.** A value stored in a strategy always
+  wins; the server never adds, rewrites or drops an option value by itself — documented in
+  `docs/modernization/10-client-config-keys.md` §1c, the README and the security wiki.
+
+### Fixed
+
+- **Strategy: saving an unrelated field silently deleted any stored option value the editor's
+  control could not represent.** The editor rendered such a value as *Default*, so the next save
+  — even a name change — dropped it straight out of the pushed `config_options` map
+  (`allow-drm-capture=true`, set by hand as a custom option before the control existed, was the
+  realistic case). For a full-administrator-only key the same gap also made a delegated editor's
+  unrelated save fail with "Only a full administrator can set or change: …". Such values are now
+  preserved verbatim: rendered as-is in the editor, re-merged from the stored map server-side when
+  a request does not mention them at all, and pushed unchanged. A delegated editor's unrelated
+  save therefore keeps a full-admin-only value intact, while setting, changing or removing one is
+  still refused.
+
 ## [1.8.0] - 2026-11-24
 
 Matches the RustDesk 1.5.x client: the new Linux DRM login-screen capture option, retried audit
