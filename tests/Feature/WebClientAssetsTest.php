@@ -37,6 +37,31 @@ class WebClientAssetsTest extends TestCase
         if (! is_dir($this->root)) {
             $this->markTestSkipped('The viewer is not published in this checkout; run install-assets.mjs.');
         }
+
+        // A tree holding only WebClientTest's stub is not a published viewer. It is very easy to
+        // end up with one — an interrupted run, or the empty directories an earlier version of
+        // that stub left behind — and testing it fails on the stub's own missing vendors, which
+        // says nothing about the viewer. Recognise the stub and skip instead.
+        if ($this->isStub()) {
+            $this->markTestSkipped('Only the test stub is present, not the published viewer; run install-assets.mjs.');
+        }
+    }
+
+    /**
+     * Whether `public/assets/webclient` holds the test stub rather than the published viewer.
+     *
+     * The stub is one line of JavaScript under `src/ui/`, so the marker is its content; a
+     * published tree always carries its vendored modules beside `src`.
+     */
+    private function isStub(): bool
+    {
+        $viewer = $this->root.'/src/ui/viewer.js';
+
+        if (! is_file($viewer) || ! is_dir($this->root.'/vendor')) {
+            return true;
+        }
+
+        return str_starts_with((string) file_get_contents($viewer), '// test stub');
     }
 
     public function test_every_import_in_the_published_tree_resolves(): void

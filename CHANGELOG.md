@@ -23,6 +23,12 @@ notes.
   delivery, broke for a destination that was reachable over IPv4 the whole time. Validation is
   unchanged: every resolved address must still be public, one non-public answer in either family
   still rejects the destination, and an IPv6-only host is still pinned over IPv6.
+- **The web-client test stub no longer leaks into the next test run.** `WebClientTest` deleted the
+  two stub files it wrote but left the empty `public/assets/webclient/src/ui` directory behind, and
+  `WebClientAssetsTest` skips only when that tree is absent — so in a checkout without the published
+  viewer (the normal source checkout) the second run tested the stub instead of skipping and failed
+  on its missing vendors. The stub now records and removes every directory it had to create, and
+  the assets test recognises a stub tree and skips it.
 
 ## [1.8.1] - 2026-11-25
 

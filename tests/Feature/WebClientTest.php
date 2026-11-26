@@ -32,12 +32,13 @@ class WebClientTest extends TestCase
         // other assertion in this file. The published copy is generated at image build
         // time and is absent from a source checkout.
         //
-        // Only the two files this creates are removed again. An earlier version deleted
-        // the whole published tree in tearDown, so running the suite in a checkout that
-        // HAD published assets destroyed them — and because the stub tested a path that
-        // later moved, it did so on every single run.
+        // Only the two files this creates are removed again, plus any directory it had to
+        // create for them. An earlier version deleted the whole published tree in tearDown,
+        // so running the suite in a checkout that HAD published assets destroyed them — and
+        // because the stub tested a path that later moved, it did so on every single run.
+        // Leaving the (empty) directories behind was its own leak: see tearDown().
         if (! File::isFile(public_path('assets/webclient/src/ui/viewer.js'))) {
-            File::ensureDirectoryExists(public_path('assets/webclient/src/ui'));
+            $this->makeDirectory(public_path('assets/webclient/src/ui'));
             File::put(public_path('assets/webclient/src/ui/viewer.js'), "// test stub\n");
             File::put(public_path('assets/webclient/src/ui/viewer.html'),
                 "<!doctype html><html><body><script type=\"module\" src=\"./viewer.js\"></script></body></html>\n");
@@ -64,12 +65,42 @@ class WebClientTest extends TestCase
                 public_path('assets/webclient/src/ui/viewer.js'),
                 public_path('assets/webclient/src/ui/viewer.html'),
             ]);
+
+            // Deepest first, and only while empty: an empty `assets/webclient/src/ui` is
+            // enough to make WebClientAssetsTest believe the viewer is published, so it ran
+            // against the stub on the second run in a checkout and failed. rmdir() refuses a
+            // non-empty directory, so a published tree can never be collateral.
+            foreach ($this->createdDirectories as $directory) {
+                if (File::isDirectory($directory)) {
+                    @rmdir($directory);
+                }
+            }
         }
 
         parent::tearDown();
     }
 
     private bool $stubbedAssets = false;
+
+    /** @var list<string> Directories the stub created, deepest first. */
+    private array $createdDirectories = [];
+
+    /**
+     * Create a directory for the stub and remember every level this run brought into being, so
+     * tearDown can take exactly those away again.
+     */
+    private function makeDirectory(string $path): void
+    {
+        for ($missing = $path; ! File::isDirectory($missing); $missing = dirname($missing)) {
+            $this->createdDirectories[] = $missing;
+
+            if (dirname($missing) === $missing) {
+                break;
+            }
+        }
+
+        File::ensureDirectoryExists($path);
+    }
 
     public function test_a_device_reported_hostname_cannot_break_out_of_the_injected_config(): void
     {
