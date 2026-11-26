@@ -257,14 +257,16 @@ class StrategyController extends Controller
             }
         }
 
-        // The editor renders full-admin-only controls disabled for a delegated editor, so the
-        // browser posts nothing for them: carry the stored value through instead of reading that
-        // silence as "Default". Only keys absent from both opt[] and the custom rows qualify, so
-        // the guard below still rejects any attempt to set, change or clear one.
+        // The editor renders full-admin-only catalog controls disabled for a delegated editor, so
+        // the browser posts nothing for them: carry the stored value through instead of reading
+        // that silence as "Default". Only catalog keys absent from both opt[] and the custom rows
+        // qualify. Free-form custom rows stay editable, so dropping a protected one there is still
+        // a removal, and the guard below still rejects any attempt to set, change or clear one.
         if (! $this->scope->isUnrestricted($request->user(), 'strategies.edit')) {
             foreach ($storedOptions as $storedKey => $storedValue) {
                 $storedKey = (string) $storedKey;
-                if (in_array(strtolower($storedKey), ClientConfigService::FULL_ADMIN_ONLY_OPTION_KEYS, true)
+                if (isset($definitions[$storedKey])
+                    && in_array(strtolower($storedKey), ClientConfigService::FULL_ADMIN_ONLY_OPTION_KEYS, true)
                     && ! array_key_exists($storedKey, $options)
                     && ! array_key_exists($storedKey, $postedOpt)) {
                     $options[$storedKey] = (string) $storedValue;

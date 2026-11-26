@@ -269,18 +269,18 @@ class StrategyValuePrecedenceTest extends TestCase
         ]);
         $strategy = $this->strategyWithDevice(['allow-drm-capture' => 'Y'], time(), $device);
 
-        // The control is rendered disabled (the browser then posts nothing for it, and the section
-        // bulk buttons skip it) with a note saying why.
+        // A full administrator gets the normal, editable control.
+        $this->actingAs($this->admin())->get(route('admin.strategies.edit', $strategy))
+            ->assertOk()
+            ->assertDontSee('Only a full administrator can change this.');
+
+        // For the delegated editor the control is rendered disabled (the browser then posts
+        // nothing for it, and the section bulk buttons skip it) with a note saying why.
         $html = $this->actingAs($delegate)->get(route('admin.strategies.edit', $strategy))
             ->assertOk()
             ->assertSee('Only a full administrator can change this.')
             ->getContent();
         $this->assertMatchesRegularExpression('/<select[^>]*name="opt\[allow-drm-capture\]"[^>]*disabled/', (string) $html);
-
-        // A full administrator gets the normal, editable control.
-        $this->actingAs($this->admin())->get(route('admin.strategies.edit', $strategy))
-            ->assertOk()
-            ->assertDontSee('Only a full administrator can change this.');
 
         // The delegated save omits the disabled key (as a browser does) and changes another one:
         // the stored full-admin-only value is carried through, not cleared, and the guard is quiet.
