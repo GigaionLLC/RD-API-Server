@@ -6,6 +6,13 @@ notes.
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-11-26
+
+A follow-up fix release: a `null` option value in the v1 Strategy API now means *Default*
+instead of clearing the client's setting, and OIDC/webhook destinations with both A and AAAA
+records are reached over IPv4. **Upgrade:** pull the new image (`docker compose pull`); there is
+nothing to migrate and nobody is signed out.
+
 ### Added
 
 - **A test now keeps the container pin table honest.** Every third-party image this project builds

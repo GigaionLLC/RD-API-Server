@@ -3,6 +3,16 @@
 All changes made by AI agents are tracked chronologically below (newest first).
 Format defined in [AGENT.md](../../AGENT.md) → Mandatory wrap-up protocol.
 
+## [2026-11-26 07:30] - Release v1.8.2
+**Agent:** rustdesk-api (Claude Opus 5.5, coordinator, ai-dev1 handoff session)
+**Files Modified:**
+- `config/app.php`, `tests/Feature/SmokeTest.php` (1.8.1 -> 1.8.2)
+- `README.md` (stable-release link and the `RUSTDESK_API_IMAGE` example)
+- `CHANGELOG.md` (`[Unreleased]` becomes `[1.8.2] - 2026-11-26` with the upgrade note)
+- this log entry
+**Database/API Changes:** None.
+**Summary:** Release preparation only. v1.8.2 ships #85: a JSON `null` option value in the v1 Strategy API means *Default*, IPv4-preferred egress pin for OIDC and webhook destinations, web-client test stub cleanup, and the Docker pin-table test.
+
 ## [2026-11-26 06:20] - v1.8.2 follow-ups: null option values, IPv4 pin, viewer stub, pin-table test
 **Agent:** rustdesk-api (Mistral Vibe, sub-agent `followups`)
 **Files Modified:**
