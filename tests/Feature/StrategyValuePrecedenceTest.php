@@ -269,11 +269,6 @@ class StrategyValuePrecedenceTest extends TestCase
         ]);
         $strategy = $this->strategyWithDevice(['allow-drm-capture' => 'Y'], time(), $device);
 
-        // A full administrator gets the normal, editable control.
-        $this->actingAs($this->admin())->get(route('admin.strategies.edit', $strategy))
-            ->assertOk()
-            ->assertDontSee('Only a full administrator can change this.');
-
         // For the delegated editor the control is rendered disabled (the browser then posts
         // nothing for it, and the section bulk buttons skip it) with a note saying why.
         $html = $this->actingAs($delegate)->get(route('admin.strategies.edit', $strategy))
@@ -294,6 +289,17 @@ class StrategyValuePrecedenceTest extends TestCase
         $strategy->refresh();
         $this->assertSame('Y', $strategy->options['allow-drm-capture']);
         $this->assertSame('N', $strategy->options['enable-audio']);
+    }
+
+    public function test_full_admin_gets_full_admin_only_controls_editable(): void
+    {
+        $strategy = $this->strategyWithDevice(['allow-drm-capture' => 'Y'], time());
+
+        $html = $this->actingAs($this->admin())->get(route('admin.strategies.edit', $strategy))
+            ->assertOk()
+            ->assertDontSee('Only a full administrator can change this.')
+            ->getContent();
+        $this->assertDoesNotMatchRegularExpression('/<select[^>]*name="opt\[allow-drm-capture\]"[^>]*disabled/', (string) $html);
     }
 
     public function test_number_option_with_a_non_numeric_stored_value_renders_as_text_and_survives(): void
