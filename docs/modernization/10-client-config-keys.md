@@ -74,6 +74,9 @@ already set by hand as a custom option.
 - **A request that never mentions such a key cannot delete it.** The editor posts every control
   it renders, so an absent catalog key with a value the control cannot express is re-merged from
   the stored map server-side. An explicit empty value is the *Default* choice and still clears.
+- **A JSON `null` option value in the v1 API is also *Default*.** `POST`/`PUT /api/v1/strategies`
+  drops such a key from the stored map, so nothing is pushed for it and the client keeps its own
+  value, while `""` stays a stored value that is pushed as `""`.
 - **A custom row that names a built-in control keeps winning.** The custom value is stored and
   the save response carries `` `<key>` is also a built-in control; your custom value was saved and
   takes precedence. `` It is appended to the same single `warning` field as the 1.5.3+ ignore

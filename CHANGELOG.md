@@ -6,6 +6,17 @@ notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `null` option value in the v1 Strategy API now means *Default*.** `PUT`/`POST
+  /api/v1/strategies` stored the `null` verbatim, `Strategy::pushableOptions()` cast it to `""` on
+  the heartbeat, and a RustDesk client reads an empty value as "delete this key" — so an
+  administrator asking for the default actively cleared the client's own setting. The key now
+  leaves the stored map, so nothing is pushed for it and the client keeps its value. An empty
+  string is a value of its own and is still stored and pushed as `""`, and a delegated caller who
+  sends `null` for a full-administrator-only key is still removing it, so the guard still rejects
+  it.
+
 ## [1.8.1] - 2026-11-25
 
 A data-integrity release for the Strategy editor: a value an administrator stored in a strategy

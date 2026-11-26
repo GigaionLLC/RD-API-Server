@@ -686,7 +686,10 @@ components:
         options:
           type: object
           additionalProperties: { type: [string, "null"] }
-          description: 'config_options map; tri-state "" / "Y" / "N" or free text.'
+          description: >-
+            config_options map; tri-state "" / "Y" / "N" or free text. null is *Default* and
+            leaves the key out of the stored map (nothing is pushed for it); "" is stored and
+            pushed as an empty value.
     AuditConn:
       type: object
       properties:
