@@ -254,6 +254,15 @@ description: "Establishes the project's Core Security Perimeter and Agentic Gove
   `api-server`, `key`) or route it through a credentialed proxy (`proxy-url`, `proxy-username`,
   `proxy-password`) can be added, changed or removed only by unrestricted administrators, in the
   console and the v1 API (`ClientConfigService::FULL_ADMIN_ONLY_OPTION_KEYS`).
+- A delegated editor's save never loses such a key: the editor renders and posts the stored value
+  (and `Admin\StrategyController::update` re-merges any stored value its control cannot express),
+  so an unrelated edit succeeds with the value intact while setting, changing or removing it is
+  still rejected. The same rule keeps every stored value a catalog control cannot express
+  (rendered as `Custom: …`) — see the precedence rule in
+  [docs/modernization/10-client-config-keys.md §1c](../../docs/modernization/10-client-config-keys.md).
+- Strategy writes follow one contract everywhere: **a value stored in a strategy always wins; the
+  server never adds, rewrites or drops an option value by itself**, including when a later release
+  turns a hand-set custom key into a built-in control.
 
 ## OIDC Device Sign-in Approval
 

@@ -52,6 +52,13 @@ class StrategyController extends Controller
     /**
      * PUT /api/v1/strategies/{strategy} — update name/note/enabled/options. Any change bumps
      * `modified_at`, so connected clients pick up the new options on their next heartbeat.
+     *
+     * The `options` map is a plain config_options map, not the editor's catalog-plus-custom
+     * split, so there is no duplicate-key case here: it replaces the stored map exactly as sent.
+     * The server adds nothing, rewrites nothing and drops nothing from it — a value an
+     * administrator stored always wins, and only this endpoint's own caller decides what the map
+     * contains. (`Strategy::pushableOptions()` filters keys the client no longer defines out of
+     * the heartbeat push only.)
      */
     public function update(Request $request, Strategy $strategy): JsonResponse
     {

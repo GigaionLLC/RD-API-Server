@@ -10,6 +10,7 @@ use App\Models\StrategyAssignment;
 use App\Models\User;
 use App\Services\AdminScopeService;
 use App\Services\ClientConfigService;
+use App\Support\StrategyOptionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -114,8 +115,14 @@ class StrategyController extends Controller
         // key/value editor. Keys the client no longer defines get their own read-only block so a
         // legacy strategy stays loadable without looking like a supported control.
         $tabs = config('strategy_options.tabs', []);
-        $catalogKeys = $this->catalogKeys();
-        $customOptions = array_diff_key((array) ($strategy->options ?? []), array_flip($catalogKeys));
+        $definitions = StrategyOptionCatalog::definitions();
+        $storedOptions = (array) ($strategy->options ?? []);
+        $customOptions = array_diff_key($storedOptions, $definitions);
+
+        // A stored value the control cannot express (say `true` for a toggle that only offers
+        // Y/N) is rendered as-is under "Custom: …" instead of falling back to "Default": the
+        // next save of an unrelated field must not delete a value an administrator stored.
+        $optionStates = $this->optionStates($definitions, $storedOptions, (int) $strategy->modified_at);
 
         $retiredDefinitions = (array) config('strategy_options.removed', []);
         $retiredOptions = [];
@@ -136,6 +143,7 @@ class StrategyController extends Controller
             'userMap',
             'deviceGroupMap',
             'tabs',
+            'optionStates',
             'customOptions',
             'retiredOptions'
         ));
@@ -179,6 +187,10 @@ class StrategyController extends Controller
         }
 
         $options = [];
+        $definitions = StrategyOptionCatalog::definitions();
+
+        /** @var array<array-key, mixed> $storedOptions */
+        $storedOptions = (array) ($strategy->options ?? []);
 
         // Known catalog options post as opt[<key>]=<value>; an empty value means "leave the
         // client's own default" (option2bool treats "" as the per-key default), so it's omitted.
@@ -191,15 +203,41 @@ class StrategyController extends Controller
             $options[$key] = $val;
         }
 
-        // Custom (non-catalog) options: parallel key/value rows; skip empty keys.
+        // Custom (non-catalog) options: parallel key/value rows; skip empty keys. A row that
+        // names a built-in control (or repeats a posted opt[] key) still wins — a value an
+        // administrator stored always wins — but the response says so instead of leaving the
+        // admin to guess which of the two applied.
         $keys = $request->input('option_keys', []);
         $values = $request->input('option_values', []);
+        $builtInOverrides = [];
         foreach ($keys as $i => $key) {
             $key = trim((string) $key);
             if ($key === '') {
                 continue;
             }
+            if (isset($definitions[$key]) || array_key_exists($key, $options)) {
+                $builtInOverrides[] = $key;
+            }
             $options[$key] = (string) ($values[$i] ?? '');
+        }
+
+        // A catalog value the control cannot express is kept when the request never mentions its
+        // key: the form could not have offered it, so silence is not an administrator clearing it.
+        // (An explicit empty opt[] value is the editor's "Default" choice and still clears the
+        // key, and a delegated editor's attempt to change a protected one is still rejected.)
+        $postedOpt = (array) $request->input('opt', []);
+        foreach ($storedOptions as $storedKey => $storedValue) {
+            $storedKey = (string) $storedKey;
+            $storedValue = (string) $storedValue;
+            if ($storedValue === '' || ! isset($definitions[$storedKey])) {
+                continue;
+            }
+            if (array_key_exists($storedKey, $options) || array_key_exists($storedKey, $postedOpt)) {
+                continue;
+            }
+            if (! StrategyOptionCatalog::acceptsValue($definitions[$storedKey], $storedValue)) {
+                $options[$storedKey] = $storedValue;
+            }
         }
 
         // Keys the client no longer defines are preserved exactly as stored (the editor shows
@@ -207,7 +245,7 @@ class StrategyController extends Controller
         // this path cannot be used to inject an arbitrary option.
         $retiredKeys = array_keys((array) config('strategy_options.removed', []));
         $droppedKeys = array_map(strval(...), (array) $request->input('drop_retired', []));
-        foreach ((array) ($strategy->options ?? []) as $storedKey => $storedValue) {
+        foreach ($storedOptions as $storedKey => $storedValue) {
             $storedKey = (string) $storedKey;
             if (in_array($storedKey, $retiredKeys, true) && ! in_array($storedKey, $droppedKeys, true)) {
                 $options[$storedKey] = (string) $storedValue;
@@ -225,12 +263,25 @@ class StrategyController extends Controller
             'modified_at' => time(),
         ])->save();
 
-        // Catalog entries carry the same warning inline; only free-form keys need it here, so
-        // an admin who pastes a deny-listed key is told instead of silently pushing nothing.
-        $customIgnored = array_diff(array_keys($options), $this->catalogKeys());
-        $warning = ClientConfigService::strategyIgnoredWarning($customIgnored);
+        $warnings = [];
 
-        return response()->json($warning === null ? (object) [] : ['warning' => $warning]);
+        // A custom row that duplicates a built-in control kept its own value; say so, because
+        // otherwise the admin sees two places claiming to set the same key.
+        $builtInOverrideWarning = ClientConfigService::customOverridesBuiltInWarning($builtInOverrides);
+        if ($builtInOverrideWarning !== null) {
+            $warnings[] = $builtInOverrideWarning;
+        }
+
+        // Catalog entries carry the client-ignored warning inline; only free-form keys need it
+        // here, so an admin who pastes a deny-listed key is told instead of silently pushing
+        // nothing.
+        $customIgnored = array_diff(array_keys($options), array_keys($definitions));
+        $ignoredWarning = ClientConfigService::strategyIgnoredWarning($customIgnored);
+        if ($ignoredWarning !== null) {
+            $warnings[] = $ignoredWarning;
+        }
+
+        return response()->json($warnings === [] ? (object) [] : ['warning' => implode(' ', $warnings)]);
     }
 
     public function storeAssignment(Request $request, Strategy $strategy): RedirectResponse
@@ -303,22 +354,53 @@ class StrategyController extends Controller
     }
 
     /**
-     * Every option key the catalog offers, in tab order.
+     * Per-option editor state: which stored values the control cannot express (they render as
+     * "Custom: …" and are preserved verbatim), whether the client reads only an exact `Y` as on,
+     * and the one-time notice for a key that became a built-in control after this strategy was
+     * last saved.
      *
-     * @return list<string>
+     * @param  array<string, array<string, mixed>>  $definitions
+     * @param  array<array-key, mixed>  $stored
+     * @return array<string, array{custom: bool, only_y_means_on: bool, kept_notice: ?string}>
      */
-    private function catalogKeys(): array
+    private function optionStates(array $definitions, array $stored, int $modifiedAt): array
     {
-        $keys = [];
-        foreach ((array) config('strategy_options.tabs', []) as $tab) {
-            foreach ($tab['sections'] as $section) {
-                foreach ($section['options'] as $opt) {
-                    $keys[] = (string) $opt['key'];
-                }
-            }
+        $states = [];
+
+        foreach ($definitions as $key => $definition) {
+            $value = (string) ($stored[$key] ?? '');
+            $states[$key] = [
+                'custom' => $value !== '' && ! StrategyOptionCatalog::acceptsValue($definition, $value),
+                'only_y_means_on' => StrategyOptionCatalog::onlyYMeansOn($key),
+                'kept_notice' => $value === '' ? null : $this->keptValueNotice($definition, $value, $modifiedAt),
+            ];
         }
 
-        return $keys;
+        return $states;
+    }
+
+    /**
+     * The notice for a key this strategy already carried before the catalog offered a control
+     * for it (`added_in` / `added_on` in config/strategy_options.php). It disappears on its own
+     * once the strategy is saved again, because that bumps `modified_at`.
+     *
+     * @param  array<string, mixed>  $definition
+     */
+    private function keptValueNotice(array $definition, string $value, int $modifiedAt): ?string
+    {
+        $addedIn = $definition['added_in'] ?? null;
+        $addedOn = $definition['added_on'] ?? null;
+        if (! is_string($addedIn) || ! is_string($addedOn)) {
+            return null;
+        }
+
+        $addedAt = strtotime($addedOn.' 00:00:00 UTC');
+        if ($addedAt === false || $modifiedAt >= $addedAt) {
+            return null;
+        }
+
+        return "Added as a built-in control in RD-API {$addedIn}. This strategy already had "
+            ."`{$value}` set by hand; it was kept and is still pushed.";
     }
 
     /**

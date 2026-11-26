@@ -26,6 +26,17 @@
  *     (`BLOCKED_CONFIG_OPTIONS`, src/hbbs_http/sync.rs:297-342 at a0c0963c). The option stays in
  *     the catalog because older clients still apply it and an install-time
  *     `rustdesk --option <key> <value>` still sets it.
+ *   - 'added_in' + 'added_on' : the RD-API release that introduced this built-in control and the
+ *     day it shipped (`YYYY-MM-DD`, UTC). Set both on every new option. A strategy that already
+ *     stores a value for the key and was last saved before `added_on` (its `modified_at`, unix
+ *     seconds) may have had that key set by hand as a custom option, so the editor adds a
+ *     one-time "Added as a built-in control in RD-API <added_in>" note next to the control. The
+ *     value is never rewritten — a value an administrator stored always wins — and the note
+ *     disappears by itself after the strategy's next save.
+ *
+ * A stored value the control cannot express (say `true` for a toggle that only offers Y/N, or a
+ * select value outside its `choices`) is preserved verbatim and rendered as "Custom: <value>":
+ * the server never adds, rewrites or drops an option value by itself.
  *
  * The top-level 'removed' map lists keys the client no longer defines at all. They can still be
  * present in stored strategies; those stay loadable, are shown read-only in the editor and are
@@ -54,7 +65,8 @@ return [
                         ['key' => 'enable-directx-capture', 'label' => 'DirectX capture (Windows)', 'type' => 'toggle'],
                         ['key' => 'allow-always-software-render', 'label' => 'Always software render', 'type' => 'toggle'],
                         ['key' => 'allow-drm-capture', 'label' => 'DRM screen capture (Linux)', 'type' => 'toggle',
-                            'note' => 'Lets RustDesk capture the Linux login screen and Wayland sessions through DRM/KMS (runs as root on the device). Needs a RustDesk build newer than 1.5.3.'],
+                            'note' => 'Lets RustDesk capture the Linux login screen and Wayland sessions through DRM/KMS (runs as root on the device). Needs a RustDesk build newer than 1.5.3.',
+                            'added_in' => '1.8.0', 'added_on' => '2026-11-24'],
                         ['key' => 'allow-remove-wallpaper', 'label' => 'Remove wallpaper during session', 'type' => 'toggle'],
                         ['key' => 'keep-awake-during-incoming-sessions', 'label' => 'Keep screen awake during incoming sessions', 'type' => 'toggle'],
                     ],
@@ -128,7 +140,8 @@ return [
                         ['key' => 'enable-lan-discovery', 'label' => 'LAN discovery', 'type' => 'toggle'],
                         ['key' => 'whitelist', 'label' => 'IP whitelist (comma/space separated)', 'type' => 'text'],
                         ['key' => 'id-whitelist', 'label' => 'Client-ID whitelist (comma separated)', 'type' => 'text',
-                            'note' => 'IDs allowed to connect, in addition to the IP whitelist. Accepts * wildcards; empty allows every ID.'],
+                            'note' => 'IDs allowed to connect, in addition to the IP whitelist. Accepts * wildcards; empty allows every ID.',
+                            'added_in' => '1.8.0', 'added_on' => '2026-11-24'],
                         ['key' => 'allow-auto-disconnect', 'label' => 'Auto-close on user inactivity', 'type' => 'toggle'],
                         ['key' => 'auto-disconnect-timeout', 'label' => 'Inactivity timeout (minutes)', 'type' => 'number'],
                         ['key' => 'allow-only-conn-window-open', 'label' => 'Only allow connection if window open', 'type' => 'toggle'],
@@ -160,7 +173,8 @@ return [
                         ['key' => 'allow-https-21114', 'label' => 'Allow HTTPS on port 21114', 'type' => 'toggle'],
                         ['key' => 'use-raw-tcp-for-api', 'label' => 'Use raw TCP for the API', 'type' => 'toggle'],
                         ['key' => 'allow-kcp-congestion-control', 'label' => 'KCP congestion control', 'type' => 'toggle',
-                            'note' => 'Run KCP with its congestion window instead of the turbo profile. Opt in only if you know the link loses packets to real congestion.'],
+                            'note' => 'Run KCP with its congestion window instead of the turbo profile. Opt in only if you know the link loses packets to real congestion.',
+                            'added_in' => '1.8.0', 'added_on' => '2026-11-24'],
                     ],
                 ],
                 [

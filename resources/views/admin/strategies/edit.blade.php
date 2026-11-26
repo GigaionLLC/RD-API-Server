@@ -6,6 +6,7 @@
 
     $current = $strategy->options ?? [];
     $customOptions = $customOptions ?? [];
+    $optionStates = $optionStates ?? [];
     $canEdit = auth()->user()->hasPermission('strategies.edit');
     $targetLabels = [
         StrategyAssignment::TARGET_DEVICE => 'Device',
@@ -135,6 +136,7 @@
                                                         @php
                                                             $val = (string) ($current[$opt['key']] ?? '');
                                                             $inputId = 'strategy-opt-'.$opt['key'];
+                                                            $state = $optionStates[$opt['key']] ?? ['custom' => false, 'only_y_means_on' => false, 'kept_notice' => null];
                                                         @endphp
                                                         <div class="rd-strategy-option">
                                                             <div class="rd-strategy-option__label">
@@ -148,6 +150,15 @@
                                                                 @if (! empty($opt['note']))
                                                                     <p class="rd-strategy-section__help">{{ $opt['note'] }}</p>
                                                                 @endif
+                                                                @if ($state['kept_notice'])
+                                                                    <p class="rd-strategy-section__help">{{ $state['kept_notice'] }}</p>
+                                                                @endif
+                                                                @if ($state['custom'])
+                                                                    <p class="rd-strategy-section__help">Not a value this control offers; kept exactly as set.</p>
+                                                                    @if ($opt['type'] === 'toggle' && $state['only_y_means_on'])
+                                                                        <p class="rd-strategy-section__help">RustDesk treats anything other than <code>Y</code> as off for this key.</p>
+                                                                    @endif
+                                                                @endif
                                                             </div>
                                                             <div class="rd-strategy-option__control">
                                                                 @if ($opt['type'] === 'toggle')
@@ -155,15 +166,26 @@
                                                                         <option value="" @selected($val === '')>Default</option>
                                                                         <option value="Y" @selected($val === 'Y')>On</option>
                                                                         <option value="N" @selected($val === 'N')>Off</option>
+                                                                        @if ($state['custom'])
+                                                                            <option value="{{ $val }}" selected>Custom: {{ $val }}</option>
+                                                                        @endif
                                                                     </select>
                                                                 @elseif ($opt['type'] === 'select')
                                                                     <select class="rd-select @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" name="opt[{{ $opt['key'] }}]" @disabled(! $canEdit)>
                                                                         @foreach ($opt['choices'] as $choiceValue => $choiceLabel)
                                                                             <option value="{{ $choiceValue }}" @selected($val === (string) $choiceValue)>{{ $choiceLabel }}</option>
                                                                         @endforeach
+                                                                        @if ($state['custom'])
+                                                                            <option value="{{ $val }}" selected>Custom: {{ $val }}</option>
+                                                                        @endif
                                                                     </select>
                                                                 @elseif ($opt['type'] === 'number')
-                                                                    <input class="rd-input @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" type="number" min="0" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default" @disabled(! $canEdit)>
+                                                                    @if ($state['custom'])
+                                                                        {{-- Not a number the browser would keep: a numeric input would blank it and lose it on save. --}}
+                                                                        <input class="rd-input rd-opt-set" id="{{ $inputId }}" type="text" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default" @disabled(! $canEdit)>
+                                                                    @else
+                                                                        <input class="rd-input @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" type="number" min="0" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default" @disabled(! $canEdit)>
+                                                                    @endif
                                                                 @else
                                                                     <input class="rd-input @if($val !== '') rd-opt-set @endif" id="{{ $inputId }}" type="text" name="opt[{{ $opt['key'] }}]" value="{{ $val }}" placeholder="Default" @disabled(! $canEdit)>
                                                                 @endif

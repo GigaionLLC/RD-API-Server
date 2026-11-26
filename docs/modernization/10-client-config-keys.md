@@ -52,6 +52,47 @@ Consequences for us (implemented in `config/strategy_options.php` +
 - Install-time delivery still works: `rustdesk --option <key> <value>`, the config string and a
   custom client's `default-settings`/`override-settings` are not filtered this way.
 
+### 1c. Value precedence — a stored value always wins (implemented)
+
+> A value stored in a strategy always wins; the server never adds, rewrites or drops an option
+> value by itself.
+
+Enforced in the editor and in both write paths (`Admin\StrategyController::update`,
+`Api\V1\StrategyController::update`). The load-bearing fact is that `strategies.options` is one
+flat map: "catalog" versus "custom" is only a display split, and a key becomes a built-in control
+the moment `config/strategy_options.php` starts offering one for it — including keys someone had
+already set by hand as a custom option.
+
+- **A value the control cannot express is kept, not blanked.** A toggle holding `true`/`1`/`y`, a
+  select value outside its `choices`, or a non-numeric value in a `number` field renders as an
+  extra `Custom: <value>` choice (already selected) with the note "Not a value this control
+  offers; kept exactly as set." Number fields fall back to a text input so the browser cannot
+  blank the value on render. The value stays until an administrator picks another choice,
+  including *Default*, which omits the key from the push again. For the `allow-` keys the editor
+  adds "RustDesk treats anything other than `Y` as off for this key" (that is `option2bool`,
+  §2 — verified at rustdesk a0c0963c → `libs/hbb_common` @ 450cc1d7, `src/config.rs:2924`-`2936`).
+- **A request that never mentions such a key cannot delete it.** The editor posts every control
+  it renders, so an absent catalog key with a value the control cannot express is re-merged from
+  the stored map server-side. An explicit empty value is the *Default* choice and still clears.
+- **A custom row that names a built-in control keeps winning.** The custom value is stored and
+  the save response carries `` `<key>` is also a built-in control; your custom value was saved and
+  takes precedence. `` It is appended to the same single `warning` field as the 1.5.3+ ignore
+  notice (§1b); the JSON shape stays `{}` when there is nothing to say.
+- **A new built-in control announces itself once.** Catalog options carry `added_in` / `added_on`.
+  When a strategy stores a value for such a key and was last saved (`modified_at`) before that
+  date, the editor shows "Added as a built-in control in RD-API `<added_in>`. This strategy
+  already had `<value>` set by hand; it was kept and is still pushed." The note disappears on the
+  strategy's next save.
+- **A delegated editor cannot lose a full-admin-only value.** The editor renders and posts the
+  stored value, so an unrelated save keeps `ClientConfigService::FULL_ADMIN_ONLY_OPTION_KEYS`
+  exactly as stored — and a value the control cannot express is re-merged server-side on top. The
+  guard is unchanged: setting, changing *or* removing one is still rejected with `Only a full
+  administrator can set or change: …`.
+- **Nothing else injects or rewrites values.** `Strategy::pushableOptions()` only drops keys the
+  client no longer defines (`removed`), `StrategyService::heartbeatPayload()` pushes the map as a
+  JSON object unchanged, and the install-script generator
+  (`ClientConfigService::installScript`) only skips empty values.
+
 ---
 
 ## 1. How the Strategy mechanism works end-to-end

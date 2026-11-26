@@ -150,7 +150,8 @@ class StrategyOptionLifecycleTest extends TestCase
                 'option_values' => ['Y', 'N'],
             ])
             ->assertOk()
-            ->assertJsonPath('warning', 'RustDesk 1.5.3+ ignores stop-service when pushed by a server; set it at install time with --option or the config string.');
+            // `enable-audio` is also a built-in control, so the precedence warning comes first.
+            ->assertJsonPath('warning', '`enable-audio` is also a built-in control; your custom value was saved and takes precedence. RustDesk 1.5.3+ ignores stop-service when pushed by a server; set it at install time with --option or the config string.');
 
         // The value is still stored: clients older than 1.5.3 honour it.
         $this->assertSame('Y', $strategy->refresh()->options['stop-service']);

@@ -335,6 +335,35 @@ class ClientConfigService
             .' at install time with --option or the config string.';
     }
 
+    /**
+     * One-line warning for the free-form custom rows in $keys that name a key the editor also
+     * offers as a built-in control (or that repeat a posted control). The custom value still
+     * wins — a value an administrator stored always wins — so this only says which of the two
+     * places took precedence. Null when no row duplicates a control.
+     *
+     * @param  array<array-key, mixed>  $keys
+     */
+    public static function customOverridesBuiltInWarning(array $keys): ?string
+    {
+        $duplicates = [];
+        foreach ($keys as $key) {
+            $key = (string) $key;
+            if ($key !== '' && ! in_array($key, $duplicates, true)) {
+                $duplicates[] = $key;
+            }
+        }
+
+        if ($duplicates === []) {
+            return null;
+        }
+
+        $list = '`'.implode('`, `', $duplicates).'`';
+
+        return count($duplicates) === 1
+            ? $list.' is also a built-in control; your custom value was saved and takes precedence.'
+            : $list.' are also built-in controls; your custom values were saved and take precedence.';
+    }
+
     private static function quotePosixArgument(string $value): string
     {
         return "'".str_replace("'", "'\\''", $value)."'";

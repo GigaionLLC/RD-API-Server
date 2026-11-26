@@ -94,6 +94,47 @@ test('strategy editor exposes accessible category tabs and bulk option controls'
     await expectNoPageOverflow(page);
 });
 
+test('strategy editor keeps a stored value its control does not offer', async ({ page }, testInfo) => {
+    await signIn(page);
+
+    await page.goto('/admin/strategies/create', { waitUntil: 'domcontentloaded' });
+    await page.fill('#name', `E2E Precedence ${testInfo.project.name} ${Date.now()}`);
+    await Promise.all([
+        page.waitForURL(/\/admin\/strategies$/, { waitUntil: 'domcontentloaded' }),
+        page.getByRole('button', { name: 'Create strategy' }).click(),
+    ]);
+    await page.locator('a[href*="/edit"]').first().click();
+    await uiReady(page);
+
+    // Set the key by hand as a custom option, the way it happens before a release adds a control.
+    await page.getByRole('tab', { name: 'Custom' }).click();
+    await page.getByRole('button', { name: 'Add custom option' }).click();
+    await page.locator('#optionRows input[name="option_keys[]"]').last().fill('allow-drm-capture');
+    await page.locator('#optionRows input[name="option_values[]"]').last().fill('true');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // The custom row wins over the built-in control, and the save says so instead of staying silent.
+    await expect(page.locator('.rd-toast--warning')).toContainText(
+        '`allow-drm-capture` is also a built-in control; your custom value was saved and takes precedence.',
+    );
+
+    // The catalog control now carries the stored value instead of falling back to "Default".
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+    const drmToggle = page.locator('select[name="opt[allow-drm-capture]"]');
+    await expect(drmToggle).toHaveValue('true');
+    await expect(drmToggle.locator('option:checked')).toHaveText('Custom: true');
+    await expect(page.getByText('Not a value this control offers; kept exactly as set.')).toHaveCount(1);
+
+    // Saving the strategy again keeps it rather than dropping it with the rest of the form.
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('.rd-toast--success')).toContainText('Saved successfully');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await uiReady(page);
+    await expect(page.locator('select[name="opt[allow-drm-capture]"]')).toHaveValue('true');
+});
+
 test('devices list reveals the bulk assignment workflow after selection', async ({ page, request }, testInfo) => {
     const deviceId = `bulk-${testInfo.project.name}`;
     const heartbeat = await request.post('/api/heartbeat', { data: { id: deviceId, uuid: deviceId, modified_at: 0 } });
