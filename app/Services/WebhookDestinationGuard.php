@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PinnedAddress;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -122,12 +123,12 @@ class WebhookDestinationGuard
             }
         }
 
-        sort($addresses, SORT_STRING);
-
+        // Which accepted address is pinned, not whether the destination is accepted: the
+        // sort used to decide it by string, and an AAAA answer sorts before the A one.
         return [
             'host' => strtolower($host),
             'port' => $port,
-            'ip' => $addresses[0],
+            'ip' => PinnedAddress::preferIpv4($addresses),
             'is_ip_literal' => $isIpLiteral,
         ];
     }

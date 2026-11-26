@@ -16,6 +16,13 @@ notes.
   string is a value of its own and is still stored and pushed as `""`, and a delegated caller who
   sends `null` for a full-administrator-only key is still removing it, so the guard still rejects
   it.
+- **OIDC and webhook destinations that publish both an A and an AAAA record now pin the IPv4
+  address.** The pinned address was chosen by string order, and `"2606:…"` sorts before
+  `"93.184…"`, so the IPv6 answer usually won — and on a host or container without IPv6 egress,
+  which is the Docker default, the pinned request then failed outright: sign-in, or every webhook
+  delivery, broke for a destination that was reachable over IPv4 the whole time. Validation is
+  unchanged: every resolved address must still be public, one non-public answer in either family
+  still rejects the destination, and an IPv6-only host is still pinned over IPv6.
 
 ## [1.8.1] - 2026-11-25
 
