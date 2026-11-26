@@ -124,6 +124,10 @@ class StrategyController extends Controller
         // next save of an unrelated field must not delete a value an administrator stored.
         $optionStates = $this->optionStates($definitions, $storedOptions, (int) $strategy->modified_at);
 
+        // A delegated editor (scoped strategies.edit) sees full-admin-only controls read-only, so a
+        // stray click or a section bulk button cannot turn their save into a guard rejection.
+        $canSetFullAdminOnly = $this->scope->isUnrestricted($request->user(), 'strategies.edit');
+
         $retiredDefinitions = (array) config('strategy_options.removed', []);
         $retiredOptions = [];
         foreach ($retiredDefinitions as $key => $definition) {
@@ -144,6 +148,7 @@ class StrategyController extends Controller
             'deviceGroupMap',
             'tabs',
             'optionStates',
+            'canSetFullAdminOnly',
             'customOptions',
             'retiredOptions'
         ));
@@ -249,6 +254,21 @@ class StrategyController extends Controller
             $storedKey = (string) $storedKey;
             if (in_array($storedKey, $retiredKeys, true) && ! in_array($storedKey, $droppedKeys, true)) {
                 $options[$storedKey] = (string) $storedValue;
+            }
+        }
+
+        // The editor renders full-admin-only controls disabled for a delegated editor, so the
+        // browser posts nothing for them: carry the stored value through instead of reading that
+        // silence as "Default". Only keys absent from both opt[] and the custom rows qualify, so
+        // the guard below still rejects any attempt to set, change or clear one.
+        if (! $this->scope->isUnrestricted($request->user(), 'strategies.edit')) {
+            foreach ($storedOptions as $storedKey => $storedValue) {
+                $storedKey = (string) $storedKey;
+                if (in_array(strtolower($storedKey), ClientConfigService::FULL_ADMIN_ONLY_OPTION_KEYS, true)
+                    && ! array_key_exists($storedKey, $options)
+                    && ! array_key_exists($storedKey, $postedOpt)) {
+                    $options[$storedKey] = (string) $storedValue;
+                }
             }
         }
 

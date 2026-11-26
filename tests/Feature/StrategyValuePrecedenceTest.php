@@ -254,6 +254,48 @@ class StrategyValuePrecedenceTest extends TestCase
         $this->assertSame('true', $strategy->refresh()->options['allow-drm-capture']);
     }
 
+    public function test_delegated_editor_sees_full_admin_only_controls_locked_and_their_save_keeps_the_value(): void
+    {
+        $inside = Group::create(['name' => 'Inside', 'type' => Group::TYPE_DEFAULT]);
+        $delegate = User::create([
+            'username' => 'delegate', 'password' => 'secret12345', 'status' => User::STATUS_NORMAL, 'group_id' => $inside->id,
+        ]);
+        $delegate->adminRoles()->attach(AdminRole::create([
+            'name' => 'Scoped', 'type' => AdminRole::TYPE_GROUP, 'scope' => [$inside->id],
+            'perms' => ['strategies.view', 'strategies.edit'],
+        ]));
+        $device = Device::create([
+            'rustdesk_id' => 'inside-peer', 'uuid' => 'uuid-inside', 'user_id' => $delegate->id, 'approved' => true,
+        ]);
+        $strategy = $this->strategyWithDevice(['allow-drm-capture' => 'Y'], time(), $device);
+
+        // The control is rendered disabled (the browser then posts nothing for it, and the section
+        // bulk buttons skip it) with a note saying why.
+        $html = $this->actingAs($delegate)->get(route('admin.strategies.edit', $strategy))
+            ->assertOk()
+            ->assertSee('Only a full administrator can change this.')
+            ->getContent();
+        $this->assertMatchesRegularExpression('/<select[^>]*name="opt\[allow-drm-capture\]"[^>]*disabled/', (string) $html);
+
+        // A full administrator gets the normal, editable control.
+        $this->actingAs($this->admin())->get(route('admin.strategies.edit', $strategy))
+            ->assertOk()
+            ->assertDontSee('Only a full administrator can change this.');
+
+        // The delegated save omits the disabled key (as a browser does) and changes another one:
+        // the stored full-admin-only value is carried through, not cleared, and the guard is quiet.
+        $this->actingAs($delegate)
+            ->putJson(route('admin.strategies.update', $strategy), [
+                'name' => 'Policy', 'enabled' => 1,
+                'opt' => ['enable-audio' => 'N'],
+            ])
+            ->assertOk();
+
+        $strategy->refresh();
+        $this->assertSame('Y', $strategy->options['allow-drm-capture']);
+        $this->assertSame('N', $strategy->options['enable-audio']);
+    }
+
     public function test_number_option_with_a_non_numeric_stored_value_renders_as_text_and_survives(): void
     {
         $strategy = $this->strategyWithDevice([

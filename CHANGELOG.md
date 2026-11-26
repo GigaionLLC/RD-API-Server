@@ -21,6 +21,11 @@ notes.
   `warning` field (`{}` when there is nothing to say). Options added to the catalog carry
   `added_in`/`added_on`; a strategy that stored such a key before that date shows a one-time
   "Added as a built-in control in RD-API 1.8.0 …" note next to the control.
+- **Strategy: full-administrator-only controls are read-only for a delegated editor.** They render
+  disabled with "Only a full administrator can change this.", the section's *All on / All off /
+  All default* buttons skip them, and the save carries their stored value through server-side, so
+  a stray click or a bulk button no longer turns a delegated editor's save into a guard
+  rejection. The guard itself is unchanged.
 - **Strategy: the precedence rule is now stated in the docs.** A value stored in a strategy always
   wins; the server never adds, rewrites or drops an option value by itself — documented in
   `docs/modernization/10-client-config-keys.md` §1c, the README and the security wiki.
